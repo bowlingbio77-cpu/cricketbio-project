@@ -1,0 +1,23 @@
+# Core (available/tested in this build)
+numpy
+pandas
+opencv-python
+mediapipe>=0.10.14
+scikit-learn
+joblib
+streamlit
+plotly
+
+# Detection + tracking (YOLOv11 + ByteTrack)
+ultralytics
+
+# Boosted-tree ML backends (optional -- code falls back to sklearn if absent)
+xgboost
+catboost
+
+# Explainability (optional -- falls back to permutation importance if absent)
+shap
+
+# Optional: enables true CNN-LSTM / Transformer sequence models
+# (falls back to sklearn MLP if absent)
+torch
