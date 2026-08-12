@@ -47,8 +47,10 @@ def load_or_train_models(model_name: str = "random_forest"):
             f"(run `python train_demo_model.py` once to cache this).")
     df = generate_synthetic_dataset()
     X = df[config.FEATURE_NAMES].values
-    perf_bundle = ml_models.train_performance_model(X, df[config.PERFORMANCE_TARGET].values, model_name)
-    injury_bundle = ml_models.train_injury_model(X, df[config.INJURY_TARGET].values, model_name)
+    perf_bundle = ml_models.train_performance_model(X, df[config.PERFORMANCE_TARGET].values, model_name,
+                                                    data_source="synthetic")
+    injury_bundle = ml_models.train_injury_model(X, df[config.INJURY_TARGET].values, model_name,
+                                                 data_source="synthetic")
     os.makedirs(config.MODEL_DIR, exist_ok=True)
     ml_models.save_bundle(perf_bundle, perf_path)
     ml_models.save_bundle(injury_bundle, injury_path)
@@ -121,6 +123,74 @@ def render_timings(stage_times: dict):
     total = stage_times.get("total")
     if total is not None:
         st.caption(f"**Total pipeline time: {total:.2f}s**")
+
+
+def data_source_of(bundle):
+    if bundle is None:
+        return "n/a"
+    return getattr(bundle, "data_source", "unknown")
+
+
+def render_model_quality_expander(perf_bundle, injury_bundle):
+    """Honesty panel: data provenance, CV metrics, and baseline comparison."""
+    with st.expander("Model quality & validity (read this)", expanded=False):
+        src = data_source_of(perf_bundle)
+        if src == "synthetic":
+            st.warning(
+                "Models are trained on **SYNTHETIC demo data** whose labels are generated from "
+                "the features themselves (src/synthetic_data.py). Near-perfect metrics below are "
+                "expected -- the model is effectively re-learning the generator's formula and they "
+                "say **nothing** about real-world accuracy. Retrain on real labeled data "
+                "(`python train_demo_model.py --data your_data.csv`) before using for coaching "
+                "or medical decisions.")
+        elif src == "real":
+            st.info("Trained on a real labeled dataset -- but still validate on a fresh holdout "
+                    "population before using it in production.")
+        else:
+            st.caption("Model provenance unknown (bundle saved by an older version).")
+
+        if perf_bundle is not None:
+            cv = getattr(perf_bundle, "cv_metrics", None) or {}
+            bl = getattr(perf_bundle, "baseline_metrics", None) or {}
+            folds = cv.get("folds", 0)
+            st.markdown(f"**Performance model** (`{perf_bundle.model_name}`)"
+                        + (f" — {folds}-fold cross-validation" if folds else ""))
+            if cv:
+                st.markdown(f"- MAE: **{cv.get('mae_mean', 0):.2f}** ± {cv.get('mae_std', 0):.2f} "
+                            f"points / 100")
+                st.markdown(f"- RMSE: **{cv.get('rmse_mean', 0):.2f}**")
+                st.markdown(f"- R²: **{cv.get('r2_mean', 0):.3f}** ± {cv.get('r2_std', 0):.3f} "
+                            f"— baseline (always predict mean): **{bl.get('r2', 0):.3f}**")
+            else:
+                st.caption("No cross-validation data stored in this bundle.")
+
+        if injury_bundle is not None:
+            cv = getattr(injury_bundle, "cv_metrics", None) or {}
+            bl = getattr(injury_bundle, "baseline_metrics", None) or {}
+            folds = cv.get("folds", 0)
+            st.markdown(f"**Injury-risk model** (`{injury_bundle.model_name}`)"
+                        + (f" — {folds}-fold cross-validation" if folds else ""))
+            if cv:
+                st.markdown(f"- Accuracy: **{cv.get('accuracy_mean', 0):.3f}** ± "
+                            f"{cv.get('accuracy_std', 0):.3f} — baseline (always majority class): "
+                            f"**{bl.get('accuracy', 0):.3f}**")
+                st.markdown(f"- F1 (macro): **{cv.get('f1_mean', 0):.3f}** ± {cv.get('f1_std', 0):.3f}")
+            else:
+                st.caption("No cross-validation data stored in this bundle.")
+
+        if src == "synthetic":
+            st.caption("These numbers tell you the model fits the demo generator, not that it "
+                       "predicts bowling outcomes. Treat all scores on the dashboard as illustrative.")
+
+
+def render_ood_warnings(feature_vector, bundle):
+    ood = ml_models.out_of_distribution_warnings(feature_vector, bundle)
+    if ood:
+        lines = [f"- **{FEATURE_LABELS.get(f, (f,))[0]}** = {v:.2f} "
+                 f"(training range {lo:.2f}–{hi:.2f})" for f, v, lo, hi in ood]
+        st.warning("Some input features fall outside the model's training range -- predictions "
+                   "extrapolate beyond what the model has seen and may be unreliable:\n"
+                   + "\n".join(lines))
 
 
 def _session_name(row):
@@ -371,6 +441,8 @@ st.sidebar.text(f"XGBoost installed:  {ml_models.BACKEND_INFO['xgboost_available
 st.sidebar.text(f"CatBoost installed: {ml_models.BACKEND_INFO['catboost_available']}")
 st.sidebar.text(f"PyTorch installed:  {ml_models.BACKEND_INFO['torch_available']}")
 st.sidebar.text(f"SHAP installed:     {explainability.SHAP_AVAILABLE}")
+if perf_bundle is not None:
+    st.sidebar.text(f"Model data source: {data_source_of(perf_bundle)}")
 
 
 # ---------- Main ----------
@@ -435,6 +507,7 @@ if feature_vector:
         for k, v in feature_vector.items()
     ])
     st.dataframe(feat_df, use_container_width=True, hide_index=True)
+    render_ood_warnings(feature_vector, perf_bundle)
 
     st.subheader("3. Machine Learning Predictions")
     result = pipeline.analyze_feature_vector(feature_vector, perf_bundle, injury_bundle)
@@ -444,6 +517,10 @@ if feature_vector:
     with c1:
         st.plotly_chart(render_gauge(result.performance_score, "Performance Score"),
                          use_container_width=True)
+        interval = ml_models.prediction_interval_performance(perf_bundle, feature_vector)
+        if interval:
+            st.caption(f"68% prediction interval: **{interval[0]:.0f}–{interval[1]:.0f}** "
+                       f"(model uncertainty)")
     with c2:
         risk = result.injury_risk
         risk_num = {"low": 25, "moderate": 60, "high": 90}[risk["risk_level"]]
@@ -453,6 +530,13 @@ if feature_vector:
             st.caption(f"P(low)={risk['probabilities'][0]:.2f}  "
                        f"P(moderate)={risk['probabilities'][1]:.2f}  "
                        f"P(high)={risk['probabilities'][2]:.2f}")
+
+    if data_source_of(perf_bundle) == "synthetic":
+        st.warning("⚠ These predictions come from **synthetic demo models** -- illustrative only. "
+                   "Retrain on real labeled data before relying on them for coaching or medical "
+                   "decisions. See 'Model quality & validity' below.")
+
+    render_model_quality_expander(perf_bundle, injury_bundle)
 
     st.subheader("4. Run Timing")
     render_timings(stage_times)

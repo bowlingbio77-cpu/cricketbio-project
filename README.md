@@ -145,6 +145,27 @@ python train_demo_model.py --data your_labeled_dataset.csv --model xgboost
 CSV columns required: the 10 names in `src/config.FEATURE_NAMES`, plus
 `performance_score` (0–100) and `injury_risk` (0=low, 1=moderate, 2=high).
 
+### ML validity safeguards
+
+The ML layer reports its own honesty, so nobody is fooled by demo metrics:
+
+- **Honest evaluation**: models are scored with 5-fold cross-validation
+  (scaler refit per fold, no leakage) instead of a single train/test split.
+- **Baseline comparison**: every metric is printed next to a trivial baseline
+  ("always predict the mean" / "always predict the majority class") so you can
+  see whether the model actually adds predictive value.
+- **Data provenance**: bundles are tagged `synthetic` or `real`; the dashboard
+  shows a loud warning when predictions come from synthetic demo models.
+- **Input validation**: `train_demo_model.py` rejects missing columns, bad
+  `injury_risk` values, non-numeric features, and warns on implausible ranges.
+- **Out-of-distribution detection**: the dashboard warns when a delivery's
+  features fall outside the training range (predictions would extrapolate).
+- **Prediction uncertainty**: the dashboard shows a ~68% prediction interval
+  for the performance score (spread of random-forest trees).
+- **Circular-label warning**: synthetic labels are generated *from* the
+  features, so near-perfect metrics there only measure fit to the demo
+  generator — this is called out explicitly rather than presented as accuracy.
+
 ## Important caveats
 
 - **Elbow flexion / ICC legality**: the feature is a good *screening* signal,
