@@ -6,12 +6,16 @@ venv/
 __pycache__/
 *.py[cod]
 
-# Model weights (large binaries, downloaded on demand)
-models/
-yolo11n.pt
+# Downloaded model weights (large binaries, fetched on demand -- not committed)
+models/pose_landmarker_heavy.task
+*.pt
 
-# Generated data
-data/
+# Trained model bundles ARE committed (retrain with train_demo_model.py)
+!models/*.joblib
+
+# User-local runtime data (history DB regenerated automatically -- not committed)
+data/*
+!data/synthetic_bowling_dataset.csv
 
 # OS / editor
 .DS_Store
