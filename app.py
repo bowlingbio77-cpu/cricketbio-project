@@ -21,10 +21,17 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
-from src import config, ml_models, explainability, coaching, pipeline
+from src import config, ml_models, explainability, coaching, pipeline, history_db
 from src.synthetic_data import generate_synthetic_dataset
 
 st.set_page_config(page_title="Cricket Bowling Biomechanics AI", layout="wide", page_icon="🏏")
+
+
+def rerun():
+    if hasattr(st, "rerun"):
+        st.rerun()
+    else:
+        st.experimental_rerun()
 
 
 # ---------- Cached resource loading ----------
@@ -116,9 +123,211 @@ def render_timings(stage_times: dict):
         st.caption(f"**Total pipeline time: {total:.2f}s**")
 
 
+def _session_name(row):
+    parts = [f"#{row['id']}", row["created_at"]]
+    if row.get("label"):
+        parts.append(f"— {row['label']}")
+    return " ".join(parts)
+
+
+def _risk_of(row):
+    risk = row.get("injury_risk")
+    if isinstance(risk, dict):
+        return risk.get("risk_level", "—")
+    return row.get("risk_level") or "—"
+
+
+def render_history_page():
+    records = history_db.load_all()
+    st.title("History & Comparison")
+    st.caption("Every delivery you saved from the Analyze page lives here -- browse past "
+               "results, compare sessions side by side, and track performance over time.")
+
+    if not records:
+        st.info("No saved results yet. Go to **Analyze**, run a delivery, and press "
+                "**Save this result to history**.")
+        return
+
+    # --- Summary metrics ---
+    perfs = [r["performance_score"] for r in records if r.get("performance_score") is not None]
+    risks = [_risk_of(r) for r in records]
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total sessions", len(records))
+    c2.metric("Avg performance", f"{np.mean(perfs):.1f}" if perfs else "—")
+    c3.metric("Best performance", f"{max(perfs):.1f}" if perfs else "—")
+    c4.metric("High-risk sessions", risks.count("high"))
+
+    # --- Full table ---
+    st.subheader("All saved sessions")
+    table = pd.DataFrame([
+        {
+            "ID": r["id"],
+            "Date": r["created_at"],
+            "Label": r.get("label") or "",
+            "Mode": r.get("input_mode") or "",
+            "Arm": r.get("bowling_arm") or "",
+            "Model": r.get("model") or "",
+            "Performance": round(r["performance_score"], 1) if r.get("performance_score") is not None else None,
+            "Risk": _risk_of(r),
+        }
+        for r in records
+    ])
+    st.dataframe(table, use_container_width=True, hide_index=True)
+
+    # --- Performance over time ---
+    chrono = sorted([r for r in records if r.get("performance_score") is not None],
+                    key=lambda r: r["created_at"])
+    if len(chrono) >= 2:
+        st.subheader("Performance over time")
+        fig = go.Figure(go.Scatter(
+            x=[r["created_at"] for r in chrono],
+            y=[r["performance_score"] for r in chrono],
+            mode="lines+markers+text",
+            text=[f"#{r['id']}" for r in chrono],
+            textposition="top center",
+            line=dict(color="#2E7D32", width=2),
+        ))
+        fig.update_layout(height=350, margin=dict(l=10, r=10, t=30, b=10),
+                          xaxis_title="Date", yaxis_title="Performance score",
+                          yaxis=dict(range=[0, 100]))
+        st.plotly_chart(fig, use_container_width=True)
+    elif chrono:
+        st.subheader("Performance over time")
+        st.caption("Save more results to see a performance trend chart.")
+
+    # --- Comparison ---
+    options = {r["id"]: _session_name(r) for r in records}
+    st.subheader("Compare sessions")
+    st.caption("Pick two or more sessions to compare side by side.")
+    selected = st.multiselect("Sessions", list(options.keys()),
+                              format_func=lambda i: options[i],
+                              key="compare_select")
+    if len(selected) >= 1:
+        sel = history_db.load_by_ids(selected)
+        sel_names = [_session_name(r) for r in sel]
+
+        c1, c2 = st.columns(2)
+        with c1:
+            fig = go.Figure(go.Bar(
+                x=sel_names, y=[r.get("performance_score") for r in sel],
+                marker_color="#2E7D32", text=[f"{r.get('performance_score'):.0f}" if r.get('performance_score') is not None else "—" for r in sel],
+                textposition="outside"))
+            fig.update_layout(title="Performance score", height=320,
+                              margin=dict(l=10, r=10, t=40, b=10), yaxis=dict(range=[0, 100]))
+            st.plotly_chart(fig, use_container_width=True)
+        with c2:
+            fig = go.Figure(go.Bar(
+                x=sel_names, y=[_risk_of(r) for r in sel],
+                marker_color=["#C62828" if _risk_of(r) == "high" else "#F9A825"
+                              if _risk_of(r) == "moderate" else "#2E7D32" for r in sel],
+                text=[_risk_of(r).title() for r in sel], textposition="outside"))
+            fig.update_layout(title="Injury risk", height=320,
+                              margin=dict(l=10, r=10, t=40, b=10))
+            st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown("**Feature-by-feature comparison**")
+        feat_rows = []
+        for feat, (label, unit, *_rest) in FEATURE_LABELS.items():
+            vals = [r["feature_vector"].get(feat) for r in sel]
+            row = {"Feature": label, "Unit": unit}
+            for name, v in zip(sel_names, vals):
+                row[name] = round(v, 2) if v is not None else None
+            if len(vals) > 1 and all(v is not None for v in vals):
+                row["Δ last vs first"] = round(vals[-1] - vals[0], 2)
+            feat_rows.append(row)
+        st.dataframe(pd.DataFrame(feat_rows), use_container_width=True, hide_index=True)
+
+        if len(selected) >= 2:
+            fig = go.Figure()
+            for name, r in zip(sel_names, sel):
+                x = [FEATURE_LABELS[k][0] for k in config.FEATURE_NAMES]
+                y = [r["feature_vector"].get(k) for k in config.FEATURE_NAMES]
+                fig.add_trace(go.Bar(x=x, y=y, name=name))
+            fig.update_layout(title="Feature values by session", barmode="group",
+                              height=400, margin=dict(l=10, r=10, t=40, b=10))
+            st.plotly_chart(fig, use_container_width=True)
+
+        # --- Detail view ---
+        st.subheader("Session details")
+        detail_id = st.selectbox("Pick a session to inspect", list(options.keys()),
+                                 format_func=lambda i: options[i], key="detail_select")
+        detail = history_db.load_by_ids([detail_id])[0]
+        c1, c2 = st.columns(2)
+        with c1:
+            perf = detail.get("performance_score")
+            st.plotly_chart(render_gauge(perf if perf is not None else 0,
+                                         "Performance Score" if perf is not None else "Performance (n/a)"),
+                            use_container_width=True)
+        with c2:
+            risk = detail.get("injury_risk")
+            if isinstance(risk, dict) and risk.get("probabilities"):
+                probs = risk["probabilities"]
+                risk_num = {"low": 25, "moderate": 60, "high": 90}[risk.get("risk_level", "low")]
+                st.plotly_chart(render_gauge(risk_num, f"Injury Risk: {risk['risk_level'].upper()}"),
+                                use_container_width=True)
+                if len(probs) >= 3:
+                    st.caption(f"P(low)={probs[0]:.2f}  P(moderate)={probs[1]:.2f}  P(high)={probs[2]:.2f}")
+            else:
+                st.info("No injury-risk prediction stored for this session.")
+        with st.expander("Features"):
+            feat_df = pd.DataFrame([
+                {"Feature": FEATURE_LABELS.get(k, (k,))[0],
+                 "Value": round(v, 2) if v is not None else None,
+                 "Unit": FEATURE_LABELS.get(k, ("", ""))[1]}
+                for k, v in detail["feature_vector"].items()
+            ])
+            st.dataframe(feat_df, use_container_width=True, hide_index=True)
+        with st.expander("Coaching recommendations"):
+            notes = detail.get("coaching_notes") or []
+            for note in notes:
+                st.markdown(f"- {note}")
+            if not notes:
+                st.caption("No coaching notes stored for this session.")
+        with st.expander("Explainable AI — feature contributions"):
+            tab1, tab2 = st.tabs(["Performance drivers", "Injury-risk drivers"])
+            with tab1:
+                shap_perf = detail.get("shap_performance")
+                if shap_perf:
+                    st.plotly_chart(render_shap_bar(shap_perf,
+                                                    "Feature contribution to performance score"),
+                                    use_container_width=True)
+                else:
+                    st.caption("No performance SHAP data stored for this session.")
+            with tab2:
+                shap_injury = detail.get("shap_injury")
+                if shap_injury:
+                    st.plotly_chart(render_shap_bar(shap_injury,
+                                                    "Feature contribution to injury-risk score"),
+                                    use_container_width=True)
+                else:
+                    st.caption("No injury SHAP data stored for this session.")
+        with st.expander("Run timing"):
+            render_timings(detail.get("stage_times") or {})
+
+    # --- Manage history ---
+    st.subheader("Manage history")
+    m1, m2, m3 = st.columns([2, 1, 1])
+    with m1:
+        del_opts = st.multiselect("Select sessions to delete", list(options.keys()),
+                                  format_func=lambda i: options[i], key="delete_select")
+    with m2:
+        if st.button("Delete selected", use_container_width=True):
+            history_db.delete_analysis(del_opts)
+            st.toast(f"Deleted {len(del_opts)} session(s).")
+            rerun()
+    with m3:
+        if st.button("Clear all history", use_container_width=True):
+            history_db.clear_all()
+            st.toast("History cleared.")
+            rerun()
+
+
 # ---------- Sidebar ----------
 st.sidebar.title("🏏 Bowling Biomechanics AI")
 st.sidebar.caption("Cricket bowling action analysis, injury-risk screening, and coaching feedback.")
+
+page = st.sidebar.radio("Navigation", ["Analyze", "History & Compare"],
+                        help="Analyze: run a new delivery. History & Compare: browse saved results and track progress.")
 
 model_choice = st.sidebar.selectbox(
     "ML model", ["random_forest", "xgboost", "catboost", "cnn_lstm", "transformer"],
@@ -151,7 +360,10 @@ with st.sidebar.expander("Fine-tune"):
     denoise = st.checkbox("Denoise frames", value=denoise,
                           help="On = more accurate on noisy footage but much slower.")
 
-perf_bundle, injury_bundle = load_or_train_models(model_choice)
+if page == "Analyze":
+    perf_bundle, injury_bundle = load_or_train_models(model_choice)
+else:
+    perf_bundle, injury_bundle = None, None
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Backend status**")
@@ -162,6 +374,10 @@ st.sidebar.text(f"SHAP installed:     {explainability.SHAP_AVAILABLE}")
 
 
 # ---------- Main ----------
+if page == "History & Compare":
+    render_history_page()
+    st.stop()
+
 st.title("Cricket Bowling Action Analysis Dashboard")
 
 feature_vector = {}
@@ -260,6 +476,19 @@ if feature_vector:
     st.subheader("6. Coaching Recommendations")
     for note in result.coaching_notes:
         st.markdown(f"- {note}")
+
+    st.subheader("7. Save to History")
+    st.caption("Persist this delivery's results to the local history database so you can "
+               "compare it against future sessions and track your performance over time.")
+    save_label = st.text_input("Label (optional)", value=st.session_state.get("save_label", ""),
+                               placeholder="e.g. Net session 1, match 3 over 4",
+                               key="save_label")
+    if st.button("💾 Save this result to history", type="primary"):
+        saved_id = history_db.save_analysis(
+            result, label=save_label, input_mode=input_mode,
+            bowling_arm=bowling_arm, model=model_choice)
+        st.success(f"Saved to history (id #{saved_id}). Open **History & Compare** in the "
+                   f"sidebar to view and compare your saved results.")
 
 else:
     st.info("Enter features manually or upload a video to run the analysis.")

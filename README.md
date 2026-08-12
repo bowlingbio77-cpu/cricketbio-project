@@ -94,6 +94,16 @@ Two modes in the sidebar:
 - **Manual feature entry** — move sliders for the 10 biomechanical features and see live predictions. No video or GPU needed.
 - **Upload bowling video** — runs the full CV pipeline (detection → tracking → pose → features).
 
+After any analysis, use **Save this result to history** (section 7) to persist the
+delivery into a local SQLite database (`data/bowling_history.db`).
+
+Two pages in the sidebar:
+- **Analyze** — run a new delivery (manual entry or video upload).
+- **History & Compare** — browse every saved session, track the performance trend
+  over time, compare sessions side-by-side (performance, injury risk, and a
+  feature-by-feature table/delta), inspect full details of any session, and
+  delete/clear history.
+
 ## Project layout
 
 ```
@@ -110,6 +120,7 @@ cricket_biomech_ai/
 │   ├── feature_engineering.py# 10 biomechanical features from landmarks
 │   ├── ml_models.py          # RF / XGBoost / CatBoost / CNN-LSTM / Transformer
 │   ├── explainability.py     # SHAP (+ permutation-importance fallback)
+│   ├── history_db.py         # SQLite history DB for saved analyses (stdlib sqlite3)
 │   ├── coaching.py           # rule-based coaching recommendation engine
 │   ├── synthetic_data.py     # generates a plausible demo dataset
 │   └── pipeline.py           # orchestrates the full video→coaching flow
