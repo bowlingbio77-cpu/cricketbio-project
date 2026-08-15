@@ -21,6 +21,16 @@ except ImportError:
     _HAS_ULTRALYTICS = False
 
 
+def resolve_weights(weights: str = config.YOLO_WEIGHTS) -> str:
+    """Find a usable YOLO weights file. Tries the configured path, the project
+    root, and the working directory before letting Ultralytics auto-download."""
+    candidates = [weights, os.path.join(config.PROJECT_ROOT, "yolo11n.pt"), "yolo11n.pt"]
+    for c in candidates:
+        if c and os.path.exists(c):
+            return c
+    return "yolo11n.pt"
+
+
 @dataclass
 class Detection:
     frame_idx: int
@@ -35,8 +45,7 @@ class BowlerDetector:
         self.conf_threshold = conf_threshold
         self.backend = "yolov11" if _HAS_ULTRALYTICS else "hog_fallback"
         if self.backend == "yolov11":
-            # "yolo11n.pt" (nano) auto-downloads from Ultralytics hub if not present locally.
-            self.model = YOLO(weights if weights.endswith(".pt") else "yolo11n.pt")
+            self.model = YOLO(resolve_weights(weights))
         else:
             self.model = cv2.HOGDescriptor()
             self.model.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())

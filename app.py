@@ -1,19 +1,21 @@
 """
-Stage 10-11: Streamlit Web Dashboard + Coaching Recommendation UI
+PaceAI — Cricket Bowling Biomechanics AI
+Pro Coaching & Injury Analytics Dashboard (dark theme)
 
 Run with:
     streamlit run app.py
 
-Two input modes:
-  1. "Manual feature entry" -- move sliders for the 10 biomechanical features
-     directly. Works immediately, no video/model downloads needed. Best for
-     exploring the model and demoing the dashboard.
-  2. "Upload bowling video" -- runs the full CV pipeline (preprocessing ->
-     YOLOv11 detection -> ByteTrack -> MediaPipe pose -> feature engineering).
-     Requires the extra model downloads described in src/pose_estimation.py
-     and src/detection.py docstrings (needs internet on first run).
+Two analysis modes:
+  1. Interactive Bio-Simulator -- slider-based kinematic entry with elite presets.
+  2. Video Motion Capture -- full CV pipeline (preprocessing -> YOLOv11
+     detection -> ByteTrack -> MediaPipe pose -> feature engineering).
+
+Also includes:
+  - History & Compare: local SQLite persistence of every saved delivery.
+  - Model quality & validity honesty panel (synthetic-data disclaimer).
 """
 import os
+import json
 import tempfile
 import time
 import streamlit as st
@@ -21,12 +23,99 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
-from src import config, ml_models, explainability, coaching, pipeline, history_db
+from src import config, ml_models, explainability, pipeline, history_db
 from src.synthetic_data import generate_synthetic_dataset
 
-st.set_page_config(page_title="Cricket Bowling Biomechanics AI", layout="wide", page_icon="🏏")
+# ---------------- PAGE CONFIGURATION ----------------
+st.set_page_config(
+    page_title="PaceAI | Cricket Bowling Biomechanics",
+    page_icon="⚡",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# ---------------- CUSTOM CSS STYLING ----------------
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Main background & headers */
+    .stApp {
+        background-color: #0d1117;
+        color: #e6edf3;
+    }
+
+    /* Card Containers */
+    .metric-card {
+        background: linear-gradient(145deg, #161b22 0%, #21262d 100%);
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .badge-low { background-color: rgba(46, 125, 50, 0.2); color: #4caf50; border: 1px solid #4caf50; }
+    .badge-moderate { background-color: rgba(249, 168, 37, 0.2); color: #fbc02d; border: 1px solid #fbc02d; }
+    .badge-high { background-color: rgba(198, 40, 40, 0.2); color: #ef5350; border: 1px solid #ef5350; }
+    .badge-legal { background-color: rgba(0, 230, 118, 0.15); color: #00e676; border: 1px solid #00e676; }
+    .badge-illegal { background-color: rgba(255, 23, 68, 0.15); color: #ff1744; border: 1px solid #ff1744; }
+
+    /* Custom Header Banner */
+    .hero-banner {
+        background: linear-gradient(90deg, #0f2027, #203a43, #2c5364);
+        border-radius: 14px;
+        padding: 24px 30px;
+        margin-bottom: 25px;
+        border: 1px solid #38444d;
+    }
+    .hero-title {
+        font-size: 2rem;
+        font-weight: 800;
+        color: #ffffff;
+        margin: 0;
+    }
+    .hero-subtitle {
+        color: #8b949e;
+        font-size: 0.95rem;
+        margin-top: 6px;
+    }
+
+    /* Drill card */
+    .drill-card {
+        border-left: 4px solid #00e676;
+        background: #161b22;
+        padding: 14px 18px;
+        border-radius: 0 8px 8px 0;
+        margin-bottom: 10px;
+        border-top: 1px solid #30363d;
+        border-right: 1px solid #30363d;
+        border-bottom: 1px solid #30363d;
+    }
+
+    /* Sidebar adjustments */
+    section[data-testid="stSidebar"] {
+        background-color: #161b22;
+        border-right: 1px solid #30363d;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 
+# ---------------- HELPERS ----------------
 def rerun():
     if hasattr(st, "rerun"):
         st.rerun()
@@ -34,7 +123,7 @@ def rerun():
         st.experimental_rerun()
 
 
-# ---------- Cached resource loading ----------
+# ---------------- CACHED MODEL LOADING ----------------
 @st.cache_resource
 def load_or_train_models(model_name: str = "random_forest"):
     perf_path = os.path.join(config.MODEL_DIR, f"performance_{model_name}.joblib")
@@ -47,63 +136,186 @@ def load_or_train_models(model_name: str = "random_forest"):
             f"(run `python train_demo_model.py` once to cache this).")
     df = generate_synthetic_dataset()
     X = df[config.FEATURE_NAMES].values
-    perf_bundle = ml_models.train_performance_model(X, df[config.PERFORMANCE_TARGET].values, model_name,
-                                                    data_source="synthetic")
-    injury_bundle = ml_models.train_injury_model(X, df[config.INJURY_TARGET].values, model_name,
-                                                 data_source="synthetic")
+    perf_bundle = ml_models.train_performance_model(X, df[config.PERFORMANCE_TARGET].values, model_name)
+    injury_bundle = ml_models.train_injury_model(X, df[config.INJURY_TARGET].values, model_name)
     os.makedirs(config.MODEL_DIR, exist_ok=True)
     ml_models.save_bundle(perf_bundle, perf_path)
     ml_models.save_bundle(injury_bundle, injury_path)
     return perf_bundle, injury_bundle
 
 
-@st.cache_data
-def get_background_data():
-    df = generate_synthetic_dataset(n_samples=200)
-    return df[config.FEATURE_NAMES].values
-
-
 FEATURE_LABELS = {
-    "shoulder_rotation_deg": ("Shoulder rotation", "deg", 0, 90, 40),
-    "elbow_flexion_deg": ("Elbow flexion (extension from straight)", "deg", 0, 45, 10),
-    "wrist_angle_deg": ("Wrist angle", "deg", 90, 180, 150),
-    "hip_rotation_deg": ("Hip rotation", "deg", 0, 80, 35),
-    "knee_flexion_deg": ("Front-knee flexion", "deg", 0, 60, 18),
-    "trunk_lean_deg": ("Trunk lateral lean", "deg", 0, 60, 27),
-    "stride_length_norm": ("Stride length (normalized)", "x height", 0.3, 1.6, 0.95),
-    "release_angle_deg": ("Release angle", "deg", 30, 90, 75),
-    "angular_velocity_deg_s": ("Peak angular velocity", "deg/s", 100, 1500, 700),
-    "ground_contact_time_s": ("Front-foot ground contact time", "s", 0.05, 0.35, 0.15),
+    "shoulder_rotation_deg": ("Shoulder Rotation", "deg", 0, 90, 42.0),
+    "elbow_flexion_deg": ("Elbow Flexion", "deg", 0, 45, 11.5),
+    "wrist_angle_deg": ("Wrist Angle", "deg", 90, 180, 155.0),
+    "hip_rotation_deg": ("Hip Rotation", "deg", 0, 80, 36.0),
+    "knee_flexion_deg": ("Front-Knee Flexion", "deg", 0, 60, 16.0),
+    "trunk_lean_deg": ("Trunk Lateral Lean", "deg", 0, 60, 24.0),
+    "stride_length_norm": ("Stride Length (norm)", "x H", 0.3, 1.6, 0.98),
+    "release_angle_deg": ("Release Angle", "deg", 30, 90, 76.0),
+    "angular_velocity_deg_s": ("Peak Angular Velocity", "deg/s", 100, 1500, 780.0),
+    "ground_contact_time_s": ("Front Foot Contact Time", "s", 0.05, 0.35, 0.14),
+}
+
+# Elite Fast Bowler Benchmark for comparison
+ELITE_BENCHMARK = {
+    "shoulder_rotation_deg": 48.0,
+    "elbow_flexion_deg": 10.0,
+    "wrist_angle_deg": 160.0,
+    "hip_rotation_deg": 42.0,
+    "knee_flexion_deg": 12.0,
+    "trunk_lean_deg": 22.0,
+    "stride_length_norm": 1.05,
+    "release_angle_deg": 78.0,
+    "angular_velocity_deg_s": 880.0,
+    "ground_contact_time_s": 0.12,
+}
+
+PRESETS = {
+    "Custom / Manual": None,
+    "⚡ Elite Express Pace (145+ km/h)": {
+        "shoulder_rotation_deg": 52.0, "elbow_flexion_deg": 8.5, "wrist_angle_deg": 165.0,
+        "hip_rotation_deg": 46.0, "knee_flexion_deg": 10.0, "trunk_lean_deg": 20.0,
+        "stride_length_norm": 1.12, "release_angle_deg": 80.0, "angular_velocity_deg_s": 950.0,
+        "ground_contact_time_s": 0.11
+    },
+    "🚨 High Lumbar Injury Risk Action": {
+        "shoulder_rotation_deg": 28.0, "elbow_flexion_deg": 22.0, "wrist_angle_deg": 135.0,
+        "hip_rotation_deg": 58.0, "knee_flexion_deg": 38.0, "trunk_lean_deg": 45.0,
+        "stride_length_norm": 0.72, "release_angle_deg": 60.0, "angular_velocity_deg_s": 460.0,
+        "ground_contact_time_s": 0.28
+    },
+    "🎯 Seam & Swing Specialist": {
+        "shoulder_rotation_deg": 40.0, "elbow_flexion_deg": 12.0, "wrist_angle_deg": 172.0,
+        "hip_rotation_deg": 34.0, "knee_flexion_deg": 18.0, "trunk_lean_deg": 26.0,
+        "stride_length_norm": 0.95, "release_angle_deg": 74.0, "angular_velocity_deg_s": 720.0,
+        "ground_contact_time_s": 0.15
+    },
+    "🌀 Mystery Spin Action": {
+        "shoulder_rotation_deg": 65.0, "elbow_flexion_deg": 14.0, "wrist_angle_deg": 120.0,
+        "hip_rotation_deg": 25.0, "knee_flexion_deg": 25.0, "trunk_lean_deg": 15.0,
+        "stride_length_norm": 0.65, "release_angle_deg": 68.0, "angular_velocity_deg_s": 520.0,
+        "ground_contact_time_s": 0.22
+    }
 }
 
 
-def render_gauge(value, title, max_val=100):
+# ---------------- CHART BUILDERS ----------------
+def render_modern_gauge(value, title, subtitle="", max_val=100, is_risk=False):
+    if is_risk:
+        bar_color = "#ef5350" if value >= 70 else "#fbc02d" if value >= 40 else "#00e676"
+    else:
+        bar_color = "#00e676" if value >= 70 else "#fbc02d" if value >= 50 else "#ef5350"
+
     fig = go.Figure(go.Indicator(
-        mode="gauge+number",
+        mode="gauge+number+delta",
         value=value,
-        title={"text": title},
+        title={"text": f"<b>{title}</b><br><span style='font-size:0.8em;color:#8b949e'>{subtitle}</span>"},
+        number={"font": {"size": 42, "color": "#ffffff"}, "suffix": "%" if is_risk else ""},
         gauge={
-            "axis": {"range": [0, max_val]},
-            "bar": {"color": "#2E7D32" if value >= 70 else "#F9A825" if value >= 50 else "#C62828"},
+            "axis": {"range": [0, max_val], "tickcolor": "#8b949e", "tickfont": {"color": "#8b949e"}},
+            "bar": {"color": bar_color, "thickness": 0.3},
+            "bgcolor": "#161b22",
+            "borderwidth": 1,
+            "bordercolor": "#30363d",
             "steps": [
-                {"range": [0, 50], "color": "#FFCDD2"},
-                {"range": [50, 70], "color": "#FFF9C4"},
-                {"range": [70, max_val], "color": "#C8E6C9"},
+                {"range": [0, 40], "color": "rgba(46, 125, 50, 0.15)" if not is_risk else "rgba(0, 230, 118, 0.15)"},
+                {"range": [40, 70], "color": "rgba(249, 168, 37, 0.15)"},
+                {"range": [70, max_val], "color": "rgba(0, 230, 118, 0.2)" if not is_risk else "rgba(239, 83, 80, 0.25)"},
             ],
         },
     ))
-    fig.update_layout(height=250, margin=dict(l=20, r=20, t=50, b=20))
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font={"color": "#e6edf3"},
+        height=240,
+        margin=dict(l=25, r=25, t=60, b=20)
+    )
+    return fig
+
+
+def render_radar_comparison(current_feats: dict):
+    categories = [
+        "Shoulder Rot.", "Arm Extension", "Wrist Cocking", "Hip Rotation",
+        "Knee Brace", "Upright Trunk", "Stride Prowess", "Release Velocity"
+    ]
+
+    def normalize(val, lo, hi):
+        return max(0, min(100, ((val - lo) / (hi - lo)) * 100))
+
+    user_vals = [
+        normalize(current_feats["shoulder_rotation_deg"], 0, 90),
+        normalize(45 - current_feats["elbow_flexion_deg"], 0, 45),
+        normalize(current_feats["wrist_angle_deg"], 90, 180),
+        normalize(current_feats["hip_rotation_deg"], 0, 80),
+        normalize(60 - current_feats["knee_flexion_deg"], 0, 60),  # Braced = lower flexion
+        normalize(60 - current_feats["trunk_lean_deg"], 0, 60),
+        normalize(current_feats["stride_length_norm"], 0.3, 1.6),
+        normalize(current_feats["angular_velocity_deg_s"], 100, 1500),
+    ]
+
+    bench_vals = [
+        normalize(ELITE_BENCHMARK["shoulder_rotation_deg"], 0, 90),
+        normalize(45 - ELITE_BENCHMARK["elbow_flexion_deg"], 0, 45),
+        normalize(ELITE_BENCHMARK["wrist_angle_deg"], 90, 180),
+        normalize(ELITE_BENCHMARK["hip_rotation_deg"], 0, 80),
+        normalize(60 - ELITE_BENCHMARK["knee_flexion_deg"], 0, 60),
+        normalize(60 - ELITE_BENCHMARK["trunk_lean_deg"], 0, 60),
+        normalize(ELITE_BENCHMARK["stride_length_norm"], 0.3, 1.6),
+        normalize(ELITE_BENCHMARK["angular_velocity_deg_s"], 100, 1500),
+    ]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(
+        r=user_vals, theta=categories, fill='toself',
+        name='Current Bowler',
+        line=dict(color='#00e676', width=2),
+        fillcolor='rgba(0, 230, 118, 0.2)'
+    ))
+    fig.add_trace(go.Scatterpolar(
+        r=bench_vals, theta=categories, fill='toself',
+        name='Elite Benchmark (145 km/h)',
+        line=dict(color='#29b6f6', width=2, dash='dot'),
+        fillcolor='rgba(41, 182, 246, 0.1)'
+    ))
+
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(visible=True, range=[0, 100], color="#6e7681", gridcolor="#30363d"),
+            angularaxis=dict(color="#c9d1d9", gridcolor="#30363d")
+        ),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#e6edf3"),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+        height=380,
+        margin=dict(l=40, r=40, t=30, b=40)
+    )
     return fig
 
 
 def render_shap_bar(contributions: dict, title: str):
-    items = sorted(contributions.items(), key=lambda kv: abs(kv[1]))
+    items = sorted(contributions.items(), key=lambda kv: abs(kv[1]), reverse=True)[:8]
+    items = sorted(items, key=lambda kv: kv[1])
     names = [FEATURE_LABELS.get(k, (k,))[0] for k, _ in items]
     values = [v for _, v in items]
-    colors = ["#C62828" if v > 0 else "#1565C0" for v in values]
-    fig = go.Figure(go.Bar(x=values, y=names, orientation="h", marker_color=colors))
-    fig.update_layout(title=title, height=350, margin=dict(l=10, r=10, t=40, b=10),
-                       xaxis_title="Contribution")
+    colors = ["#ef5350" if v > 0 else "#29b6f6" for v in values]
+
+    fig = go.Figure(go.Bar(
+        x=values, y=names, orientation="h",
+        marker=dict(color=colors, line=dict(width=0)),
+    ))
+    fig.update_layout(
+        title=dict(text=f"<b>{title}</b>", font=dict(color="#ffffff", size=14)),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#c9d1d9"),
+        xaxis=dict(title="Relative Model Impact (SHAP value)", gridcolor="#30363d", zerolinecolor="#8b949e"),
+        yaxis=dict(gridcolor="#21262d"),
+        height=340,
+        margin=dict(l=10, r=20, t=40, b=20)
+    )
     return fig
 
 
@@ -115,9 +327,11 @@ def render_timings(stage_times: dict):
     labels = [k.replace("_", " ").title() for k, _ in ordered]
     values = [v for _, v in ordered]
     fig = go.Figure(go.Bar(x=values, y=labels, orientation="h",
-                           marker_color=["#1565C0" if k != "total" else "#2E7D32"
+                           marker_color=["#29b6f6" if k != "total" else "#00e676"
                                          for k, _ in ordered]))
     fig.update_layout(title="Stage timing", height=320,
+                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                      font=dict(color="#c9d1d9"),
                       margin=dict(l=10, r=10, t=40, b=10), xaxis_title="Seconds")
     st.plotly_chart(fig, use_container_width=True)
     total = stage_times.get("total")
@@ -125,6 +339,7 @@ def render_timings(stage_times: dict):
         st.caption(f"**Total pipeline time: {total:.2f}s**")
 
 
+# ---------------- MODEL HONESTY / VALIDITY PANEL ----------------
 def data_source_of(bundle):
     if bundle is None:
         return "n/a"
@@ -193,6 +408,7 @@ def render_ood_warnings(feature_vector, bundle):
                    + "\n".join(lines))
 
 
+# ---------------- HISTORY & COMPARE PAGE ----------------
 def _session_name(row):
     parts = [f"#{row['id']}", row["created_at"]]
     if row.get("label"):
@@ -215,7 +431,7 @@ def render_history_page():
 
     if not records:
         st.info("No saved results yet. Go to **Analyze**, run a delivery, and press "
-                "**Save this result to history**.")
+                "**Save to History**.")
         return
 
     # --- Summary metrics ---
@@ -255,9 +471,10 @@ def render_history_page():
             mode="lines+markers+text",
             text=[f"#{r['id']}" for r in chrono],
             textposition="top center",
-            line=dict(color="#2E7D32", width=2),
+            line=dict(color="#00e676", width=2),
         ))
-        fig.update_layout(height=350, margin=dict(l=10, r=10, t=30, b=10),
+        fig.update_layout(height=350, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                          font=dict(color="#c9d1d9"), margin=dict(l=10, r=10, t=30, b=10),
                           xaxis_title="Date", yaxis_title="Performance score",
                           yaxis=dict(range=[0, 100]))
         st.plotly_chart(fig, use_container_width=True)
@@ -280,19 +497,22 @@ def render_history_page():
         with c1:
             fig = go.Figure(go.Bar(
                 x=sel_names, y=[r.get("performance_score") for r in sel],
-                marker_color="#2E7D32", text=[f"{r.get('performance_score'):.0f}" if r.get('performance_score') is not None else "—" for r in sel],
+                marker_color="#00e676", text=[f"{r.get('performance_score'):.0f}" if r.get('performance_score') is not None else "—" for r in sel],
                 textposition="outside"))
             fig.update_layout(title="Performance score", height=320,
-                              margin=dict(l=10, r=10, t=40, b=10), yaxis=dict(range=[0, 100]))
+                              paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                              font=dict(color="#c9d1d9"), margin=dict(l=10, r=10, t=40, b=10),
+                              yaxis=dict(range=[0, 100]))
             st.plotly_chart(fig, use_container_width=True)
         with c2:
             fig = go.Figure(go.Bar(
                 x=sel_names, y=[_risk_of(r) for r in sel],
-                marker_color=["#C62828" if _risk_of(r) == "high" else "#F9A825"
-                              if _risk_of(r) == "moderate" else "#2E7D32" for r in sel],
+                marker_color=["#ef5350" if _risk_of(r) == "high" else "#fbc02d"
+                              if _risk_of(r) == "moderate" else "#00e676" for r in sel],
                 text=[_risk_of(r).title() for r in sel], textposition="outside"))
             fig.update_layout(title="Injury risk", height=320,
-                              margin=dict(l=10, r=10, t=40, b=10))
+                              paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                              font=dict(color="#c9d1d9"), margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig, use_container_width=True)
 
         st.markdown("**Feature-by-feature comparison**")
@@ -314,7 +534,8 @@ def render_history_page():
                 y = [r["feature_vector"].get(k) for k in config.FEATURE_NAMES]
                 fig.add_trace(go.Bar(x=x, y=y, name=name))
             fig.update_layout(title="Feature values by session", barmode="group",
-                              height=400, margin=dict(l=10, r=10, t=40, b=10))
+                              height=400, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                              font=dict(color="#c9d1d9"), margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig, use_container_width=True)
 
         # --- Detail view ---
@@ -325,16 +546,16 @@ def render_history_page():
         c1, c2 = st.columns(2)
         with c1:
             perf = detail.get("performance_score")
-            st.plotly_chart(render_gauge(perf if perf is not None else 0,
-                                         "Performance Score" if perf is not None else "Performance (n/a)"),
+            st.plotly_chart(render_modern_gauge(perf if perf is not None else 0,
+                                                "Performance Score" if perf is not None else "Performance (n/a)"),
                             use_container_width=True)
         with c2:
             risk = detail.get("injury_risk")
             if isinstance(risk, dict) and risk.get("probabilities"):
                 probs = risk["probabilities"]
                 risk_num = {"low": 25, "moderate": 60, "high": 90}[risk.get("risk_level", "low")]
-                st.plotly_chart(render_gauge(risk_num, f"Injury Risk: {risk['risk_level'].upper()}"),
-                                use_container_width=True)
+                st.plotly_chart(render_modern_gauge(risk_num, f"Injury Risk: {risk['risk_level'].upper()}",
+                                                    is_risk=True), use_container_width=True)
                 if len(probs) >= 3:
                     st.caption(f"P(low)={probs[0]:.2f}  P(moderate)={probs[1]:.2f}  P(high)={probs[2]:.2f}")
             else:
@@ -392,82 +613,116 @@ def render_history_page():
             rerun()
 
 
-# ---------- Sidebar ----------
-st.sidebar.title("🏏 Bowling Biomechanics AI")
-st.sidebar.caption("Cricket bowling action analysis, injury-risk screening, and coaching feedback.")
+# ---------------- SIDEBAR CONTROLS ----------------
+with st.sidebar:
+    st.markdown("### 🏏 PaceAI Biomechanics")
+    st.caption("AI Motion Capture, Kinetics & Injury Prevention")
+    st.markdown("---")
 
-page = st.sidebar.radio("Navigation", ["Analyze", "History & Compare"],
-                        help="Analyze: run a new delivery. History & Compare: browse saved results and track progress.")
+    page = st.radio("🧭 Navigation", ["⚡ Analyze", "📚 History & Compare"],
+                    help="Analyze: run a new delivery. History: browse saved results and compare.")
 
-model_choice = st.sidebar.selectbox(
-    "ML model", ["random_forest", "xgboost", "catboost", "cnn_lstm", "transformer"],
-    help="XGBoost/CatBoost/CNN-LSTM/Transformer fall back to a scikit-learn "
-         "equivalent automatically if their library isn't installed.")
+    if page == "⚡ Analyze":
+        input_mode = st.radio("📥 Analysis Mode", ["🎛️ Interactive Bio-Simulator", "📹 Video Motion Capture"], index=0)
+    else:
+        input_mode = "🎛️ Interactive Bio-Simulator"
 
-input_mode = st.sidebar.radio("Input mode", ["Manual feature entry", "Upload bowling video"])
-bowling_arm = st.sidebar.selectbox("Bowling arm", ["right", "left"])
+    st.markdown("#### ⚙️ Model & Bowling Setup")
+    bowling_arm = st.selectbox("Bowling Arm", ["Right-Arm", "Left-Arm"])
+    model_choice = st.selectbox(
+        "AI Prediction Backbone",
+        ["random_forest", "xgboost", "catboost", "cnn_lstm", "transformer"],
+        help="Selects the ML architecture for kinetic scoring. XGBoost/CatBoost/CNN-LSTM/Transformer "
+             "fall back to a scikit-learn equivalent automatically if their library isn't installed."
+    )
 
-st.sidebar.markdown("**Processing speed / accuracy**")
-processing_preset = st.sidebar.selectbox(
-    "Preset", ["Balanced", "Fast", "Maximum accuracy"],
-    help="Balanced (default): denoise off, 640×360 @ 20 fps -- most speed with little "
-         "accuracy loss. Fast: same resolution @ 15 fps. Maximum accuracy: denoise on, "
-         "960×540 @ 30 fps (slowest).")
-if processing_preset == "Fast":
-    target_fps, resize_choice, denoise = 15, (640, 360), False
-elif processing_preset == "Maximum accuracy":
-    target_fps, resize_choice, denoise = 30, (960, 540), True
-else:
+    # Video-only processing controls (kept for CV speed/accuracy tuning)
+    camera_view = "behind"
     target_fps, resize_choice, denoise = 20, (640, 360), False
+    with st.expander("🎥 Video Processing (CV speed/accuracy)"):
+        camera_view = st.selectbox(
+            "Camera view", ["behind", "side"],
+            help="Recording orientation. 'Behind' (rear of the bowler) is assumed by the "
+                 "2D fallback features; 'side' is supported for world-landmark metrics.")
+        processing_preset = st.selectbox(
+            "Preset", ["Balanced", "Fast", "Maximum accuracy"],
+            help="Balanced (default): denoise off, 640×360 @ 20 fps -- most speed with little "
+                 "accuracy loss. Fast: same resolution @ 15 fps. Maximum accuracy: denoise on, "
+                 "960×540 @ 30 fps (slowest).")
+        if processing_preset == "Fast":
+            target_fps, resize_choice, denoise = 15, (640, 360), False
+        elif processing_preset == "Maximum accuracy":
+            target_fps, resize_choice, denoise = 30, (960, 540), True
+        else:
+            target_fps, resize_choice, denoise = 20, (640, 360), False
+        target_fps = st.slider("Target FPS", 5, 30, target_fps, step=5,
+                               help="Lower = fewer frames for pose estimation = faster.")
+        resize_choice = st.selectbox(
+            "Frame resolution",
+            [(640, 360), (960, 540), (1280, 720)],
+            format_func=lambda d: f"{d[0]}×{d[1]}",
+            index=[(640, 360), (960, 540), (1280, 720)].index(resize_choice))
+        denoise = st.checkbox("Denoise frames", value=denoise,
+                              help="On = more accurate on noisy footage but much slower.")
 
-with st.sidebar.expander("Fine-tune"):
-    target_fps = st.slider("Target FPS", 5, 30, target_fps, step=5,
-                           help="Lower = fewer frames for pose estimation = faster.")
-    resize_choice = st.selectbox(
-        "Frame resolution",
-        [(640, 360), (960, 540), (1280, 720)],
-        format_func=lambda d: f"{d[0]}×{d[1]}", index=[(640, 360), (960, 540), (1280, 720)].index(resize_choice))
-    denoise = st.checkbox("Denoise frames", value=denoise,
-                          help="On = more accurate on noisy footage but much slower.")
+    st.markdown("---")
+    st.markdown("#### 🔍 System Status")
+    st.caption(f"⚡ XGBoost: **{'Active' if ml_models.BACKEND_INFO['xgboost_available'] else 'Scikit Fallback'}**")
+    st.caption(f"🐱 CatBoost: **{'Active' if ml_models.BACKEND_INFO['catboost_available'] else 'Scikit Fallback'}**")
+    st.caption(f"🧠 PyTorch: **{'Active' if ml_models.BACKEND_INFO['torch_available'] else 'Disabled'}**")
+    st.caption(f"🔬 SHAP Engine: **{'Active' if explainability.SHAP_AVAILABLE else 'Finite Diff'}**")
+    st.caption(f"📚 History entries: **{history_db.count()}**")
 
-if page == "Analyze":
-    perf_bundle, injury_bundle = load_or_train_models(model_choice)
-else:
-    perf_bundle, injury_bundle = None, None
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("**Backend status**")
-st.sidebar.text(f"XGBoost installed:  {ml_models.BACKEND_INFO['xgboost_available']}")
-st.sidebar.text(f"CatBoost installed: {ml_models.BACKEND_INFO['catboost_available']}")
-st.sidebar.text(f"PyTorch installed:  {ml_models.BACKEND_INFO['torch_available']}")
-st.sidebar.text(f"SHAP installed:     {explainability.SHAP_AVAILABLE}")
-if perf_bundle is not None:
-    st.sidebar.text(f"Model data source: {data_source_of(perf_bundle)}")
-
-
-# ---------- Main ----------
-if page == "History & Compare":
+# ---------------- PAGE DISPATCH ----------------
+if page == "📚 History & Compare":
     render_history_page()
     st.stop()
 
-st.title("Cricket Bowling Action Analysis Dashboard")
+perf_bundle, injury_bundle = load_or_train_models(model_choice)
+
+# ---------------- HERO BANNER ----------------
+st.markdown("""
+<div class="hero-banner">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+        <div>
+            <h1 class="hero-title">⚡ Fast-Bowling Biomechanics AI</h1>
+            <p class="hero-subtitle">Kinematic Chain Profiling • ICC Arm Legality Check • Lumbar & Knee Injury Prevention</p>
+        </div>
+        <div>
+            <span class="status-badge badge-legal" style="margin-right: 8px;">● AI Engine Ready</span>
+            <span class="status-badge badge-low">● YOLOv11 + MediaPipe</span>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 
 feature_vector = {}
 stage_times = {}
 
-if input_mode == "Manual feature entry":
-    st.subheader("1. Biomechanical Feature Input")
-    st.caption("Enter (or simulate) the 10 release-point biomechanical features for one delivery.")
-    cols = st.columns(2)
-    for i, (feat, (label, unit, lo, hi, default)) in enumerate(FEATURE_LABELS.items()):
-        with cols[i % 2]:
-            feature_vector[feat] = st.slider(f"{label} ({unit})", float(lo), float(hi), float(default))
+# ---------------- INPUT SECTION ----------------
+if input_mode == "🎛️ Interactive Bio-Simulator":
+    st.markdown("### 1. Delivery Kinematic Parameters")
+    
+    # Preset Selector
+    selected_preset = st.selectbox("⚡ Quick Load Action Preset:", list(PRESETS.keys()))
+    preset_data = PRESETS[selected_preset]
+
+    with st.expander("🛠️ Fine-Tune Biomechanical Sliders (Release & Impact Points)", expanded=True):
+        cols = st.columns(2)
+        for i, (feat, (label, unit, lo, hi, default_val)) in enumerate(FEATURE_LABELS.items()):
+            active_val = preset_data[feat] if preset_data else default_val
+            with cols[i % 2]:
+                feature_vector[feat] = st.slider(
+                    f"{label} ({unit})",
+                    float(lo), float(hi), float(active_val),
+                    help=f"Acceptable range: {lo} - {hi} {unit}"
+                )
 
 else:
-    st.subheader("1. Upload Bowling Video")
-    st.caption("Runs the full CV pipeline: preprocessing → YOLOv11 detection → ByteTrack → "
-               "MediaPipe pose (33 landmarks) → biomechanical feature extraction.")
-    uploaded = st.file_uploader("Upload a single-delivery clip", type=["mp4", "mov", "avi"])
+    st.markdown("### 1. Upload Bowling Video")
+    st.info("Runs Computer Vision pipeline: Detection (YOLOv11) ➔ Multi-object tracking (ByteTrack) ➔ 3D Pose (MediaPipe) ➔ Biomechanical extraction.")
+    uploaded = st.file_uploader("Upload bowling delivery video clip", type=["mp4", "mov", "avi"])
 
     if uploaded is not None:
         upload_t0 = time.perf_counter()
@@ -477,109 +732,248 @@ else:
         upload_time = time.perf_counter() - upload_t0
 
         if not os.path.exists(config.POSE_MODEL_PATH):
-            st.error(
-                "Pose model not found. Download it once (needs internet):\n\n"
-                "`wget -O models/pose_landmarker_heavy.task "
-                "https://storage.googleapis.com/mediapipe-models/pose_landmarker/"
-                "pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task`"
-            )
+            st.warning("MediaPipe pose task model missing. Run pose downloader or manual entry.")
         else:
-            with st.spinner("Running detection, tracking, and pose estimation..."):
+            with st.spinner("Extracting 33 body landmarks and kinematic angles across delivery frames..."):
                 try:
-                    result = pipeline.analyze_video(video_path, bowling_arm=bowling_arm,
-                                                      performance_bundle=perf_bundle,
-                                                      injury_bundle=injury_bundle,
-                                                      target_fps=target_fps,
-                                                      resize_dim=resize_choice,
-                                                      denoise=denoise)
+                    result = pipeline.analyze_video(
+                        video_path,
+                        bowling_arm=bowling_arm.lower().split("-")[0],
+                        performance_bundle=perf_bundle,
+                        injury_bundle=injury_bundle,
+                        target_fps=target_fps,
+                        resize_dim=resize_choice,
+                        denoise=denoise,
+                        camera_view=camera_view,
+                    )
                     feature_vector = result.feature_vector
-                    stage_times = dict(result.stage_times or {})
-                    stage_times["upload"] = upload_time
-                    st.success("Pose extracted and features computed.")
+                    st.session_state["video_stage_times"] = dict(result.stage_times or {})
+                    st.session_state["video_upload_time"] = upload_time
+                    st.session_state["last_warnings"] = list(result.warnings or [])
+                    st.success("✅ Delivery motion capture completed successfully!")
                 except Exception as e:
-                    st.error(f"Pipeline failed: {e}")
+                    st.error(f"Pipeline error: {e}")
 
+
+# ---------------- ANALYSIS & VISUALIZATION ----------------
 if feature_vector:
-    st.subheader("2. Extracted / Input Features")
-    feat_df = pd.DataFrame([
-        {"Feature": FEATURE_LABELS.get(k, (k,))[0], "Value": round(v, 2),
-         "Unit": FEATURE_LABELS.get(k, ("", ""))[1]}
-        for k, v in feature_vector.items()
-    ])
-    st.dataframe(feat_df, use_container_width=True, hide_index=True)
+    result = pipeline.analyze_feature_vector(feature_vector, perf_bundle, injury_bundle)
+    risk = result.injury_risk or {}
+    risk_level = str(risk.get("risk_level", "low")).lower()
+    risk_score = {"low": 22, "moderate": 58, "high": 88}.get(risk_level, 22)
+    risk_probs = risk.get("probabilities") or []
+
+    # Merge video pipeline timings (if this run came from a video)
+    if input_mode.startswith("📹") and st.session_state.get("video_stage_times"):
+        stage_times = dict(st.session_state["video_stage_times"])
+        stage_times.update(dict(result.stage_times or {}))
+        upload = st.session_state.get("video_upload_time")
+        if upload:
+            stage_times["upload"] = upload
+    else:
+        stage_times = dict(result.stage_times or {})
+
+    elbow_flex = feature_vector.get("elbow_flexion_deg", 10.0)
+    is_icc_legal = elbow_flex <= 15.0
+
+    st.markdown("---")
+
+    for warning in st.session_state.get("last_warnings", []):
+        st.warning(warning)
+
+    # Key Summary Metric Header
+    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+    with col_m1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">PERFORMANCE RATING</span>
+            <h2 style="margin:4px 0; color:#00e676;">{result.performance_score:.1f}<span style="font-size:1rem;color:#8b949e"> / 100</span></h2>
+            <span style="color:#8b949e; font-size:0.78rem;">Pace Potential Index</span>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_m2:
+        badge_cls = f"badge-{risk_level}"
+        p_high = f"{risk_probs[2]:.2f}" if len(risk_probs) > 2 else "n/a"
+        st.markdown(f"""
+        <div class="metric-card">
+            <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">INJURY RISK LEVEL</span>
+            <div style="margin:8px 0;"><span class="status-badge {badge_cls}">{risk_level.upper()} RISK</span></div>
+            <span style="color:#8b949e; font-size:0.78rem;">P(High Risk) = {p_high}</span>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_m3:
+        icc_badge = "badge-legal" if is_icc_legal else "badge-illegal"
+        icc_text = "LEGAL (≤15°)" if is_icc_legal else "SUSPECT (>15°)"
+        st.markdown(f"""
+        <div class="metric-card">
+            <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">ICC ACTION LEGALITY</span>
+            <div style="margin:8px 0;"><span class="status-badge {icc_badge}">{icc_text}</span></div>
+            <span style="color:#8b949e; font-size:0.78rem;">Flexion: <b>{elbow_flex:.1f}°</b></span>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_m4:
+        st.markdown(f"""
+        <div class="metric-card">
+            <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">FRONT KNEE BRACE</span>
+            <h2 style="margin:4px 0; color:#29b6f6;">{feature_vector.get('knee_flexion_deg', 0):.1f}°</h2>
+            <span style="color:#8b949e; font-size:0.78rem;">Ideal: &lt; 15° for lever efficiency</span>
+        </div>
+        """, unsafe_allow_html=True)
+
     render_ood_warnings(feature_vector, perf_bundle)
 
-    st.subheader("3. Machine Learning Predictions")
-    result = pipeline.analyze_feature_vector(feature_vector, perf_bundle, injury_bundle)
-    stage_times = dict(result.stage_times or {})
+    # ---------------- TABBED DETAILED BREAKDOWN ----------------
+    tab_summary, tab_radar, tab_shap, tab_coaching, tab_export = st.tabs([
+        "📊 Gauges & Joint Stress",
+        "🕸️ Kinetic Radar vs Pro Benchmark",
+        "🧠 Explainable AI (SHAP)",
+        "🏋️ Coaching & Rehab Drills",
+        "📑 Biomechanical Report"
+    ])
 
-    c1, c2 = st.columns(2)
-    with c1:
-        st.plotly_chart(render_gauge(result.performance_score, "Performance Score"),
-                         use_container_width=True)
-        interval = ml_models.prediction_interval_performance(perf_bundle, feature_vector)
-        if interval:
-            st.caption(f"68% prediction interval: **{interval[0]:.0f}–{interval[1]:.0f}** "
-                       f"(model uncertainty)")
-    with c2:
-        risk = result.injury_risk
-        risk_num = {"low": 25, "moderate": 60, "high": 90}[risk["risk_level"]]
-        st.plotly_chart(render_gauge(risk_num, f"Injury Risk: {risk['risk_level'].upper()}"),
-                         use_container_width=True)
-        if risk["probabilities"]:
-            st.caption(f"P(low)={risk['probabilities'][0]:.2f}  "
-                       f"P(moderate)={risk['probabilities'][1]:.2f}  "
-                       f"P(high)={risk['probabilities'][2]:.2f}")
+    with tab_summary:
+        col_g1, col_g2 = st.columns(2)
+        with col_g1:
+            st.plotly_chart(
+                render_modern_gauge(result.performance_score, "Performance & Pace Potential", "Kinematic Energy Transfer Score"),
+                use_container_width=True
+            )
+            interval = ml_models.prediction_interval_performance(perf_bundle, feature_vector)
+            if interval:
+                st.caption(f"68% prediction interval: **{interval[0]:.0f}–{interval[1]:.0f}** "
+                           f"(model uncertainty)")
+        with col_g2:
+            st.plotly_chart(
+                render_modern_gauge(risk_score, "Injury Hazard Index", f"Overall Risk: {risk_level.upper()}", is_risk=True),
+                use_container_width=True
+            )
+            if len(risk_probs) >= 3:
+                st.caption(f"P(low)={risk_probs[0]:.2f}  P(moderate)={risk_probs[1]:.2f}  "
+                           f"P(high)={risk_probs[2]:.2f}")
 
-    if data_source_of(perf_bundle) == "synthetic":
-        st.warning("⚠ These predictions come from **synthetic demo models** -- illustrative only. "
-                   "Retrain on real labeled data before relying on them for coaching or medical "
-                   "decisions. See 'Model quality & validity' below.")
+        st.markdown("#### 🦴 Joint & Segment Kinetic Stress Levels")
+        # Estimate stress indexes based on biomechanics
+        trunk_stress = min(100, int((feature_vector['trunk_lean_deg'] / 50.0) * 100))
+        knee_stress = min(100, int((feature_vector['knee_flexion_deg'] / 40.0) * 100))
+        shoulder_stress = min(100, int((feature_vector['angular_velocity_deg_s'] / 1200.0) * 100))
 
+        stress_cols = st.columns(3)
+        with stress_cols[0]:
+            st.markdown(f"**Lumbar Spine Lateral Shear**: `{trunk_stress}%`")
+            st.progress(trunk_stress / 100.0)
+        with stress_cols[1]:
+            st.markdown(f"**Front Knee Impact Load**: `{knee_stress}%`")
+            st.progress(knee_stress / 100.0)
+        with stress_cols[2]:
+            st.markdown(f"**Rotator Cuff Dynamic Strain**: `{shoulder_stress}%`")
+            st.progress(shoulder_stress / 100.0)
+
+    with tab_radar:
+        st.markdown("#### 🕸️ Biomechanical Signature vs Elite Fast Bowlers")
+        st.caption("A wider, balanced polygon indicates closer alignment with ideal aerodynamic and kinematic levers.")
+        st.plotly_chart(render_radar_comparison(feature_vector), use_container_width=True)
+
+    with tab_shap:
+        st.markdown("#### 🧠 Model Explainability Breakdown")
+        st.caption("Identifies which exact kinematic variables pushed performance up or triggered injury alerts.")
+        shap_c1, shap_c2 = st.columns(2)
+        with shap_c1:
+            if result.shap_contributions_performance:
+                st.plotly_chart(
+                    render_shap_bar(result.shap_contributions_performance, "Performance Contributors (Blue = Positive, Red = Drag)"),
+                    use_container_width=True
+                )
+        with shap_c2:
+            if result.shap_contributions_injury:
+                st.plotly_chart(
+                    render_shap_bar(result.shap_contributions_injury, "Injury Hazard Risk Drivers (Red = Elevates Risk)"),
+                    use_container_width=True
+                )
+
+    with tab_coaching:
+        st.markdown("### 🏋️ AI Coaching & Prescriptive Drills")
+        
+        # Categorized recommendations
+        if result.coaching_notes:
+            for note in result.coaching_notes:
+                st.markdown(f"""
+                <div class="drill-card">
+                    <b>🎯 Biomechanics Note:</b> {note}
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.success("Action mechanics are well within optimal ranges.")
+
+        st.markdown("#### 📋 Recommended Corrective Exercise Protocols")
+        d1, d2 = st.columns(2)
+        with d1:
+            st.markdown("""
+            **1. Front Knee Block Stability (Brace Reinforcement)**
+            - *Drill:* Single-leg box deceleration landings + resistance band knee blocks.
+            - *Target:* Prevent collapse of the front knee at Front Foot Contact (FFC).
+            """)
+        with d2:
+            st.markdown("""
+            **2. Anti-Lateral Flexion Core Bracing**
+            - *Drill:* Half-kneeling Pallof presses & suitcase carries.
+            - *Target:* Minimize excessive trunk lateral flexion to prevent L4/L5 lumbar stress fractures.
+            """)
+
+    with tab_export:
+        st.markdown("### 📑 Biomechanical Delivery Report")
+        feat_df = pd.DataFrame([
+            {
+                "Kinematic Feature": FEATURE_LABELS.get(k, (k,))[0],
+                "Measured Value": f"{v:.2f} {FEATURE_LABELS.get(k, ('', ''))[1]}",
+                "Benchmark Range": f"{FEATURE_LABELS.get(k, ('','',0,0,0))[2]} - {FEATURE_LABELS.get(k, ('','',0,0,0))[3]} {FEATURE_LABELS.get(k, ('', ''))[1]}"
+            }
+            for k, v in feature_vector.items()
+        ])
+        st.dataframe(feat_df, use_container_width=True, hide_index=True)
+
+        report_json = json.dumps({
+            "performance_score": result.performance_score,
+            "injury_risk": result.injury_risk,
+            "icc_legal": is_icc_legal,
+            "kinematics": feature_vector,
+            "coaching_feedback": result.coaching_notes
+        }, indent=2)
+
+        st.download_button(
+            label="📥 Download Full Delivery Analysis (JSON)",
+            data=report_json,
+            file_name="bowling_biomechanics_report.json",
+            mime="application/json"
+        )
+
+    # ---------------- MODEL QUALITY HONESTY PANEL ----------------
     render_model_quality_expander(perf_bundle, injury_bundle)
 
-    st.subheader("4. Run Timing")
-    render_timings(stage_times)
+    # ---------------- RUN TIMING ----------------
+    if stage_times:
+        st.markdown("### ⏱️ Run Timing")
+        render_timings(stage_times)
 
-    st.subheader("5. Explainable AI — Why this prediction?")
-    tab1, tab2 = st.tabs(["Performance drivers", "Injury-risk drivers"])
-    with tab1:
-        if result.shap_contributions_performance:
-            st.plotly_chart(render_shap_bar(result.shap_contributions_performance,
-                                             "Feature contribution to performance score"),
-                             use_container_width=True)
-        if not explainability.SHAP_AVAILABLE:
-            st.caption("SHAP not installed -- showing finite-difference sensitivity as a fallback "
-                       "(`pip install shap` for full SHAP explanations).")
-    with tab2:
-        if result.shap_contributions_injury:
-            st.plotly_chart(render_shap_bar(result.shap_contributions_injury,
-                                             "Feature contribution to injury-risk score"),
-                             use_container_width=True)
-
-    st.subheader("6. Coaching Recommendations")
-    for note in result.coaching_notes:
-        st.markdown(f"- {note}")
-
-    st.subheader("7. Save to History")
+    # ---------------- SAVE TO HISTORY ----------------
+    st.markdown("### 💾 Save to History")
     st.caption("Persist this delivery's results to the local history database so you can "
                "compare it against future sessions and track your performance over time.")
-    save_label = st.text_input("Label (optional)", value=st.session_state.get("save_label", ""),
-                               placeholder="e.g. Net session 1, match 3 over 4",
+    save_label = st.text_input("Label (optional)", placeholder="e.g. Net session 1, match 3 over 4",
                                key="save_label")
-    if st.button("💾 Save this result to history", type="primary"):
+    if st.button("💾 Save this result", type="primary"):
         saved_id = history_db.save_analysis(
             result, label=save_label, input_mode=input_mode,
-            bowling_arm=bowling_arm, model=model_choice)
-        st.success(f"Saved to history (id #{saved_id}). Open **History & Compare** in the "
-                   f"sidebar to view and compare your saved results.")
+            bowling_arm=bowling_arm.lower().split("-")[0], model=model_choice)
+        st.success(f"Saved to history (id #{saved_id}). Open **History & Compare** in the sidebar "
+                   f"to view and compare your saved results.")
 
 else:
     st.info("Enter features manually or upload a video to run the analysis.")
 
 st.markdown("---")
 st.caption(
-    "Demo models are trained on synthetic data (src/synthetic_data.py) grounded in published "
-    "fast-bowling biomechanics ranges -- retrain on real labeled data "
-    "(`python train_demo_model.py --data your_dataset.csv`) before using for real coaching/medical decisions."
+    "⚡ **PaceAI Biomechanics Engine** • Demo models are trained on synthetic data "
+    "(src/synthetic_data.py) -- retrain on real labeled data (`python train_demo_model.py "
+    "--data your_dataset.csv`) before using for real coaching/medical decisions. "
+    "Designed for elite high-performance cricket centers, coaches, and sports physiotherapists."
 )

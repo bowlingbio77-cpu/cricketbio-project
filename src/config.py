@@ -63,7 +63,17 @@ FEATURE_NAMES = [
 # --- ML module ---
 RANDOM_STATE = 42
 PERFORMANCE_TARGET = "performance_score"   # regression, 0-100
-INJURY_TARGET = "injury_risk"              # classification, 0=low,1=moderate,2=high
+# Injury risk is defined as: the chance that an injury occurs if the SAME
+# action is performed long-term (repetitive exposure), graded by the SEVERITY
+# of the injury that would occur. The training target is an ordinal outcome
+# (0=no injury, 1=minor, 2=moderate, 3=severe) simulated over a per-row long-term
+# exposure. The model reports P(injury) for the exposure chosen at inference,
+# the expected severity, and a combined 0-1 risk score = P(injury) x severity.
+INJURY_TARGET = "injury_severity"                        # ordinal 0-3 (no/minor/moderate/severe)
+INJURY_EXPOSURE_FEATURE = "long_term_exposure_deliveries"  # deliveries performed over time
+INJURY_EXPOSURE_DELIVERIES = 500      # default long-term exposure assumed at inference
+INJURY_RISK_LOW = 0.33                # risk_score (0-1) below this -> "low" long-term risk
+INJURY_RISK_HIGH = 0.66               # risk_score above this -> "high"
 
 # Elbow flexion legal delivery threshold (ICC law of cricket: <=15 degrees extension)
 ICC_ELBOW_EXTENSION_LIMIT_DEG = 15.0

@@ -236,7 +236,7 @@ def train_injury_model(X: np.ndarray, y: np.ndarray, model_name: ModelName = "ra
                         feature_names=None, label_map=None,
                         data_source: str = "synthetic") -> TrainedBundle:
     feature_names = feature_names or config.FEATURE_NAMES
-    label_map = label_map or {0: "low", 1: "moderate", 2: "high"}
+    label_map = label_map or {0: "no injury", 1: "injury"}
     X = np.asarray(X, dtype=float)
     y = np.asarray(y).astype(int)
     scaler = StandardScaler().fit(X)

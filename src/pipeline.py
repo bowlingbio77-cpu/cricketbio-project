@@ -13,6 +13,7 @@ import os
 import time
 from dataclasses import dataclass, asdict, field
 from typing import Optional
+import numpy as np
 
 from . import config, preprocessing, detection, tracking, pose_estimation
 from . import feature_engineering as feateng
@@ -28,9 +29,45 @@ class AnalysisResult:
     shap_contributions_injury: Optional[dict]
     coaching_notes: list
     stage_times: dict = field(default_factory=dict)
+    warnings: list = field(default_factory=list)
+    camera_view: Optional[str] = None
+    bowling_arm: str = "right"
 
     def to_dict(self):
         return asdict(self)
+
+
+def _crop_to_bbox(frame, bbox, pad_frac: float = 0.3) -> Optional[np.ndarray]:
+    """Crop a frame to an expanded bounding box (best-effort; None if too small)."""
+    h, w = frame.shape[:2]
+    x1, y1, x2, y2 = bbox
+    bw, bh = max(1.0, x2 - x1), max(1.0, y2 - y1)
+    pad_x, pad_y = pad_frac * bw, pad_frac * bh
+    nx1 = max(0, int(x1 - pad_x))
+    ny1 = max(0, int(y1 - pad_y))
+    nx2 = min(w, int(x2 + pad_x))
+    ny2 = min(h, int(y2 + pad_y))
+    if nx2 - nx1 < 16 or ny2 - ny1 < 16:
+        return None
+    return frame[ny1:ny2, nx1:nx2]
+
+
+def _crop_frames_to_bowler(frames, tracks, bowler) -> list:
+    """Return a new frame list cropped to the bowler's track bbox (carrying the
+    previous bbox forward over brief gaps). Bboxes must be in frame coordinates."""
+    bbox_by_frame = dict(zip(bowler.frames, bowler.bboxes))
+    last_bbox = None
+    cropped = []
+    for idx, ts, frame in frames:
+        bbox = bbox_by_frame.get(idx, last_bbox)
+        if bbox is not None:
+            last_bbox = bbox
+            cut = _crop_to_bbox(frame, bbox)
+            if cut is not None:
+                cropped.append((idx, ts, cut))
+                continue
+        cropped.append((idx, ts, frame))
+    return cropped
 
 
 def analyze_video(video_path: str, bowling_arm: str = "right",
@@ -38,25 +75,49 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
                    injury_bundle: ml_models.TrainedBundle = None,
                    target_fps: int = config.TARGET_FPS,
                    resize_dim=config.RESIZE_DIM,
-                   denoise: bool = config.DENOISE) -> AnalysisResult:
+                   denoise: bool = config.DENOISE,
+                   camera_view: str = "behind") -> AnalysisResult:
     """
     Full pipeline on a single delivery video clip. Requires:
       - models/pose_landmarker_heavy.task (MediaPipe pose model, download separately)
       - trained performance_bundle / injury_bundle (see train_demo_model.py)
-    Detection+tracking (YOLOv11/ByteTrack) is used to crop to the bowler before
-    pose estimation when `ultralytics` is installed; otherwise pose estimation
-    runs on the full frame (fine for single-bowler, tightly-framed clips).
+    Detection+tracking (YOLOv11/ByteTrack) crops to the bowler before pose
+    estimation when `ultralytics` is installed; otherwise pose estimation runs
+    on the full frame (fine for single-bowler, tightly-framed clips).
     `target_fps` / `resize_dim` / `denoise` override the preprocessing defaults
-    (speed vs. accuracy trade-off).
+    (speed vs. accuracy trade-off). `camera_view` is recorded and passed to the
+    feature engineering (2D fallbacks assume a rear/behind view).
     """
     timings = {}
+    warnings = []
     t_start = time.perf_counter()
 
-    # 1-3: preprocess, detect, track (best-effort bowler crop)
+    # 1: preprocess
     t0 = time.perf_counter()
     frames = list(preprocessing.preprocess_video(video_path, target_fps=target_fps,
                                                   resize_dim=resize_dim, denoise=denoise))
     timings["preprocess"] = time.perf_counter() - t0
+
+    # 2-3: detection + tracking + bowler crop (best effort)
+    t0 = time.perf_counter()
+    crop_stats = None
+    try:
+        tracker = tracking.BowlerTracker()
+        tracks = tracker.track_frames([(idx, fr) for idx, ts, fr in frames])
+        bowler = tracking.select_bowler_track(tracks)
+        if bowler is not None and len(bowler) >= 3:
+            frames = _crop_frames_to_bowler(frames, tracks, bowler)
+            crop_stats = {"track_id": bowler.track_id, "frames_tracked": len(bowler)}
+            warnings.append(
+                f"Detection/tracking: cropped to bowler track #{bowler.track_id} "
+                f"({len(bowler)} frames) before pose estimation."
+            )
+        else:
+            warnings.append("Detection/tracking found no stable bowler track; "
+                            "pose estimation ran on full frames.")
+    except Exception as exc:
+        warnings.append(f"Detection/tracking skipped ({exc}); pose ran on full frames.")
+    timings["detection_tracking"] = time.perf_counter() - t0
 
     # 4-5: pose estimation -> 33 landmarks/frame
     t0 = time.perf_counter()
@@ -67,10 +128,16 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     if len(pose_sequence) < 3:
         raise RuntimeError("Not enough frames with a detected pose -- check video quality/framing.")
 
-    # 6: biomechanical feature engineering
+    # 6: biomechanical feature engineering (+ delivery-quality diagnostics)
     t0 = time.perf_counter()
-    feature_vector = feateng.build_feature_vector(pose_sequence, bowling_arm=bowling_arm)
+    feature_vector, diagnostics = feateng.analyze_delivery(
+        pose_sequence, bowling_arm=bowling_arm, camera_view=camera_view)
     timings["feature_engineering"] = time.perf_counter() - t0
+
+    if diagnostics.get("reliable") is not True:
+        warnings.append(f"Delivery quality: {diagnostics.get('reliability_reason')}")
+    if crop_stats is not None and diagnostics.get("n_frames", 0) < 10:
+        warnings.append("Few pose frames after cropping -- consider tighter framing.")
 
     # 7: ML predictions
     performance_score = None
@@ -112,12 +179,16 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         shap_contributions_injury=shap_injury,
         coaching_notes=notes,
         stage_times=timings,
+        warnings=warnings,
+        camera_view=camera_view,
+        bowling_arm=bowling_arm,
     )
 
 
 def analyze_feature_vector(feature_vector: dict,
                             performance_bundle: ml_models.TrainedBundle = None,
-                            injury_bundle: ml_models.TrainedBundle = None) -> AnalysisResult:
+                            injury_bundle: ml_models.TrainedBundle = None,
+                            camera_view: str = "behind") -> AnalysisResult:
     """    Same as analyze_video but skips CV/pose stages -- useful for the Streamlit
     manual-entry mode and for testing without a video file."""
     timings = {}
@@ -159,4 +230,5 @@ def analyze_feature_vector(feature_vector: dict,
         shap_contributions_injury=shap_injury,
         coaching_notes=notes,
         stage_times=timings,
+        camera_view=camera_view,
     )

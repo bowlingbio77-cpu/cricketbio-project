@@ -34,11 +34,18 @@ class Track:
 
 class BowlerTracker:
     def __init__(self, weights: str = config.YOLO_WEIGHTS,
-                 conf_threshold: float = config.DETECTION_CONF_THRESHOLD):
+                 conf_threshold: float = config.DETECTION_CONF_THRESHOLD,
+                 detector: "BowlerDetector" = None):
         self.conf_threshold = conf_threshold
         self.backend = "bytetrack" if _HAS_ULTRALYTICS else "iou_fallback"
         if self.backend == "bytetrack":
-            self.model = YOLO(weights if weights.endswith(".pt") else "yolo11n.pt")
+            from .detection import resolve_weights
+            self.model = YOLO(resolve_weights(weights))
+        else:
+            from .detection import BowlerDetector
+            detector = detector or BowlerDetector(weights=weights,
+                                                  conf_threshold=conf_threshold)
+            self.detector = detector
         self._iou_tracks: Dict[int, Track] = {}
         self._next_id = 0
 
@@ -47,8 +54,52 @@ class BowlerTracker:
         if self.backend == "bytetrack":
             return self._track_bytetrack(video_path)
         raise RuntimeError(
-            "IoU fallback tracker works frame-by-frame; call track_frame() in a loop instead."
+            "IoU fallback tracker works frame-by-frame; call track_frames() in a loop instead."
         )
+
+    def track_frames(self, frames) -> Dict[int, Track]:
+        """
+        Run tracking over an in-memory sequence of frames (already decoded,
+        e.g. after preprocessing) so the video file is only read once.
+
+        `frames`: iterable of (frame_idx, frame_bgr) tuples.
+        Returns {track_id: Track} with bboxes in the same frame coordinates.
+        """
+        if self.backend == "bytetrack":
+            return self._track_bytetrack_frames(frames)
+        tracks: Dict[int, Track] = {}
+        for idx, frame in frames:
+            dets = self.detector.detect(frame, idx)
+            assigned = self.track_frame(idx, dets)
+            for tid, bbox in assigned.items():
+                if tid not in tracks:
+                    tracks[tid] = Track(track_id=tid)
+                tracks[tid].frames.append(idx)
+                tracks[tid].bboxes.append(bbox)
+        return tracks
+
+    def _track_bytetrack_frames(self, frames) -> Dict[int, Track]:
+        """ByteTrack over a list of (frame_idx, frame_bgr) tuples."""
+        source = [frame for _, frame in frames]
+        tracks: Dict[int, Track] = {}
+        if not source:
+            return tracks
+        results = self.model.track(
+            source=source, classes=[config.BOWLER_CLASS_ID],
+            conf=self.conf_threshold, tracker=config.BYTETRACK_CONFIG,
+            persist=True, stream=True, verbose=False,
+        )
+        for frame_idx, r in enumerate(results):
+            if r.boxes.id is None:
+                continue
+            ids = r.boxes.id.int().tolist()
+            xyxys = r.boxes.xyxy.tolist()
+            for tid, box in zip(ids, xyxys):
+                if tid not in tracks:
+                    tracks[tid] = Track(track_id=tid)
+                tracks[tid].frames.append(frame_idx)
+                tracks[tid].bboxes.append(tuple(box))
+        return tracks
 
     def _track_bytetrack(self, video_path: str) -> Dict[int, Track]:
         tracks: Dict[int, Track] = {}
