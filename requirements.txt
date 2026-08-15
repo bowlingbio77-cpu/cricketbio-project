@@ -1,23 +1,29 @@
-# Core (available/tested in this build)
-numpy
-pandas
-opencv-python
+# Core (available/tested in this build -- pinned so committed model bundles
+# in models/*.joblib always load with matching library versions)
+numpy==2.5.1
+pandas==3.0.5
+opencv-python-headless==5.0.0.93
 mediapipe>=0.10.14
-scikit-learn
-joblib
-streamlit
-plotly
+scikit-learn==1.9.0
+joblib==1.5.3
+streamlit==1.60.0
+plotly==6.9.0
 
 # Detection + tracking (YOLOv11 + ByteTrack)
-ultralytics
+ultralytics==8.4.115
 
-# Boosted-tree ML backends (optional -- code falls back to sklearn if absent)
-xgboost
-catboost
+# Boosted-tree ML backends (pinned: bundles were pickled with these exact
+# versions -- xgboost/catboost have historically broken old pickles across
+# major bumps). Code falls back to sklearn if absent.
+xgboost==3.3.0
+catboost==1.2.10
 
-# Explainability (optional -- falls back to permutation importance if absent)
-shap
+# Explainability (optional -- falls back to permutation/finite-diff if absent;
+# note shap on numpy>=2.5 fails to import (numba), which is caught and handled)
+shap==0.52.0
 
 # Optional: enables true CNN-LSTM / Transformer sequence models
 # (falls back to sklearn MLP if absent)
-torch
+# NOT installed on Streamlit Cloud -- torch's ~800MB wheel blows up the build
+# budget and the fallback MLP is used instead. Uncomment locally if you want it:
+# torch

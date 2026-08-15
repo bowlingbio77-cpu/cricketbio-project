@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0",
+  "description": "Cricket fast-bowling injury recovery benchmarks and biomechanical risk thresholds.",
+  "meta": {
+    "source": "Peer-reviewed fast-bowling epidemiology and biomechanics literature (screening reference only)",
+    "disclaimer": "Benchmark ranges for coaching/screening purposes. NOT a medical diagnosis or individual prognosis.",
+    "units": {
+      "angles": "degrees",
+      "stride_length": "normalized to bowler stature (1.0 = one body height)",
+      "workload": "deliveries (balls)",
+      "time": "days / weeks"
+    }
+  },
+  "injuries": [
+    {
+      "key": "lumbar_stress_fracture",
+      "injury": "Lumbar Stress Fracture (LBSI / Spondylolysis)",
+      "anatomical_site": "L4/L5 Pars Interarticularis (non-bowling side)",
+      "clinical_incidence": "24%-55% (adults); up to 64% (adolescents)",
+      "primary_triggers": {
+        "shoulder_counter_rotation": {"condition": ">", "threshold": 30, "unit": "deg"},
+        "lateral_trunk_flexion": {"condition": ">", "threshold": 35, "unit": "deg"},
+        "seven_day_ball_load": {"condition": ">", "threshold": 234, "unit": "balls"}
+      },
+      "avg_days_to_return": 182,
+      "median_days_to_match": 182,
+      "days_to_mri_bone_union": 203,
+      "recovery_window": "24-36 weeks (6-9 months)"
+    },
+    {
+      "key": "abdominal_side_strain",
+      "injury": "Abdominal Side Strain",
+      "anatomical_site": "Internal / External Obliques",
+      "clinical_incidence": "12%-18%",
+      "primary_triggers": {
+        "lateral_trunk_flexion": {"condition": ">", "threshold": 35, "unit": "deg"},
+        "angular_velocity_deg_s": {"condition": ">", "threshold": 800, "unit": "deg/s"}
+      },
+      "avg_days_to_return": 41,
+      "median_days_to_match": 41,
+      "days_to_mri_bone_union": null,
+      "recovery_window": "6-10 weeks"
+    },
+    {
+      "key": "hamstring_strain",
+      "injury": "Hamstring Muscle Strain",
+      "anatomical_site": "Biceps Femoris",
+      "clinical_incidence": "15%-22%",
+      "primary_triggers": {
+        "stride_length_norm": {"condition": ">", "threshold": 0.88, "unit": "x height"}
+      },
+      "avg_days_to_return": 28,
+      "median_days_to_match": 28,
+      "days_to_mri_bone_union": null,
+      "recovery_window": "3-6 weeks"
+    },
+    {
+      "key": "rotator_cuff_labral",
+      "injury": "Rotator Cuff / Labral Overload",
+      "anatomical_site": "Supraspinatus Tendon",
+      "clinical_incidence": "12%-15%",
+      "primary_triggers": {
+        "shoulder_abduction_deg": {"condition": ">", "threshold": 190, "unit": "deg"},
+        "continuous_overs": {"condition": ">", "threshold": 8, "unit": "overs"}
+      },
+      "avg_days_to_return": 56,
+      "median_days_to_match": 56,
+      "days_to_mri_bone_union": null,
+      "recovery_window": "8-14 weeks"
+    },
+    {
+      "key": "patellar_tendinopathy",
+      "injury": "Patellar Tendinopathy",
+      "anatomical_site": "Patellar Tendon / Meniscus (front leg)",
+      "clinical_incidence": "10%-14%",
+      "primary_triggers": {
+        "knee_angle_ffc": {"condition": "<", "threshold": 150, "unit": "deg"}
+      },
+      "avg_days_to_return": 45,
+      "median_days_to_match": 45,
+      "days_to_mri_bone_union": null,
+      "recovery_window": "6-12 weeks"
+    }
+  ],
+  "workload": {
+    "acwr_sweet_spot": [0.80, 1.30],
+    "acwr_high_risk_above": 1.50,
+    "acwr_high_risk_injury_multiplier": [2.5, 3.3],
+    "seven_day_spike_balls": 234,
+    "seven_day_safe_balls": 197,
+    "seven_day_spike_lumbar_risk_multiplier": 11.0,
+    "rest_days_minimum": 2,
+    "rest_days_short_injury_multiplier": 2.4
+  }
+}

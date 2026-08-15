@@ -6,9 +6,10 @@ venv/
 __pycache__/
 *.py[cod]
 
-# Downloaded model weights (large binaries, fetched on demand -- not committed)
-models/pose_landmarker_heavy.task
-*.pt
+# Downloaded model weights (committed so Video Motion Capture works on
+# Streamlit Cloud without a runtime download step)
+!models/pose_landmarker_heavy.task
+!yolo11n.pt
 
 # Trained model bundles ARE committed (retrain with train_demo_model.py)
 !models/*.joblib
@@ -16,6 +17,8 @@ models/pose_landmarker_heavy.task
 # User-local runtime data (history DB regenerated automatically -- not committed)
 data/*
 !data/synthetic_bowling_dataset.csv
+!data/cricket_injury_recovery_benchmarks.json
+!data/cricket_injury_recovery_benchmarks.csv
 
 # OS / editor
 .DS_Store

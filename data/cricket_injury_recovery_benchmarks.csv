@@ -1,0 +1,6 @@
+Injury_Type,Anatomical_Site,Clinical_Incidence,Primary_Biomechanical_Trigger,Avg_Days_to_Return,Recovery_Window,Median_Days_to_Match
+Lumbar Stress Fracture (LBSI / Spondylolysis),L4/L5 Pars Interarticularis (non-bowling side),"24%-55% (adults); up to 64% (adolescents)","Shoulder counter-rotation >30 deg; lateral trunk flexion >35 deg; 7-day load >234 balls",182,24-36 weeks (6-9 months),182
+Abdominal Side Strain,Internal / External Obliques,12%-18%,"Lateral trunk flexion >35 deg (with rapid rotation); aggressive non-bowling arm pull-down",41,6-10 weeks,41
+Hamstring Muscle Strain,Biceps Femoris,15%-22%,"Overstriding (>88% stature); rapid deceleration at front-foot plant",28,3-6 weeks,28
+Rotator Cuff / Labral Overload,Supraspinatus Tendon,12%-15%,"Shoulder hyper-abduction >190 deg; bowling >8 continuous overs in a spell",56,8-14 weeks,56
+Patellar Tendinopathy,Patellar Tendon / Meniscus (front leg),10%-14%,"Knee flexion <150 deg at front-foot contact absorbing 8-9x body-weight impact",45,6-12 weeks,45
