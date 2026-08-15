@@ -12,6 +12,10 @@ plotly==6.9.0
 # Detection + tracking (YOLOv11 + ByteTrack)
 ultralytics==8.4.115
 
+# Bundles a static ffmpeg (libx264) for writing the browser-playable H.264
+# ball-tracking video (OpenCV wheels have no working H.264 encoder)
+imageio-ffmpeg==0.6.0
+
 # Boosted-tree ML backends (pinned: bundles were pickled with these exact
 # versions -- xgboost/catboost have historically broken old pickles across
 # major bumps). Code falls back to sklearn if absent.
@@ -19,8 +23,9 @@ xgboost==3.3.0
 catboost==1.2.10
 
 # Explainability (optional -- falls back to permutation/finite-diff if absent;
-# note shap on numpy>=2.5 fails to import (numba), which is caught and handled)
+# numba>=0.67 is required for shap to import on numpy>=2.5)
 shap==0.52.0
+numba==0.67.0
 
 # Optional: enables true CNN-LSTM / Transformer sequence models
 # (falls back to sklearn MLP if absent)

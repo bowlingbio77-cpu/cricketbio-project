@@ -150,7 +150,7 @@ def main():
     parser.add_argument("--data", type=str, default=None, help="Path to labeled CSV (defaults to synthetic)")
     parser.add_argument("--model", type=str, default="random_forest",
                         choices=["random_forest", "xgboost", "catboost", "cnn_lstm", "transformer", "all"])
-    parser.add_argument("--n_samples", type=int, default=1500, help="Number of synthetic samples to generate")
+    parser.add_argument("--n_samples", type=int, default=4000, help="Number of synthetic samples to generate")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--synthetic", type=str, default="clinical",
                         choices=["clinical", "binary"],

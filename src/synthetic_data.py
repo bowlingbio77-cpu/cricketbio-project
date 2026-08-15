@@ -43,7 +43,61 @@ def _norm01(series, lo, hi):
     return ((series - lo) / (hi - lo)).clip(0, 1)
 
 
-def generate_clinical_synthetic_dataset(n_samples: int = 1500,
+# Feature ranges mirrored from app.py FEATURE_LABELS sliders so that every
+# value reachable in the UI is inside the training distribution.
+FEATURE_BOUNDS = {
+    "shoulder_rotation_deg": (0, 90),
+    "elbow_flexion_deg": (0, 45),
+    "wrist_angle_deg": (90, 180),
+    "hip_rotation_deg": (0, 80),
+    "knee_flexion_deg": (0, 60),
+    "trunk_lean_deg": (0, 60),
+    "stride_length_norm": (0.3, 1.6),
+    "release_angle_deg": (30, 90),
+    "angular_velocity_deg_s": (100, 1500),
+    "ground_contact_time_s": (0.05, 0.35),
+}
+
+
+def compute_performance_score(df: pd.DataFrame) -> pd.Series:
+    """
+    Biomechanically-grounded 0-100 performance target for fast bowling.
+
+    Each component is a 0-1 "how close to elite" score; weights sum to 1.0.
+    Grounding (fast-bowling literature / ICC law 21.5):
+
+      * angular velocity  -> raw arm speed (pace driver), higher is better
+      * knee flexion      -> front-knee BRACE at landing: ideal small (< ~15 deg);
+                             41 deg knee is a lever-efficiency failure (w = 0)
+      * elbow flexion     -> ICC action legality: flexion should be small (<= 15 deg)
+      * shoulder rotation -> counter-rotation: low is efficient + lumbar-safe
+      * trunk lateral lean-> moderate (~22 deg) is optimal; extreme lean = lumbar risk
+      * stride length     -> long but NOT over-striding (ideal ~1.05 x stature)
+      * hip rotation      -> pelvis/shoulder separation, moderate ~40 deg optimal
+      * release angle     -> release high and over, ideal ~75 deg
+      * ground contact    -> short, explosive front-foot contact, ideal ~0.09 s
+      * wrist angle       -> wrist snap at release, higher is better
+
+    This deliberately makes performance AGREE with the injury model: the same
+    mechanics that score low (weak knee brace, high counter-rotation, trunk
+    collapse) are the ones the clinical trigger thresholds flag as injury risk.
+    """
+    w_av = 0.18 * _norm01(df.angular_velocity_deg_s, 100, 1500)
+    w_knee = 0.16 * (1 - (df.knee_flexion_deg - 6).clip(lower=0) / 30).clip(0, 1)
+    w_elbow = 0.13 * (1 - df.elbow_flexion_deg / 30).clip(0, 1)
+    w_shoulder = 0.11 * (1 - df.shoulder_rotation_deg / 60).clip(0, 1)
+    w_trunk = 0.09 * (1 - (df.trunk_lean_deg - 22).abs() / 30).clip(0, 1)
+    w_stride = 0.09 * (1 - (df.stride_length_norm - 1.05).abs() / 0.6).clip(0, 1)
+    w_hip = 0.08 * (1 - (df.hip_rotation_deg - 40).abs() / 40).clip(0, 1)
+    w_release = 0.07 * (1 - (df.release_angle_deg - 75).abs() / 40).clip(0, 1)
+    w_gct = 0.06 * (1 - (df.ground_contact_time_s - 0.09).clip(lower=0) / 0.2).clip(0, 1)
+    w_wrist = 0.03 * _norm01(df.wrist_angle_deg, 90, 180)
+    score = (w_av + w_knee + w_elbow + w_shoulder + w_trunk
+             + w_stride + w_hip + w_release + w_gct + w_wrist) * 100
+    return score.clip(0, 100)
+
+
+def generate_clinical_synthetic_dataset(n_samples: int = 4000,
                                         seed: int = config.RANDOM_STATE) -> pd.DataFrame:
     """
     Benchmark-grounded synthetic dataset for the 3-class injury-risk model.
@@ -54,11 +108,13 @@ def generate_clinical_synthetic_dataset(n_samples: int = 1500,
       * shoulder counter-rotation  > 30 deg   (lumbar stress fracture)
       * lateral trunk flexion      > 35 deg   (lumbar / abdominal)
       * front-knee flexion         > 30 deg   (patellar: knee angle < 150 deg)
-      * stride length              > 88% stature (hamstring overstriding)
+      * stride length              > 120% stature (hamstring overstriding)
 
     The trigger count is mapped 0 -> low, 1 -> moderate, >=2 -> high, with a
     small label-noise term so the task is not trivially separable. Performance
-    score uses the same kinematic formula as generate_synthetic_dataset.
+    score uses compute_performance_score (biomechanically grounded, agrees with
+    the injury triggers). ~30% of samples are drawn uniformly over the full UI
+    slider ranges so the model stays accurate at the extremes users can reach.
     """
     from . import injury_knowledge_base as kb
 
@@ -73,32 +129,36 @@ def generate_clinical_synthetic_dataset(n_samples: int = 1500,
     shoulder_th = _threshold("shoulder_counter_rotation", 30.0)
     trunk_th = _threshold("lateral_trunk_flexion", 35.0)
     knee_th = 180.0 - _threshold("knee_angle_ffc", 150.0)      # -> flexion threshold
-    stride_th = _threshold("stride_length_norm", 0.88)
+    stride_th = _threshold("stride_length_norm", 1.2)
 
     rng = np.random.default_rng(seed)
-    df = pd.DataFrame({
-        "shoulder_rotation_deg": rng.normal(30, 11, n_samples).clip(0, 90),
-        "elbow_flexion_deg": rng.gamma(2.0, 5.0, n_samples).clip(0, 45),
-        "wrist_angle_deg": rng.normal(150, 20, n_samples).clip(90, 180),
-        "hip_rotation_deg": rng.normal(35, 12, n_samples).clip(0, 80),
-        "knee_flexion_deg": rng.normal(12, 9, n_samples).clip(0, 60),
-        "trunk_lean_deg": rng.normal(20, 10, n_samples).clip(0, 60),
-        "stride_length_norm": rng.normal(0.82, 0.22, n_samples).clip(0.3, 1.6),
-        "release_angle_deg": rng.normal(75, 10, n_samples).clip(30, 90),
-        "angular_velocity_deg_s": rng.normal(700, 200, n_samples).clip(100, 1500),
-        "ground_contact_time_s": rng.normal(0.15, 0.05, n_samples).clip(0.05, 0.35),
-    })
 
-    perf = (
-        0.25 * _norm01(df.shoulder_rotation_deg, 0, 90)
-        + 0.20 * _norm01(df.angular_velocity_deg_s, 100, 1500)
-        + 0.15 * _norm01(df.hip_rotation_deg, 0, 80)
-        + 0.15 * (1 - np.abs(df.stride_length_norm - 1.0) / 0.7).clip(0, 1)
-        + 0.15 * _norm01(df.release_angle_deg, 30, 90)
-        - 0.10 * _norm01(df.trunk_lean_deg, 0, 60)
-    )
-    perf = (perf * 100).clip(0, 100) + rng.normal(0, 5, n_samples)
-    df["performance_score"] = perf.clip(0, 100)
+    # ~70% of samples from realistic clinical marginals, ~30% drawn uniformly
+    # over the full UI slider ranges so the trained models learn the surface
+    # at the corners too (users can push every slider to its extreme).
+    n_clin = int(round(0.7 * n_samples))
+    n_unif = n_samples - n_clin
+
+    clin = pd.DataFrame({
+        "shoulder_rotation_deg": rng.normal(30, 11, n_clin).clip(0, 90),
+        "elbow_flexion_deg": rng.gamma(2.0, 5.0, n_clin).clip(0, 45),
+        "wrist_angle_deg": rng.normal(150, 20, n_clin).clip(90, 180),
+        "hip_rotation_deg": rng.normal(35, 12, n_clin).clip(0, 80),
+        "knee_flexion_deg": rng.normal(12, 9, n_clin).clip(0, 60),
+        "trunk_lean_deg": rng.normal(20, 10, n_clin).clip(0, 60),
+        "stride_length_norm": rng.normal(0.82, 0.22, n_clin).clip(0.3, 1.6),
+        "release_angle_deg": rng.normal(75, 10, n_clin).clip(30, 90),
+        "angular_velocity_deg_s": rng.normal(700, 200, n_clin).clip(100, 1500),
+        "ground_contact_time_s": rng.normal(0.15, 0.05, n_clin).clip(0.05, 0.35),
+    })
+    unif = pd.DataFrame({
+        name: rng.uniform(lo, hi, n_unif)
+        for name, (lo, hi) in FEATURE_BOUNDS.items()
+    })
+    df = pd.concat([clin, unif], ignore_index=True).sample(frac=1.0, random_state=seed).reset_index(drop=True)
+
+    df["performance_score"] = compute_performance_score(df) + rng.normal(0, 4, n_samples)
+    df["performance_score"] = df["performance_score"].clip(0, 100)
 
     # --- 3-class clinical severity from benchmark trigger thresholds ---
     triggers = (

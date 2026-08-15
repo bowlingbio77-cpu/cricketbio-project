@@ -1,8 +1,8 @@
 {
   "model_name": "catboost",
   "data_source": "synthetic",
-  "trained_at": "2026-08-15T06:26:38.852286+00:00",
-  "n_samples": 3000,
+  "trained_at": "2026-08-15T09:19:53.771978+00:00",
+  "n_samples": 4000,
   "injury_label_map": {
     "0": "low",
     "1": "moderate",
@@ -10,20 +10,20 @@
   },
   "performance_metrics": {
     "folds": 5,
-    "n_samples": 3000,
-    "mae_mean": 4.241771845638249,
-    "mae_std": 0.13048365874063284,
-    "r2_mean": 0.590881103554814,
-    "r2_std": 0.02415675591949636,
-    "rmse_mean": 5.305450389751536
+    "n_samples": 4000,
+    "mae_mean": 3.437840171924813,
+    "mae_std": 0.05590031736548531,
+    "r2_mean": 0.8936575359445349,
+    "r2_std": 0.007246795993646073,
+    "rmse_mean": 4.31502139978418
   },
   "injury_metrics": {
     "folds": 5,
-    "n_samples": 3000,
-    "accuracy_mean": 0.9476666666666667,
-    "accuracy_std": 0.006548960901462841,
-    "f1_mean": 0.9476761350875342,
-    "f1_std": 0.0066845968537402965
+    "n_samples": 4000,
+    "accuracy_mean": 0.9512499999999999,
+    "accuracy_std": 0.006373774391990976,
+    "f1_mean": 0.9525317137331258,
+    "f1_std": 0.006446476586189661
   },
-  "training_time_sec": 12.87
+  "training_time_sec": 26.26
 }

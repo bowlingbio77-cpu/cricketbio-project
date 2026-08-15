@@ -1,8 +1,8 @@
 {
   "model_name": "transformer",
   "data_source": "synthetic",
-  "trained_at": "2026-08-15T06:27:54.138039+00:00",
-  "n_samples": 3000,
+  "trained_at": "2026-08-15T09:24:41.755368+00:00",
+  "n_samples": 4000,
   "injury_label_map": {
     "0": "low",
     "1": "moderate",
@@ -10,20 +10,20 @@
   },
   "performance_metrics": {
     "folds": 5,
-    "n_samples": 3000,
-    "mae_mean": 4.358438017631067,
-    "mae_std": 0.15934408925535432,
-    "r2_mean": 0.5637490917505893,
-    "r2_std": 0.03780854639868206,
-    "rmse_mean": 5.473486174530653
+    "n_samples": 4000,
+    "mae_mean": 3.5735379068220956,
+    "mae_std": 0.08893936354289762,
+    "r2_mean": 0.8846333482172998,
+    "r2_std": 0.009826596457061465,
+    "rmse_mean": 4.492876567014838
   },
   "injury_metrics": {
     "folds": 5,
-    "n_samples": 3000,
-    "accuracy_mean": 0.8193333333333334,
-    "accuracy_std": 0.008273115763993916,
-    "f1_mean": 0.8192926215046464,
-    "f1_std": 0.008522437431332176
+    "n_samples": 4000,
+    "accuracy_mean": 0.8414999999999999,
+    "accuracy_std": 0.01307191646240136,
+    "f1_mean": 0.8441936198574946,
+    "f1_std": 0.012610298967918073
   },
-  "training_time_sec": 37.08
+  "training_time_sec": 86.12
 }

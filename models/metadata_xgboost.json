@@ -1,8 +1,8 @@
 {
   "model_name": "xgboost",
   "data_source": "synthetic",
-  "trained_at": "2026-08-15T06:26:25.960912+00:00",
-  "n_samples": 3000,
+  "trained_at": "2026-08-15T09:19:27.423751+00:00",
+  "n_samples": 4000,
   "injury_label_map": {
     "0": "low",
     "1": "moderate",
@@ -10,20 +10,20 @@
   },
   "performance_metrics": {
     "folds": 5,
-    "n_samples": 3000,
-    "mae_mean": 4.318326718993781,
-    "mae_std": 0.1590670306932033,
-    "r2_mean": 0.57611786381171,
-    "r2_std": 0.029861282752802785,
-    "rmse_mean": 5.399000801000563
+    "n_samples": 4000,
+    "mae_mean": 3.620501563413357,
+    "mae_std": 0.05532035202635509,
+    "r2_mean": 0.8815554259048728,
+    "r2_std": 0.007368649945184257,
+    "rmse_mean": 4.5542959900692255
   },
   "injury_metrics": {
     "folds": 5,
-    "n_samples": 3000,
-    "accuracy_mean": 0.9496666666666667,
-    "accuracy_std": 0.008393118874676081,
-    "f1_mean": 0.9496304046337457,
-    "f1_std": 0.008645923023672657
+    "n_samples": 4000,
+    "accuracy_mean": 0.9495000000000001,
+    "accuracy_std": 0.0066895440801298155,
+    "f1_mean": 0.9506187111665778,
+    "f1_std": 0.006904148287186469
   },
-  "training_time_sec": 3.82
+  "training_time_sec": 9.48
 }

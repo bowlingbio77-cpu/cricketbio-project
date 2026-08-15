@@ -8,6 +8,7 @@ which will auto-download `yolo11n.pt` on first use (needs internet).
 Falls back to an OpenCV HOG person-detector if ultralytics isn't installed,
 so the rest of the pipeline can still be exercised offline/without a GPU.
 """
+import os
 from dataclasses import dataclass
 from typing import List
 import numpy as np

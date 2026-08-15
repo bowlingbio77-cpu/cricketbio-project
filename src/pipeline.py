@@ -15,7 +15,8 @@ from dataclasses import dataclass, asdict, field
 from typing import Optional
 import numpy as np
 
-from . import config, preprocessing, detection, tracking, pose_estimation
+from . import config, preprocessing, tracking, pose_estimation
+from . import ball_tracking
 from . import feature_engineering as feateng
 from . import ml_models, explainability, coaching
 
@@ -32,6 +33,8 @@ class AnalysisResult:
     warnings: list = field(default_factory=list)
     camera_view: Optional[str] = None
     bowling_arm: str = "right"
+    video_path: Optional[str] = None       # annotated ball-tracking MP4 (video mode)
+    ball_stats: dict = field(default_factory=dict)
 
     def to_dict(self):
         return asdict(self)
@@ -76,7 +79,8 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
                    target_fps: int = config.TARGET_FPS,
                    resize_dim=config.RESIZE_DIM,
                    denoise: bool = config.DENOISE,
-                   camera_view: str = "behind") -> AnalysisResult:
+                   camera_view: str = "behind",
+                   run_ml: bool = True) -> AnalysisResult:
     """
     Full pipeline on a single delivery video clip. Requires:
       - models/pose_landmarker_heavy.task (MediaPipe pose model, download separately)
@@ -87,6 +91,8 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     `target_fps` / `resize_dim` / `denoise` override the preprocessing defaults
     (speed vs. accuracy trade-off). `camera_view` is recorded and passed to the
     feature engineering (2D fallbacks assume a rear/behind view).
+    `run_ml=False` skips the prediction/SHAP/coaching stages (when the caller
+    will re-run them on the same feature vector) -- avoids a wasted ML pass.
     """
     timings = {}
     warnings = []
@@ -97,6 +103,46 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     frames = list(preprocessing.preprocess_video(video_path, target_fps=target_fps,
                                                   resize_dim=resize_dim, denoise=denoise))
     timings["preprocess"] = time.perf_counter() - t0
+
+    # 1b: ball detection + tracking -> annotated output video (run on the full
+    # frames BEFORE the bowler crop, so the ball is never cut out of frame).
+    video_path = None
+    ball_stats = {}
+    t0 = time.perf_counter()
+    try:
+        track, track_stats = ball_tracking.track_ball(frames)
+        if track:
+            impact_idx = track_stats.get("impact_idx")
+            # The ball is only relevant until it hits the bat/pad/ground: clip
+            # the track at impact so the red box (and the stats below) stop at
+            # contact instead of chasing the deflected/bounced ball.
+            display_track = ([p for p in track if p.frame_idx <= impact_idx]
+                             if impact_idx is not None else track)
+            annotated = ball_tracking.annotate_frames(frames, display_track)
+            video_path = ball_tracking.write_mp4(
+                annotated, ball_tracking.make_output_path(), fps=target_fps)
+            ball_stats = ball_tracking.summarize(display_track, fps=target_fps)
+            ball_stats["release_idx"] = track_stats.get("release_idx")
+            ball_stats["impact_idx"] = impact_idx
+            ball_stats["coverage_pct"] = (ball_stats.get("n_frames", 0) / max(1, len(frames))) * 100
+            warnings.append(
+                f"Ball tracking: {ball_stats['n_detected']} detected + "
+                f"{ball_stats['n_interpolated']} predicted frames "
+                f"({ball_stats['coverage_pct']:.0f}% of clip) -- annotated video below."
+            )
+            if impact_idx is not None:
+                warnings.append(
+                    f"Ball tracking: box stops at frame {impact_idx} (detected bat/pad/ground "
+                    f"contact) so it doesn't chase the ball after it hits the bat.")
+            else:
+                warnings.append("Ball tracking: no clear bat/pad contact detected in this clip, "
+                                "so the box follows the ball for the whole tracked segment.")
+        else:
+            warnings.append("Ball tracking: ball not detected reliably in this clip "
+                            "(no annotated video produced).")
+    except Exception as exc:
+        warnings.append(f"Ball tracking skipped ({exc}).")
+    timings["ball_tracking"] = time.perf_counter() - t0
 
     # 2-3: detection + tracking + bowler crop (best effort)
     t0 = time.perf_counter()
@@ -145,7 +191,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     shap_perf = None
     shap_injury = None
 
-    if performance_bundle is not None:
+    if run_ml and performance_bundle is not None:
         t0 = time.perf_counter()
         performance_score = ml_models.predict(performance_bundle, feature_vector)
         timings["ml_predictions"] = time.perf_counter() - t0
@@ -153,7 +199,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         shap_perf = explainability.explain_prediction(performance_bundle, feature_vector)
         timings["shap_explanation"] = time.perf_counter() - t0
 
-    if injury_bundle is not None:
+    if run_ml and injury_bundle is not None:
         t0 = time.perf_counter()
         injury_risk = ml_models.predict(injury_bundle, feature_vector)
         timings["ml_predictions"] = timings.get("ml_predictions", 0.0) + (time.perf_counter() - t0)
@@ -167,7 +213,8 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         feature_vector, performance_score, injury_risk,
         shap_contributions=shap_injury or shap_perf,
     )
-    timings["coaching"] = time.perf_counter() - t0
+    if run_ml:
+        timings["coaching"] = time.perf_counter() - t0
 
     timings["total"] = time.perf_counter() - t_start
 
@@ -182,6 +229,8 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         warnings=warnings,
         camera_view=camera_view,
         bowling_arm=bowling_arm,
+        video_path=video_path,
+        ball_stats=ball_stats,
     )
 
 

@@ -28,6 +28,24 @@ class PoseFrame:
     world_landmarks: Optional[np.ndarray] = None  # shape (33, 3) -> metric x,y,z (meters)
 
 
+def _primary_person(pose_landmarks) -> int:
+    """
+    Index of the person to analyze. MediaPipe can detect several people in one
+    frame (fielders, keeper, umpire); blindly taking [0] is not guaranteed to
+    be the bowler. We pick the person with the LARGEST landmark bounding box:
+    in a bowler-cropped frame that is the bowler, and in a full scene it is the
+    dominant (usually nearest) person.
+    """
+    best_idx, best_area = 0, -1.0
+    for i, lm in enumerate(pose_landmarks):
+        xs = [p.x for p in lm]
+        ys = [p.y for p in lm]
+        area = (max(xs) - min(xs)) * (max(ys) - min(ys))
+        if area > best_area:
+            best_idx, best_area = i, area
+    return best_idx
+
+
 class PoseEstimator:
     def __init__(self, model_path: str = config.POSE_MODEL_PATH,
                  min_detection_confidence: float = config.POSE_MIN_DETECTION_CONFIDENCE,
@@ -57,12 +75,13 @@ class PoseEstimator:
         if not result.pose_landmarks:
             return None
 
-        lm = result.pose_landmarks[0]  # primary detected person
+        idx = _primary_person(result.pose_landmarks)
+        lm = result.pose_landmarks[idx]
         landmarks = np.array([[p.x, p.y, p.z, p.visibility] for p in lm])
 
         world = None
         if result.pose_world_landmarks:
-            wlm = result.pose_world_landmarks[0]
+            wlm = result.pose_world_landmarks[idx]
             world = np.array([[p.x, p.y, p.z] for p in wlm])
 
         return PoseFrame(frame_idx, timestamp_sec, landmarks, world)
