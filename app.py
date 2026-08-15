@@ -135,20 +135,39 @@ def render_loader(message: str = "Extracting 33 3D Pose Landmarks...",
     components.html(html, height=560, scrolling=False)
 
 
-def render_fullscreen_splash(message: str = "Booting PaceAI Engine...",
+def render_fullscreen_splash(message: str = "Loading...",
                              fps: str = "—", knee: str = "BOOTING", risk: str = "BOOT"):
-    """Full-viewport splash used during app/model startup (CSS animates, JS skipped)."""
-    html = (_loader_html()
-            .replace("{{MESSAGE}}", message)
-            .replace("{{FPS}}", fps)
-            .replace("{{KNEE}}", knee)
-            .replace("{{RISK}}", risk))
-    st.markdown(
-        '<div style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;'
-        'background:#0b0f19;display:flex;align-items:center;justify-content:center;'
-        'overflow:hidden;">' + html + "</div>",
-        unsafe_allow_html=True,
-    )
+    """Full-viewport splash used during app/model startup (self-fading CSS)."""
+    html = f"""
+    <div style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;
+         background:#0b0f19;display:flex;align-items:center;justify-content:center;
+         flex-direction:column;font-family:Arial,sans-serif;
+         animation:splashFade 0.5s ease 2.6s forwards;opacity:1;">
+      <style>
+        @keyframes splashFade {{ to {{ opacity:0; visibility:hidden; pointer-events:none; }} }}
+        @keyframes ballSpin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
+        .splash-ball {{ animation: ballSpin 1.2s linear infinite; }}
+      </style>
+      <svg class="splash-ball" viewBox="0 0 100 100" width="120" height="120" aria-label="Cricket ball">
+        <defs>
+          <radialGradient id="ballGrad" cx="35%" cy="30%" r="85%">
+            <stop offset="0%" stop-color="#e34c4c"/>
+            <stop offset="100%" stop-color="#8f1a1a"/>
+          </radialGradient>
+        </defs>
+        <circle cx="50" cy="50" r="46" fill="url(#ballGrad)"/>
+        <path d="M 24 32 A 46 46 0 0 1 76 32" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2.5"/>
+        <path d="M 24 32 A 46 46 0 0 1 76 32" fill="none" stroke="none"/>
+        <path d="M 30 35 L 34 47 M 38 40 L 42 52 M 46 44 L 50 56 M 54 47 L 58 59 M 62 49 L 66 61" stroke="rgba(255,255,255,0.85)" stroke-width="2" stroke-linecap="round"/>
+        <path d="M 24 32 A 46 46 0 0 0 76 32" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2.5"/>
+        <path d="M 30 35 L 34 23 M 38 40 L 42 28 M 46 44 L 50 32 M 54 47 L 58 35 M 62 49 L 66 37" stroke="rgba(255,255,255,0.85)" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <div style="margin-top:18px;font-size:20px;font-weight:bold;color:#e6edf3;letter-spacing:2px;">
+        {message}
+      </div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
 
 
 # ---------------- HELPERS ----------------
@@ -187,7 +206,7 @@ def load_or_train_models(model_name: str = "random_forest"):
 # model bundle is loaded/cached, then re-run into the real dashboard.
 if not st.session_state.get("booted", False):
     st.session_state["booted"] = True
-    render_fullscreen_splash("Booting PaceAI Biomechanics Engine...")
+    render_fullscreen_splash("Loading...")
     _ = load_or_train_models("random_forest")
     rerun()
 
