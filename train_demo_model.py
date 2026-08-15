@@ -154,8 +154,9 @@ def main():
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--synthetic", type=str, default="clinical",
                         choices=["clinical", "binary"],
-                        help="Which synthetic generator to use when --data is not given "
-                             "(clinical = benchmark-grounded 3-class injury target)")
+                        help="Which synthetic generator to use when --data is not given. "
+                             "'clinical' = benchmark-grounded 3-class injury target (recommended); "
+                             "'binary' = deprecated legacy alias (also emits 3-class severity)")
     args = parser.parse_args()
 
     set_seed(args.seed)

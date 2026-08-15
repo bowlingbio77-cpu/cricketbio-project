@@ -260,9 +260,10 @@ def train_injury_model(X: np.ndarray, y: np.ndarray, model_name: ModelName = "ra
 def predict(bundle: TrainedBundle, feature_vector: dict):
     x = np.array([[feature_vector[f] for f in bundle.feature_names]])
     xs = bundle.scaler.transform(x)
+    raw = np.asarray(bundle.model.predict(xs)).ravel()
     if bundle.task == "performance":
-        return float(bundle.model.predict(xs)[0])
-    pred_idx = int(bundle.model.predict(xs)[0])
+        return float(raw[0])
+    pred_idx = int(raw[0])
     proba = None
     if hasattr(bundle.model, "predict_proba"):
         proba = bundle.model.predict_proba(xs)[0].tolist()

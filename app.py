@@ -25,7 +25,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 from src import config, ml_models, explainability, pipeline, history_db, injury_knowledge_base as injury_kb
-from src.synthetic_data import generate_synthetic_dataset
+from src.synthetic_data import generate_clinical_synthetic_dataset
 
 # ---------------- PAGE CONFIGURATION ----------------
 st.set_page_config(
@@ -172,7 +172,7 @@ def load_or_train_models(model_name: str = "random_forest"):
             f"(run `python train_demo_model.py` once to cache this).")
     render_loader(message=f"Training {model_name} models on synthetic demo data...",
                   fps="—", knee="BOOTING", risk="TRAIN")
-    df = generate_synthetic_dataset()
+    df = generate_clinical_synthetic_dataset()
     X = df[config.FEATURE_NAMES].values
     perf_bundle = ml_models.train_performance_model(X, df[config.PERFORMANCE_TARGET].values, model_name)
     injury_bundle = ml_models.train_injury_model(X, df[config.INJURY_TARGET].values, model_name)
@@ -381,7 +381,7 @@ def render_timings(stage_times: dict):
                       paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                       font=dict(color="#c9d1d9"),
                       margin=dict(l=10, r=10, t=40, b=10), xaxis_title="Seconds")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
     total = stage_times.get("total")
     if total is not None:
         st.caption(f"**Total pipeline time: {total:.2f}s**")
@@ -506,7 +506,7 @@ def render_history_page():
         }
         for r in records
     ])
-    st.dataframe(table, use_container_width=True, hide_index=True)
+    st.dataframe(table, width='stretch', hide_index=True)
 
     # --- Performance over time ---
     chrono = sorted([r for r in records if r.get("performance_score") is not None],
@@ -525,7 +525,7 @@ def render_history_page():
                           font=dict(color="#c9d1d9"), margin=dict(l=10, r=10, t=30, b=10),
                           xaxis_title="Date", yaxis_title="Performance score",
                           yaxis=dict(range=[0, 100]))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     elif chrono:
         st.subheader("Performance over time")
         st.caption("Save more results to see a performance trend chart.")
@@ -551,7 +551,7 @@ def render_history_page():
                               paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                               font=dict(color="#c9d1d9"), margin=dict(l=10, r=10, t=40, b=10),
                               yaxis=dict(range=[0, 100]))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         with c2:
             fig = go.Figure(go.Bar(
                 x=sel_names, y=[_risk_of(r) for r in sel],
@@ -561,7 +561,7 @@ def render_history_page():
             fig.update_layout(title="Injury risk", height=320,
                               paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                               font=dict(color="#c9d1d9"), margin=dict(l=10, r=10, t=40, b=10))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
         st.markdown("**Feature-by-feature comparison**")
         feat_rows = []
@@ -573,7 +573,7 @@ def render_history_page():
             if len(vals) > 1 and all(v is not None for v in vals):
                 row["Δ last vs first"] = round(vals[-1] - vals[0], 2)
             feat_rows.append(row)
-        st.dataframe(pd.DataFrame(feat_rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(feat_rows), width='stretch', hide_index=True)
 
         if len(selected) >= 2:
             fig = go.Figure()
@@ -584,7 +584,7 @@ def render_history_page():
             fig.update_layout(title="Feature values by session", barmode="group",
                               height=400, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                               font=dict(color="#c9d1d9"), margin=dict(l=10, r=10, t=40, b=10))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
         # --- Detail view ---
         st.subheader("Session details")
@@ -596,14 +596,14 @@ def render_history_page():
             perf = detail.get("performance_score")
             st.plotly_chart(render_modern_gauge(perf if perf is not None else 0,
                                                 "Performance Score" if perf is not None else "Performance (n/a)"),
-                            use_container_width=True)
+                            width='stretch')
         with c2:
             risk = detail.get("injury_risk")
             if isinstance(risk, dict) and risk.get("probabilities"):
                 probs = risk["probabilities"]
                 risk_num = {"low": 25, "moderate": 60, "high": 90}[risk.get("risk_level", "low")]
                 st.plotly_chart(render_modern_gauge(risk_num, f"Injury Risk: {risk['risk_level'].upper()}",
-                                                    is_risk=True), use_container_width=True)
+                                                    is_risk=True), width='stretch')
                 if len(probs) >= 3:
                     st.caption(f"P(low)={probs[0]:.2f}  P(moderate)={probs[1]:.2f}  P(high)={probs[2]:.2f}")
             else:
@@ -615,7 +615,7 @@ def render_history_page():
                  "Unit": FEATURE_LABELS.get(k, ("", ""))[1]}
                 for k, v in detail["feature_vector"].items()
             ])
-            st.dataframe(feat_df, use_container_width=True, hide_index=True)
+            st.dataframe(feat_df, width='stretch', hide_index=True)
         with st.expander("Coaching recommendations"):
             notes = detail.get("coaching_notes") or []
             for note in notes:
@@ -629,7 +629,7 @@ def render_history_page():
                 if shap_perf:
                     st.plotly_chart(render_shap_bar(shap_perf,
                                                     "Feature contribution to performance score"),
-                                    use_container_width=True)
+                                    width='stretch')
                 else:
                     st.caption("No performance SHAP data stored for this session.")
             with tab2:
@@ -637,7 +637,7 @@ def render_history_page():
                 if shap_injury:
                     st.plotly_chart(render_shap_bar(shap_injury,
                                                     "Feature contribution to injury-risk score"),
-                                    use_container_width=True)
+                                    width='stretch')
                 else:
                     st.caption("No injury SHAP data stored for this session.")
         with st.expander("Run timing"):
@@ -650,12 +650,12 @@ def render_history_page():
         del_opts = st.multiselect("Select sessions to delete", list(options.keys()),
                                   format_func=lambda i: options[i], key="delete_select")
     with m2:
-        if st.button("Delete selected", use_container_width=True):
+        if st.button("Delete selected", width='stretch'):
             history_db.delete_analysis(del_opts)
             st.toast(f"Deleted {len(del_opts)} session(s).")
             rerun()
     with m3:
-        if st.button("Clear all history", use_container_width=True):
+        if st.button("Clear all history", width='stretch'):
             history_db.clear_all()
             st.toast("History cleared.")
             rerun()
@@ -782,32 +782,31 @@ else:
         if not os.path.exists(config.POSE_MODEL_PATH):
             st.warning("MediaPipe pose task model missing. Run pose downloader or manual entry.")
         else:
-            loader = st.empty()
-            with loader.container():
-                render_loader(message=f"Analyzing '{uploaded.name}'...",
-                              fps=str(target_fps),
-                              knee="ANALYZING",
-                              risk="CALC...")
-            try:
-                result = pipeline.analyze_video(
-                    video_path,
-                    bowling_arm=bowling_arm.lower().split("-")[0],
-                    performance_bundle=perf_bundle,
-                    injury_bundle=injury_bundle,
-                    target_fps=target_fps,
-                    resize_dim=resize_choice,
-                    denoise=denoise,
-                    camera_view=camera_view,
-                )
-                loader.empty()
-                feature_vector = result.feature_vector
-                st.session_state["video_stage_times"] = dict(result.stage_times or {})
-                st.session_state["video_upload_time"] = upload_time
-                st.session_state["last_warnings"] = list(result.warnings or [])
-                st.success("✅ Delivery motion capture completed successfully!")
-            except Exception as e:
-                loader.empty()
-                st.error(f"Pipeline error: {e}")
+            with st.status(f"Analyzing delivery kinematics: '{uploaded.name}'...", expanded=True) as status:
+                st.write("Tracking bowler ROI & cropping crease...")
+                st.write("Extracting 33 3D landmarks (MediaPipe)...")
+                try:
+                    result = pipeline.analyze_video(
+                        video_path,
+                        bowling_arm=bowling_arm.lower().split("-")[0],
+                        performance_bundle=perf_bundle,
+                        injury_bundle=injury_bundle,
+                        target_fps=target_fps,
+                        resize_dim=resize_choice,
+                        denoise=denoise,
+                        camera_view=camera_view,
+                    )
+                    st.write("Calculating knee brace & shoulder counter-rotation...")
+                    st.write("Evaluating clinical lumbar stress risk...")
+                    status.update(label="Analysis complete", state="complete", expanded=False)
+                    feature_vector = result.feature_vector
+                    st.session_state["video_stage_times"] = dict(result.stage_times or {})
+                    st.session_state["video_upload_time"] = upload_time
+                    st.session_state["last_warnings"] = list(result.warnings or [])
+                    st.success(f"✅ Delivery processed ({target_fps} FPS)")
+                except Exception as e:
+                    status.update(label="Analysis failed", state="error", expanded=True)
+                    st.error(f"Pipeline error: {e}")
 
 
 # ---------------- ANALYSIS & VISUALIZATION ----------------
@@ -892,7 +891,7 @@ if feature_vector:
         with col_g1:
             st.plotly_chart(
                 render_modern_gauge(result.performance_score, "Performance & Pace Potential", "Kinematic Energy Transfer Score"),
-                use_container_width=True
+                width='stretch'
             )
             interval = ml_models.prediction_interval_performance(perf_bundle, feature_vector)
             if interval:
@@ -901,7 +900,7 @@ if feature_vector:
         with col_g2:
             st.plotly_chart(
                 render_modern_gauge(risk_score, "Injury Hazard Index", f"Overall Risk: {risk_level.upper()}", is_risk=True),
-                use_container_width=True
+                width='stretch'
             )
             if len(risk_probs) >= 3:
                 st.caption(f"P(low)={risk_probs[0]:.2f}  P(moderate)={risk_probs[1]:.2f}  "
@@ -927,7 +926,7 @@ if feature_vector:
     with tab_radar:
         st.markdown("#### 🕸️ Biomechanical Signature vs Elite Fast Bowlers")
         st.caption("A wider, balanced polygon indicates closer alignment with ideal aerodynamic and kinematic levers.")
-        st.plotly_chart(render_radar_comparison(feature_vector), use_container_width=True)
+        st.plotly_chart(render_radar_comparison(feature_vector), width='stretch')
 
     with tab_shap:
         st.markdown("#### 🧠 Model Explainability Breakdown")
@@ -937,13 +936,13 @@ if feature_vector:
             if result.shap_contributions_performance:
                 st.plotly_chart(
                     render_shap_bar(result.shap_contributions_performance, "Performance Contributors (Blue = Positive, Red = Drag)"),
-                    use_container_width=True
+                    width='stretch'
                 )
         with shap_c2:
             if result.shap_contributions_injury:
                 st.plotly_chart(
                     render_shap_bar(result.shap_contributions_injury, "Injury Hazard Risk Drivers (Red = Elevates Risk)"),
-                    use_container_width=True
+                    width='stretch'
                 )
 
     with tab_coaching:
@@ -1033,7 +1032,7 @@ if feature_vector:
                 "median_days_to_match": "Median Days to Match",
                 "recovery_window": "Recovery Window",
             })
-            st.dataframe(bench_df, use_container_width=True, hide_index=True)
+            st.dataframe(bench_df, width='stretch', hide_index=True)
 
     with tab_export:
         st.markdown("### 📑 Biomechanical Delivery Report")
@@ -1045,7 +1044,7 @@ if feature_vector:
             }
             for k, v in feature_vector.items()
         ])
-        st.dataframe(feat_df, use_container_width=True, hide_index=True)
+        st.dataframe(feat_df, width='stretch', hide_index=True)
 
         report_json = json.dumps({
             "performance_score": result.performance_score,

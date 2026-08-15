@@ -9,67 +9,34 @@ ranges and label-generating rules are grounded in published fast-bowling
 biomechanics ranges (ICC elbow-extension law, typical elite trunk-lean/knee-
 flexion/stride-length bands referenced in coaching.py).
 
-Injury risk is modelled as the *chance of an injury occurring if the same
-action is performed long-term*: a per-delivery hazard is derived from the
-release-point mechanics, then combined with a sampled long-term exposure
-(number of deliveries) into a cumulative chronic probability, and finally a
-single binary outcome ("injury_occurred") is simulated per row. The trained
-model therefore predicts P(injury) for the exposure chosen at inference time.
+Injury risk is modelled as a *3-class severity level* (0=low, 1=moderate,
+2=high) derived from clinical trigger thresholds in
+data/cricket_injury_recovery_benchmarks.json (see
+generate_clinical_synthetic_dataset). The trained model therefore predicts
+P(severity) per delivery.
 
 Replace this with `pd.read_csv(<your real labeled dataset>)` as soon as you
 have one -- train_demo_model.py works with either.
 """
+import warnings
+
 import numpy as np
 import pandas as pd
 from . import config
 
 
 def generate_synthetic_dataset(n_samples: int = 1500, seed: int = config.RANDOM_STATE) -> pd.DataFrame:
-    rng = np.random.default_rng(seed)
+    """Deprecated alias for generate_clinical_synthetic_dataset.
 
-    df = pd.DataFrame({
-        "shoulder_rotation_deg": rng.normal(40, 15, n_samples).clip(0, 90),
-        "elbow_flexion_deg": rng.gamma(2.0, 5.0, n_samples).clip(0, 45),  # most bowlers legal (<15), tail illegal
-        "wrist_angle_deg": rng.normal(150, 20, n_samples).clip(90, 180),
-        "hip_rotation_deg": rng.normal(35, 12, n_samples).clip(0, 80),
-        "knee_flexion_deg": rng.normal(18, 10, n_samples).clip(0, 60),
-        "trunk_lean_deg": rng.normal(27, 10, n_samples).clip(0, 60),
-        "stride_length_norm": rng.normal(0.95, 0.2, n_samples).clip(0.3, 1.6),
-        "release_angle_deg": rng.normal(75, 10, n_samples).clip(30, 90),
-        "angular_velocity_deg_s": rng.normal(700, 200, n_samples).clip(100, 1500),
-        "ground_contact_time_s": rng.normal(0.15, 0.05, n_samples).clip(0.05, 0.35),
-    })
-
-    # --- Performance score: rewards good rotation/velocity, penalizes poor mechanics ---
-    perf = (
-        0.25 * _norm01(df.shoulder_rotation_deg, 0, 90)
-        + 0.20 * _norm01(df.angular_velocity_deg_s, 100, 1500)
-        + 0.15 * _norm01(df.hip_rotation_deg, 0, 80)
-        + 0.15 * (1 - np.abs(df.stride_length_norm - 1.0) / 0.7).clip(0, 1)
-        + 0.15 * _norm01(df.release_angle_deg, 30, 90)
-        - 0.10 * _norm01(df.trunk_lean_deg, 0, 60)
-    )
-    perf = (perf * 100).clip(0, 100) + rng.normal(0, 5, n_samples)
-    df["performance_score"] = perf.clip(0, 100)
-
-    # --- Injury risk: chance that a load injury occurs if this SAME action is
-    # performed long-term. A per-delivery hazard comes from the release-point
-    # mechanics; combining it with a long-term exposure (number of deliveries
-    # performed over time) gives a cumulative chronic probability, from which a
-    # single binary outcome is simulated per row.
-    hazard = (
-        1.5 * (df.elbow_flexion_deg > config.ICC_ELBOW_EXTENSION_LIMIT_DEG).astype(float)
-        + 1.2 * _norm01(df.trunk_lean_deg, 15, 60)
-        + 1.0 * _norm01(df.knee_flexion_deg, 5, 60)
-        + 0.8 * _norm01(df.ground_contact_time_s, 0.1, 0.35)
-    )
-    per_delivery_prob = 1 / (1 + np.exp(-(hazard - 1.6)))       # logistic hazard in (0,1)
-    exposure = rng.uniform(100, 1500, n_samples)                # long-term deliveries
-    chronic_prob = 1 - (1 - per_delivery_prob) ** exposure      # P(injury after N repeats)
-    df[config.INJURY_EXPOSURE_FEATURE] = exposure
-    df[config.INJURY_TARGET] = (rng.uniform(size=n_samples) < chronic_prob).astype(int)
-
-    return df
+    Kept for backward compatibility (the app's no-bundle fallback and the
+    ``--synthetic binary`` CLI path both call it). The earlier binary hazard
+    model saturated to a single class for typical exposures, so it is no longer
+    generated here.
+    """
+    warnings.warn(
+        "generate_synthetic_dataset is deprecated; use generate_clinical_synthetic_dataset.",
+        DeprecationWarning, stacklevel=2)
+    return generate_clinical_synthetic_dataset(n_samples=n_samples, seed=seed)
 
 
 def _norm01(series, lo, hi):
