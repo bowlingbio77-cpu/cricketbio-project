@@ -19,11 +19,12 @@ import json
 import tempfile
 import time
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
-from src import config, ml_models, explainability, pipeline, history_db
+from src import config, ml_models, explainability, pipeline, history_db, injury_knowledge_base as injury_kb
 from src.synthetic_data import generate_synthetic_dataset
 
 # ---------------- PAGE CONFIGURATION ----------------
@@ -115,6 +116,41 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+# ---------------- LOADING OVERLAY ----------------
+@st.cache_data
+def _loader_html() -> str:
+    path = os.path.join(config.ASSETS_DIR, "loading_overlay.html")
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+def render_loader(message: str = "Extracting 33 3D Pose Landmarks...",
+                  fps: str = "120", knee: str = "OPTIMAL", risk: str = "CALC..."):
+    """Render the animated Biomech AI loading overlay (self-playing CSS/JS)."""
+    html = (_loader_html()
+            .replace("{{MESSAGE}}", message)
+            .replace("{{FPS}}", fps)
+            .replace("{{KNEE}}", knee)
+            .replace("{{RISK}}", risk))
+    components.html(html, height=560, scrolling=False)
+
+
+def render_fullscreen_splash(message: str = "Booting PaceAI Engine...",
+                             fps: str = "—", knee: str = "BOOTING", risk: str = "BOOT"):
+    """Full-viewport splash used during app/model startup (CSS animates, JS skipped)."""
+    html = (_loader_html()
+            .replace("{{MESSAGE}}", message)
+            .replace("{{FPS}}", fps)
+            .replace("{{KNEE}}", knee)
+            .replace("{{RISK}}", risk))
+    st.markdown(
+        '<div style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;'
+        'background:#0b0f19;display:flex;align-items:center;justify-content:center;'
+        'overflow:hidden;">' + html + "</div>",
+        unsafe_allow_html=True,
+    )
+
+
 # ---------------- HELPERS ----------------
 def rerun():
     if hasattr(st, "rerun"):
@@ -134,6 +170,8 @@ def load_or_train_models(model_name: str = "random_forest"):
 
     st.info(f"No saved '{model_name}' models found -- training on synthetic demo data now "
             f"(run `python train_demo_model.py` once to cache this).")
+    render_loader(message=f"Training {model_name} models on synthetic demo data...",
+                  fps="—", knee="BOOTING", risk="TRAIN")
     df = generate_synthetic_dataset()
     X = df[config.FEATURE_NAMES].values
     perf_bundle = ml_models.train_performance_model(X, df[config.PERFORMANCE_TARGET].values, model_name)
@@ -142,6 +180,16 @@ def load_or_train_models(model_name: str = "random_forest"):
     ml_models.save_bundle(perf_bundle, perf_path)
     ml_models.save_bundle(injury_bundle, injury_path)
     return perf_bundle, injury_bundle
+
+
+# ---------------- BOOT SPLASH ----------------
+# On the very first run, show a full-screen loading overlay while the default
+# model bundle is loaded/cached, then re-run into the real dashboard.
+if not st.session_state.get("booted", False):
+    st.session_state["booted"] = True
+    render_fullscreen_splash("Booting PaceAI Biomechanics Engine...")
+    _ = load_or_train_models("random_forest")
+    rerun()
 
 
 FEATURE_LABELS = {
@@ -734,25 +782,32 @@ else:
         if not os.path.exists(config.POSE_MODEL_PATH):
             st.warning("MediaPipe pose task model missing. Run pose downloader or manual entry.")
         else:
-            with st.spinner("Extracting 33 body landmarks and kinematic angles across delivery frames..."):
-                try:
-                    result = pipeline.analyze_video(
-                        video_path,
-                        bowling_arm=bowling_arm.lower().split("-")[0],
-                        performance_bundle=perf_bundle,
-                        injury_bundle=injury_bundle,
-                        target_fps=target_fps,
-                        resize_dim=resize_choice,
-                        denoise=denoise,
-                        camera_view=camera_view,
-                    )
-                    feature_vector = result.feature_vector
-                    st.session_state["video_stage_times"] = dict(result.stage_times or {})
-                    st.session_state["video_upload_time"] = upload_time
-                    st.session_state["last_warnings"] = list(result.warnings or [])
-                    st.success("✅ Delivery motion capture completed successfully!")
-                except Exception as e:
-                    st.error(f"Pipeline error: {e}")
+            loader = st.empty()
+            with loader.container():
+                render_loader(message=f"Analyzing '{uploaded.name}'...",
+                              fps=str(target_fps),
+                              knee="ANALYZING",
+                              risk="CALC...")
+            try:
+                result = pipeline.analyze_video(
+                    video_path,
+                    bowling_arm=bowling_arm.lower().split("-")[0],
+                    performance_bundle=perf_bundle,
+                    injury_bundle=injury_bundle,
+                    target_fps=target_fps,
+                    resize_dim=resize_choice,
+                    denoise=denoise,
+                    camera_view=camera_view,
+                )
+                loader.empty()
+                feature_vector = result.feature_vector
+                st.session_state["video_stage_times"] = dict(result.stage_times or {})
+                st.session_state["video_upload_time"] = upload_time
+                st.session_state["last_warnings"] = list(result.warnings or [])
+                st.success("✅ Delivery motion capture completed successfully!")
+            except Exception as e:
+                loader.empty()
+                st.error(f"Pipeline error: {e}")
 
 
 # ---------------- ANALYSIS & VISUALIZATION ----------------
@@ -823,11 +878,12 @@ if feature_vector:
     render_ood_warnings(feature_vector, perf_bundle)
 
     # ---------------- TABBED DETAILED BREAKDOWN ----------------
-    tab_summary, tab_radar, tab_shap, tab_coaching, tab_export = st.tabs([
+    tab_summary, tab_radar, tab_shap, tab_coaching, tab_clinical, tab_export = st.tabs([
         "📊 Gauges & Joint Stress",
         "🕸️ Kinetic Radar vs Pro Benchmark",
         "🧠 Explainable AI (SHAP)",
         "🏋️ Coaching & Rehab Drills",
+        "🏥 Clinical Risk",
         "📑 Biomechanical Report"
     ])
 
@@ -918,6 +974,66 @@ if feature_vector:
             - *Drill:* Half-kneeling Pallof presses & suitcase carries.
             - *Target:* Minimize excessive trunk lateral flexion to prevent L4/L5 lumbar stress fractures.
             """)
+
+    with tab_clinical:
+        st.markdown("### 🏥 Clinical Injury-Risk Benchmarks")
+        st.caption("Literature-derived trigger thresholds (data/cricket_injury_recovery_benchmarks.json) "
+                   "evaluated against this delivery. Screening reference only -- not a medical diagnosis.")
+
+        clinical_feats = injury_kb.map_from_pipeline_features(feature_vector)
+        risks = injury_kb.assess_biomechanical_risks(clinical_feats)
+
+        if risks:
+            for r in risks:
+                badge_cls = "badge-high" if r["severity"] == "High" else "badge-moderate"
+                trig_text = "".join(f"<li>{t}</li>" for t in r["trigger_detected"])
+                st.markdown(f"""
+                <div class="drill-card">
+                    <b>🩺 {r['injury']}</b>
+                    &nbsp;<span class="status-badge {badge_cls}">{r['severity'].upper()} RISK</span>
+                    <div style="margin-top:6px; color:#8b949e; font-size:0.85rem;">
+                        <b>Site:</b> {r['anatomical_site']} &nbsp;•&nbsp;
+                        <b>Incidence:</b> {r['clinical_incidence']}
+                    </div>
+                    <div style="margin-top:4px; font-size:0.9rem;">
+                        <b>Trigger:</b>
+                        <ul style="margin:4px 0 4px 18px; color:#e6edf3;">{trig_text}</ul>
+                    </div>
+                    <div style="color:#8b949e; font-size:0.85rem;">
+                        <b>Recovery:</b> {r['est_recovery_timeline']}
+                        (median <b style="color:#ef5350">{r['median_days_to_match']}</b> days to match fitness)
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.success("No clinical benchmark trigger thresholds exceeded for this delivery.")
+
+        st.markdown("#### 🧬 Workload & ACWR (optional inputs)")
+        w1, w2, w3 = st.columns(3)
+        with w1:
+            acwr = st.number_input("ACWR (acute:chronic workload ratio)", 0.0, 3.0, 1.0, 0.05,
+                                   help="Sweet spot 0.80-1.30; >1.50 = 2.5x-3.3x injury likelihood.")
+        with w2:
+            seven_day_load = st.number_input("7-day bowling load (balls)", 0, 2000, 180, 1,
+                                             help=">234 balls in 7 days ≈ 11x lumbar stress-fracture risk vs <197.")
+        with w3:
+            rest_days = st.number_input("Rest days between spells", 0, 14, 3, 1,
+                                        help="<2 rest days between spells = 2.4x higher injury rate.")
+        for check in injury_kb.workload_risk(acwr=acwr, seven_day_load=seven_day_load, rest_days=rest_days):
+            icon = {"at_risk": "🚨", "warning": "⚠️", "ok": "✅"}.get(check["status"], "•")
+            st.markdown(f"{icon} **{check['check']}** — {check['detail']}")
+
+        with st.expander("Full clinical benchmark table"):
+            bench_df = pd.DataFrame(injury_kb.all_benchmarks())
+            bench_df = bench_df.rename(columns={
+                "injury": "Injury", "anatomical_site": "Anatomical Site",
+                "clinical_incidence": "Clinical Incidence",
+                "primary_triggers": "Primary Triggers",
+                "avg_days_to_return": "Avg Days to Return",
+                "median_days_to_match": "Median Days to Match",
+                "recovery_window": "Recovery Window",
+            })
+            st.dataframe(bench_df, use_container_width=True, hide_index=True)
 
     with tab_export:
         st.markdown("### 📑 Biomechanical Delivery Report")

@@ -1,29 +1,39 @@
 """
-Trains the performance-assessment and injury-risk models and saves them to
-models/, so the Streamlit dashboard has something to load immediately.
+Trains performance-assessment and injury-risk models and exports bundled
+artifacts to models/ along with training metadata for dashboard inspection.
 
 Usage:
-    python train_demo_model.py                       # synthetic demo data, random_forest
-    python train_demo_model.py --model xgboost
-    python train_demo_model.py --data path/to/real_dataset.csv   # once you have real labels
+    python train_demo_model.py                       # Clinical-benchmark synthetic, Random Forest
+    python train_demo_model.py --model xgboost       # Train XGBoost
+    python train_demo_model.py --model all           # Benchmark all available models
+    python train_demo_model.py --data dataset.csv    # Train on real labeled data
+    python train_demo_model.py --synthetic binary    # Old binary demo generator instead of clinical
 
-Real dataset CSV must have columns: config.FEATURE_NAMES + ["performance_score", "injury_risk"]
-where injury_risk is in {0,1,2} = {low, moderate, high}.
-
-Reports honest 5-fold cross-validated metrics and compares them against trivial
-baselines (mean-predictor / majority-class) so you can see whether the model
-actually adds predictive value. Models trained on the synthetic demo data are
-flagged as such -- near-perfect metrics there are expected because the labels
-are generated from the same features, and say nothing about real-world accuracy.
+Injury target: 0=low, 1=moderate, 2=high. The default synthetic source
+(generate_clinical_synthetic_dataset) derives these 3 classes from the trigger
+thresholds in data/cricket_injury_recovery_benchmarks.json.
 """
 import argparse
+import json
 import os
+import random
+import sys
+import time
+from datetime import datetime, timezone
+import numpy as np
 import pandas as pd
 
-from src import config, ml_models
-from src.synthetic_data import generate_synthetic_dataset
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, ValueError):
+    pass
 
-# Expected plausible ranges per feature (used for sanity checks only -- not enforced).
+from src import config, ml_models
+from src.synthetic_data import generate_synthetic_dataset, generate_clinical_synthetic_dataset
+
+INJURY_LABEL_MAP = {0: "low", 1: "moderate", 2: "high"}
+
 FEATURE_SANITY_RANGES = {
     "shoulder_rotation_deg": (0, 90),
     "elbow_flexion_deg": (0, 45),
@@ -38,112 +48,155 @@ FEATURE_SANITY_RANGES = {
 }
 
 
+def set_seed(seed: int = 42):
+    random.seed(seed)
+    np.random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+
+
 def validate_dataset(df: pd.DataFrame) -> pd.DataFrame:
-    """Raise clear errors on missing columns / bad labels; drop unusable rows."""
+    """Validate column types, targets, and check sanity bounds."""
     required = config.FEATURE_NAMES + [config.PERFORMANCE_TARGET, config.INJURY_TARGET]
     missing = [c for c in required if c not in df.columns]
     if missing:
-        raise SystemExit(
-            f"Dataset is missing required columns: {missing}\n"
-            f"Expected: {required}"
-        )
+        raise SystemExit(f"❌ Missing required columns: {missing}\nExpected: {required}")
 
     df = df.dropna(subset=required).copy()
     if len(df) == 0:
-        raise SystemExit("No complete rows after dropping rows with missing values.")
+        raise SystemExit("❌ Dataset is empty after dropping missing values.")
 
     bad_risk = sorted(set(df[config.INJURY_TARGET].unique()) - {0, 1, 2})
     if bad_risk:
-        raise SystemExit(
-            f"injury_risk must contain only {{0,1,2}} (0=low,1=moderate,2=high), "
-            f"found: {bad_risk}"
-        )
+        raise SystemExit(f"❌ injury_risk must only contain {{0, 1, 2}}, found: {bad_risk}")
 
-    non_numeric = [c for c in config.FEATURE_NAMES
-                   if not pd.api.types.is_numeric_dtype(df[c])]
+    non_numeric = [c for c in config.FEATURE_NAMES if not pd.api.types.is_numeric_dtype(df[c])]
     if non_numeric:
-        raise SystemExit(f"Features must be numeric, found non-numeric: {non_numeric}")
+        raise SystemExit(f"❌ Non-numeric feature columns found: {non_numeric}")
 
+    # Biomechanical plausibility check
     for c, (lo, hi) in FEATURE_SANITY_RANGES.items():
         outside = df[(df[c] < lo) | (df[c] > hi)]
         if len(outside):
-            print(f"  ⚠ warning: {len(outside)} rows have {c} outside the plausible range "
-                  f"[{lo}, {hi}] (min={df[c].min():.2f}, max={df[c].max():.2f}).")
+            print(f"  ⚠️  Warning: {len(outside)} rows have '{c}' outside typical range "
+                  f"[{lo}, {hi}] (min={df[c].min():.1f}, max={df[c].max():.1f}).")
     return df
 
 
 def print_report(bundle):
     cv = getattr(bundle, "cv_metrics", None) or {}
     base = getattr(bundle, "baseline_metrics", None) or {}
+
     if bundle.task == "performance":
         cv_r2 = cv.get("r2_mean", 0.0)
-        print(f"  MAE  = {cv.get('mae_mean', 0.0):.2f} +- {cv.get('mae_std', 0.0):.2f} / 100")
-        print(f"  RMSE = {cv.get('rmse_mean', 0.0):.2f}")
-        print(f"  R2   = {cv_r2:.3f} +- {cv.get('r2_std', 0.0):.3f}   "
-              f"(baseline 'always predict mean' R2 = {base.get('r2', 0.0):.3f})")
+        print(f"  • MAE  : {cv.get('mae_mean', 0.0):.2f} ± {cv.get('mae_std', 0.0):.2f} pts")
+        print(f"  • RMSE : {cv.get('rmse_mean', 0.0):.2f}")
+        print(f"  • R²   : {cv_r2:.3f} ± {cv.get('r2_std', 0.0):.3f} (Trivial Mean Baseline R² = {base.get('r2', 0.0):.3f})")
         if bundle.data_source == "synthetic":
-            print("  NOTE: SYNTHETIC demo data -- labels are generated from these features, so "
-                  "metrics only measure fit to the demo generator, not real bowling performance.")
+            print("    ℹ️  NOTE: Trained on SYNTHETIC data. High fit is expected.")
         elif cv_r2 > 0.95:
-            print("  WARNING: R2 > 0.95 on real data is suspicious -- check for label leakage "
-                  "or a feature that is an input to the target.")
+            print("    ⚠️  WARNING: R² > 0.95 on real data indicates potential target leakage.")
     else:
         acc = cv.get("accuracy_mean", 0.0)
-        print(f"  Accuracy = {acc:.3f} +- {cv.get('accuracy_std', 0.0):.3f}   "
-              f"(baseline 'always majority class' = {base.get('accuracy', 0.0):.3f})")
-        print(f"  F1 (macro) = {cv.get('f1_mean', 0.0):.3f} +- {cv.get('f1_std', 0.0):.3f}")
+        print(f"  • Accuracy : {acc:.3f} ± {cv.get('accuracy_std', 0.0):.3f} (Majority Class Baseline = {base.get('accuracy', 0.0):.3f})")
+        print(f"  • F1-Macro : {cv.get('f1_mean', 0.0):.3f} ± {cv.get('f1_std', 0.0):.3f}")
+        print(f"  • Classes  : {sorted(bundle.label_map.items())}")
         if bundle.data_source == "synthetic":
-            print("  NOTE: SYNTHETIC demo data -- near-perfect accuracy is expected because labels "
-                  "are generated from these features. Not evidence of real-world performance.")
+            print("    ℹ️  NOTE: Trained on SYNTHETIC data.")
         elif acc > 0.98:
-            print("  WARNING: Accuracy > 0.98 on real data is suspicious -- check for leakage.")
+            print("    ⚠️  WARNING: Accuracy > 0.98 on real data indicates potential target leakage.")
+
+
+def train_single_model(model_name: str, X: np.ndarray, y_perf: np.ndarray,
+                       y_injury: np.ndarray, data_source: str):
+    print(f"\n{'='*20} Training Model: {model_name.upper()} {'='*20}")
+    t0 = time.time()
+
+    print(f"▶ [1/2] Training Performance Regressor ({model_name})...")
+    perf_bundle = ml_models.train_performance_model(X, y_perf, model_name=model_name, data_source=data_source)
+    print_report(perf_bundle)
+
+    print(f"\n▶ [2/2] Training Injury-Risk Classifier ({model_name})...")
+    injury_bundle = ml_models.train_injury_model(X, y_injury, model_name=model_name,
+                                                 label_map=INJURY_LABEL_MAP,
+                                                 data_source=data_source)
+    print_report(injury_bundle)
+
+    os.makedirs(config.MODEL_DIR, exist_ok=True)
+    perf_path = os.path.join(config.MODEL_DIR, f"performance_{model_name}.joblib")
+    injury_path = os.path.join(config.MODEL_DIR, f"injury_{model_name}.joblib")
+    ml_models.save_bundle(perf_bundle, perf_path)
+    ml_models.save_bundle(injury_bundle, injury_path)
+
+    # Save summary metadata JSON for Streamlit integration
+    meta_path = os.path.join(config.MODEL_DIR, f"metadata_{model_name}.json")
+    metadata = {
+        "model_name": model_name,
+        "data_source": data_source,
+        "trained_at": datetime.now(timezone.utc).isoformat(),
+        "n_samples": len(X),
+        "injury_label_map": INJURY_LABEL_MAP,
+        "performance_metrics": getattr(perf_bundle, "cv_metrics", {}),
+        "injury_metrics": getattr(injury_bundle, "cv_metrics", {}),
+        "training_time_sec": round(time.time() - t0, 2)
+    }
+    with open(meta_path, "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    print(f"\n✅ Artifacts saved successfully:\n   • {perf_path}\n   • {injury_path}\n   • {meta_path}")
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--data", type=str, default=None,
-                         help="Path to a labeled CSV. Defaults to synthetic demo data.")
+    parser = argparse.ArgumentParser(description="PaceAI Model Training & Benchmark Pipeline")
+    parser.add_argument("--data", type=str, default=None, help="Path to labeled CSV (defaults to synthetic)")
     parser.add_argument("--model", type=str, default="random_forest",
-                         choices=["random_forest", "xgboost", "catboost", "cnn_lstm", "transformer"])
-    parser.add_argument("--n_samples", type=int, default=1500)
+                        choices=["random_forest", "xgboost", "catboost", "cnn_lstm", "transformer", "all"])
+    parser.add_argument("--n_samples", type=int, default=1500, help="Number of synthetic samples to generate")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
+    parser.add_argument("--synthetic", type=str, default="clinical",
+                        choices=["clinical", "binary"],
+                        help="Which synthetic generator to use when --data is not given "
+                             "(clinical = benchmark-grounded 3-class injury target)")
     args = parser.parse_args()
 
+    set_seed(args.seed)
+
+    # Load / Generate Data
     if args.data:
         df = pd.read_csv(args.data)
-        print(f"Loaded {len(df)} rows from {args.data}")
+        print(f"📂 Loaded {len(df)} rows from {args.data}")
         df = validate_dataset(df)
         data_source = "real"
-        print(f"Validated: {len(df)} usable rows.")
     else:
-        df = generate_synthetic_dataset(n_samples=args.n_samples)
-        df.to_csv(os.path.join(config.DATA_DIR, "synthetic_bowling_dataset.csv"), index=False)
-        print(f"Generated {len(df)} synthetic rows (no --data given; "
-              f"saved to data/synthetic_bowling_dataset.csv)")
+        os.makedirs(config.DATA_DIR, exist_ok=True)
+        if args.synthetic == "clinical":
+            df = generate_clinical_synthetic_dataset(n_samples=args.n_samples, seed=args.seed)
+        else:
+            df = generate_synthetic_dataset(n_samples=args.n_samples, seed=args.seed)
+        synth_path = os.path.join(config.DATA_DIR, "synthetic_bowling_dataset.csv")
+        df.to_csv(synth_path, index=False)
+        print(f"🎲 Generated {len(df)} synthetic samples [{args.synthetic}] (Saved to: {synth_path})")
         data_source = "synthetic"
 
     X = df[config.FEATURE_NAMES].values
     y_perf = df[config.PERFORMANCE_TARGET].values
     y_injury = df[config.INJURY_TARGET].values
 
-    print(f"\nTraining performance model ({args.model}) on {data_source} data...")
-    perf_bundle = ml_models.train_performance_model(X, y_perf, model_name=args.model,
-                                                     data_source=data_source)
-    print_report(perf_bundle)
+    # Check Class Balance for Injury Target
+    class_counts = pd.Series(y_injury).value_counts().sort_index().to_dict()
+    print(f"📊 Class Distribution ({INJURY_LABEL_MAP}): {class_counts}")
 
-    print(f"\nTraining injury-risk model ({args.model}) on {data_source} data...")
-    injury_bundle = ml_models.train_injury_model(X, y_injury, model_name=args.model,
-                                                  data_source=data_source)
-    print_report(injury_bundle)
+    models_to_train = (
+        ["random_forest", "xgboost", "catboost", "cnn_lstm", "transformer"]
+        if args.model == "all"
+        else [args.model]
+    )
 
-    perf_path = os.path.join(config.MODEL_DIR, f"performance_{args.model}.joblib")
-    injury_path = os.path.join(config.MODEL_DIR, f"injury_{args.model}.joblib")
-    ml_models.save_bundle(perf_bundle, perf_path)
-    ml_models.save_bundle(injury_bundle, injury_path)
-    print(f"\nSaved:\n  {perf_path}\n  {injury_path}")
+    for m in models_to_train:
+        train_single_model(m, X, y_perf, y_injury, data_source)
 
-    print(f"\nBackends: xgboost={ml_models.BACKEND_INFO['xgboost_available']}  "
-          f"catboost={ml_models.BACKEND_INFO['catboost_available']}  "
-          f"torch={ml_models.BACKEND_INFO['torch_available']}")
+    print(f"\n🚀 System Backends:")
+    for k, v in ml_models.BACKEND_INFO.items():
+        print(f"   • {k}: {'Available' if v else 'Not installed (fallback active)'}")
 
 
 if __name__ == "__main__":

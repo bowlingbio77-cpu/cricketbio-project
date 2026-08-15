@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+  :root {
+    --bg-color: #0b0f19;
+    --primary-cyan: #00f2fe;
+    --accent-green: #00ff87;
+    --accent-red: #ff3366;
+    --grid-line: rgba(0, 242, 254, 0.08);
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: var(--bg-color);
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    color: #fff;
+    overflow: hidden;
+  }
+
+  .loader-container {
+    position: relative;
+    width: 420px;
+    padding: 30px;
+    background: radial-gradient(circle at center, rgba(15, 23, 42, 0.95), rgba(7, 10, 19, 0.98));
+    border: 1px solid rgba(0, 242, 254, 0.25);
+    border-radius: 20px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 242, 254, 0.15);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Futuristic Corner Tech Accents */
+  .corner-accent {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-color: var(--primary-cyan);
+    border-style: solid;
+  }
+  .top-left { top: 8px; left: 8px; border-width: 2px 0 0 2px; }
+  .top-right { top: 8px; right: 8px; border-width: 2px 2px 0 0; }
+  .bottom-left { bottom: 8px; left: 8px; border-width: 0 0 2px 2px; }
+  .bottom-right { bottom: 8px; right: 8px; border-width: 0 2px 2px 0; }
+
+  /* SVG Viewport & Grid */
+  .visualizer-stage {
+    position: relative;
+    width: 280px;
+    height: 280px;
+  }
+
+  .scanning-radar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 1px dashed rgba(0, 242, 254, 0.2);
+    animation: rotateRadar 8s linear infinite;
+  }
+
+  .pulse-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 240px;
+    height: 240px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 255, 135, 0.15);
+    animation: pulseRing 3s ease-out infinite;
+  }
+
+  /* Bowling Arm Arc & Angles */
+  .arm-arc {
+    stroke-dasharray: 180;
+    stroke-dashoffset: 180;
+    animation: traceArc 2.4s ease-in-out infinite alternate;
+  }
+
+  .joint-node {
+    animation: pulseJoint 1.8s ease-in-out infinite;
+  }
+
+  /* Text & Telemetry */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 242, 254, 0.1);
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(0, 242, 254, 0.3);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--primary-cyan);
+    margin-top: 15px;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    background-color: var(--accent-green);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--accent-green);
+    animation: blink 1s infinite alternate;
+  }
+
+  .phase-text {
+    font-size: 14px;
+    font-weight: 500;
+    margin-top: 14px;
+    color: #e2e8f0;
+    min-height: 22px;
+    text-align: center;
+    letter-spacing: 0.4px;
+    transition: opacity 0.25s ease-in-out;
+  }
+
+  /* Progress Bar */
+  .progress-wrapper {
+    width: 100%;
+    margin-top: 18px;
+  }
+
+  .progress-track {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-cyan), var(--accent-green));
+    border-radius: 4px;
+    box-shadow: 0 0 10px var(--primary-cyan);
+    animation: progressLoad 4.5s ease-in-out infinite;
+  }
+
+  .metrics-readout {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    margin-top: 15px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    font-size: 11px;
+    color: #94a3b8;
+    font-family: 'SF Mono', Consolas, monospace;
+  }
+
+  /* Keyframe Animations */
+  @keyframes rotateRadar {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes pulseRing {
+    0% { transform: translate(-50%, -50%) scale(0.85); opacity: 0.8; }
+    100% { transform: translate(-50%, -50%) scale(1.15); opacity: 0; }
+  }
+
+  @keyframes pulseJoint {
+    0%, 100% { r: 3.5; opacity: 0.8; filter: drop-shadow(0 0 2px var(--primary-cyan)); }
+    50% { r: 5.5; opacity: 1; filter: drop-shadow(0 0 8px var(--primary-cyan)); }
+  }
+
+  @keyframes traceArc {
+    0% { stroke-dashoffset: 180; }
+    100% { stroke-dashoffset: 0; }
+  }
+
+  @keyframes blink {
+    from { opacity: 0.3; }
+    to { opacity: 1; }
+  }
+
+  @keyframes progressLoad {
+    0% { width: 5%; }
+    50% { width: 75%; }
+    90% { width: 95%; }
+    100% { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="loader-container">
+  <div class="corner-accent top-left"></div>
+  <div class="corner-accent top-right"></div>
+  <div class="corner-accent bottom-left"></div>
+  <div class="corner-accent bottom-right"></div>
+
+  <div class="visualizer-stage">
+    <div class="scanning-radar"></div>
+    <div class="pulse-ring"></div>
+
+    <!-- Biomechanical Skeleton SVG -->
+    <svg viewBox="0 0 200 200" width="100%" height="100%">
+      <!-- Kinetic Path & Swing Arc -->
+      <path d="M 95 65 A 45 45 0 0 1 145 75" fill="none" stroke="rgba(0, 242, 254, 0.4)" stroke-width="1.5" stroke-dasharray="3,3" />
+      <path class="arm-arc" d="M 95 65 A 45 45 0 0 1 145 75" fill="none" stroke="var(--primary-cyan)" stroke-width="2.5" stroke-linecap="round" />
+
+      <!-- Skeletal Links (Bones / Vectors) -->
+      <!-- Head / Spine -->
+      <circle cx="100" cy="40" r="7" fill="none" stroke="var(--accent-green)" stroke-width="1.5" />
+      <line x1="100" y1="47" x2="100" y2="70" stroke="rgba(255,255,255,0.6)" stroke-width="2" />
+      <!-- Shoulders to Hips (Trunk) -->
+      <line x1="90" y1="70" x2="110" y2="70" stroke="var(--primary-cyan)" stroke-width="2" />
+      <line x1="100" y1="70" x2="98" y2="110" stroke="rgba(255,255,255,0.8)" stroke-width="2" />
+      <line x1="90" y1="110" x2="106" y2="110" stroke="var(--primary-cyan)" stroke-width="2" />
+
+      <!-- Bowling Arm (Right) -->
+      <line x1="110" y1="70" x2="132" y2="52" stroke="var(--accent-green)" stroke-width="2" />
+      <line x1="132" y1="52" x2="145" y2="75" stroke="var(--accent-green)" stroke-width="2" />
+      
+      <!-- Non-Bowling Arm (Left) -->
+      <line x1="90" y1="70" x2="72" y2="85" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" />
+
+      <!-- Front Leg (Brace Leg) -->
+      <line x1="106" y1="110" x2="122" y2="148" stroke="var(--primary-cyan)" stroke-width="2.5" />
+      <line x1="122" y1="148" x2="135" y2="182" stroke="var(--primary-cyan)" stroke-width="2.5" />
+
+      <!-- Back Leg (Trailing) -->
+      <line x1="90" y1="110" x2="70" y2="140" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" />
+      <line x1="70" y1="140" x2="62" y2="175" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" />
+
+      <!-- Kinematic Joint Markers (MediaPipe Pose Nodes) -->
+      <circle class="joint-node" cx="100" cy="40" r="3.5" fill="var(--accent-green)" />
+      <circle class="joint-node" cx="110" cy="70" r="3.5" fill="var(--primary-cyan)" />
+      <circle class="joint-node" cx="132" cy="52" r="3.5" fill="var(--primary-cyan)" />
+      <circle class="joint-node" cx="145" cy="75" r="4.5" fill="var(--accent-red)" /> <!-- Ball Release -->
+      <circle class="joint-node" cx="90" cy="70" r="3" fill="var(--primary-cyan)" />
+      <circle class="joint-node" cx="98" cy="110" r="3.5" fill="var(--primary-cyan)" />
+      <circle class="joint-node" cx="122" cy="148" r="4" fill="var(--accent-green)" /> <!-- Knee Brace Node -->
+      <circle class="joint-node" cx="135" cy="182" r="3.5" fill="var(--primary-cyan)" />
+      
+      <!-- Angle Arc Tag: Knee Brace -->
+      <path d="M 120 142 A 10 10 0 0 1 127 154" fill="none" stroke="var(--accent-green)" stroke-width="1.2" />
+      <text x="135" y="146" fill="var(--accent-green)" font-size="7" font-family="monospace">168°</text>
+    </svg>
+  </div>
+
+  <div class="status-badge">
+    <div class="status-dot"></div>
+    <span>Biomech AI Engine</span>
+  </div>
+
+  <div class="phase-text" id="statusMessage">{{MESSAGE}}</div>
+
+  <div class="progress-wrapper">
+    <div class="progress-track">
+      <div class="progress-fill"></div>
+    </div>
+  </div>
+
+  <div class="metrics-readout">
+    <span>RATE: <b style="color:var(--primary-cyan)">{{FPS}} FPS</b></span>
+    <span>KNEE BRACE: <b style="color:var(--accent-green)">{{KNEE}}</b></span>
+    <span>RISK: <b style="color:var(--primary-cyan)">{{RISK}}</b></span>
+  </div>
+</div>
+
+<script>
+  // Dynamic Pipeline Stages
+  const steps = [
+    "Extracting 33 3D Pose Landmarks...",
+    "Isolating Front-Foot Contact (FFC)...",
+    "Measuring Knee Brace & Stride Angle...",
+    "Computing Shoulder Counter-Rotation...",
+    "Evaluating Lumbar Shear & Injury Risk...",
+    "Generating SHAP Attribution Matrix..."
+  ];
+
+  let stepIdx = 0;
+  const statusEl = document.getElementById("statusMessage");
+
+  setInterval(() => {
+    stepIdx = (stepIdx + 1) % steps.length;
+    statusEl.style.opacity = '0';
+    setTimeout(() => {
+      statusEl.innerText = steps[stepIdx];
+      statusEl.style.opacity = '1';
+    }, 250);
+  }, 1200);
+</script>
+
+</body>
+</html>
