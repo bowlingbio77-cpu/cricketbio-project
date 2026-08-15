@@ -22,3 +22,6 @@ data/*
 Thumbs.db
 .idea/
 .vscode/
+
+# CatBoost training temp output
+catboost_info/

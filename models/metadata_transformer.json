@@ -1,0 +1,29 @@
+{
+  "model_name": "transformer",
+  "data_source": "synthetic",
+  "trained_at": "2026-08-15T06:27:54.138039+00:00",
+  "n_samples": 3000,
+  "injury_label_map": {
+    "0": "low",
+    "1": "moderate",
+    "2": "high"
+  },
+  "performance_metrics": {
+    "folds": 5,
+    "n_samples": 3000,
+    "mae_mean": 4.358438017631067,
+    "mae_std": 0.15934408925535432,
+    "r2_mean": 0.5637490917505893,
+    "r2_std": 0.03780854639868206,
+    "rmse_mean": 5.473486174530653
+  },
+  "injury_metrics": {
+    "folds": 5,
+    "n_samples": 3000,
+    "accuracy_mean": 0.8193333333333334,
+    "accuracy_std": 0.008273115763993916,
+    "f1_mean": 0.8192926215046464,
+    "f1_std": 0.008522437431332176
+  },
+  "training_time_sec": 37.08
+}

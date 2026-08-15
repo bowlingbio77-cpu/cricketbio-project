@@ -1,7 +1,7 @@
 {
   "model_name": "random_forest",
   "data_source": "synthetic",
-  "trained_at": "2026-08-15T06:08:46.438897+00:00",
+  "trained_at": "2026-08-15T06:26:22.116807+00:00",
   "n_samples": 3000,
   "injury_label_map": {
     "0": "low",
@@ -25,5 +25,5 @@
     "f1_mean": 0.9551435285338272,
     "f1_std": 0.007530011453904153
   },
-  "training_time_sec": 18.71
+  "training_time_sec": 18.64
 }
