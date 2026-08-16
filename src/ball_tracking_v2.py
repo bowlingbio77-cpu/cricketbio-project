@@ -95,6 +95,15 @@ BALLISTIC_FIT_WINDOW = 8    # points used for the local quadratic fit
 BALLISTIC_MIN_POINTS = 5    # minimum points before a fit is trusted
 BALLISTIC_PENALTY_WEIGHT = 0.5  # how strongly fit residual inflates match cost
 
+# -- re-seed (gap recovery) ------------------------------------------------- #
+# A track that gaps out (misses > MAX_GAP_FRAMES) before the ball is hit can
+# still be the real delivery. Once it dies we keep its ballistic extrapolation
+# alive briefly and allow ONE re-seed: the first confident YOLO detection near
+# the predicted position starts a successor track that is stitched to the dead
+# one, so occluded-but-still-ballistic flights are recovered end-to-end.
+RESEED_LOOKAHEAD_FRAMES = 8   # frames after death during which a re-seed may fire
+RESEED_RADIUS_PX = 48.0       # max distance from the ballistic prediction for a re-seed
+
 # -- motion-blob size limits (validated in v1) ------------------------------ #
 MOTION_MIN_AREA = 8.0       # px^2 -- below this it's frame noise
 MOTION_MAX_AREA = 1200.0    # px^2 -- above this it's a limb/body part
@@ -235,6 +244,95 @@ def _predict_quadratic(points: List[BallPoint], frame_idx: int) -> Optional[np.n
     return np.array([np.polyval(cx, tq), np.polyval(cy, tq)])
 
 
+def _owner_of(segment: List[BallPoint], finished: List[_Track]) -> Optional[_Track]:
+    """Find which finished track a chosen segment belongs to. Split segments
+    reuse the track's BallPoint objects, so the first point's identity locates
+    the owning track even after trailing points were popped."""
+    if not segment:
+        return None
+    first = segment[0]
+    for t in finished:
+        if any(p is first for p in t.points):
+            return t
+    return None
+
+
+def _resolve_chain(t: _Track, finished: List[_Track]) -> List[_Track]:
+    """Return the full re-seed chain [oldest_ancestor, ..., newest_successor]
+    that `t` belongs to, walking the `stitched_from` links both ways."""
+    by_id = {ft.track_id: ft for ft in finished}
+    first = t
+    while first.stitched_from is not None:
+        parent = by_id.get(first.stitched_from)
+        if parent is None:
+            break
+        first = parent
+    chain: List[_Track] = [first]
+    cur = first
+    while True:
+        nxt = next((ft for ft in finished if ft.stitched_from == cur.track_id), None)
+        if nxt is None:
+            break
+        chain.append(nxt)
+        cur = nxt
+    return chain
+
+
+def _full_chain_points(chain: List[_Track]) -> List[BallPoint]:
+    """Concatenate a re-seeded chain (oldest ancestor first) into one trajectory.
+    Each track's Kalman-predicted tail is dropped (it can carry a corrupted
+    velocity from noise latches during the gap) and the holes are filled with
+    ballistic bridge points extrapolated from the oldest ancestor's real
+    detections -- a ball that re-appears near the ballistic prediction was in
+    flight, so the gap is a straight stretch of the same parabola. Only the
+    oldest ancestor's detections feed the fit: it is the sole pre-impact part
+    of the chain, and a successor's post-deflection points would bend the
+    parabola the bridge must follow."""
+    yolo_pts: List[BallPoint] = [p for p in chain[0].points if p.source == "yolo"] if chain else []
+    pts: List[BallPoint] = []
+    for i, c in enumerate(chain):
+        tail = _real_tail(c)
+        pts.extend(tail)
+        if i < len(chain) - 1 and tail:
+            nxt = chain[i + 1]
+            if nxt.points:
+                bridge = _ballistic_bridge(yolo_pts, tail[-1], nxt.points[0])
+                if bridge:
+                    pts.extend(bridge)
+    return pts
+
+
+def _real_tail(track: _Track) -> List[BallPoint]:
+    """A track's points up to (not including) its Kalman-predicted tail."""
+    for i, p in enumerate(track.points):
+        if p.source == "predicted":
+            return track.points[:i]
+    return track.points
+
+
+def _ballistic_bridge(yolo_pts: List[BallPoint], tail_end: BallPoint,
+                      succ_start: BallPoint) -> List[BallPoint]:
+    """Synthesize the points between `tail_end` and `succ_start` by
+    extrapolating the yolo-only quadratic fit one frame at a time."""
+    if len(yolo_pts) < BALLISTIC_MIN_POINTS:
+        return []
+    span = succ_start.frame_idx - tail_end.frame_idx
+    if span <= 1:
+        return []
+    bridge = []
+    for f in range(tail_end.frame_idx + 1, succ_start.frame_idx):
+        pos = _predict_quadratic(yolo_pts, f)
+        if pos is None:
+            return []
+        frac = (f - tail_end.frame_idx) / float(span)
+        ts = tail_end.timestamp_sec + (succ_start.timestamp_sec - tail_end.timestamp_sec) * frac
+        w = max(1.0, np.median([p.w for p in yolo_pts]))
+        h = max(1.0, np.median([p.h for p in yolo_pts]))
+        bridge.append(BallPoint(f, ts, float(pos[0]), float(pos[1]), 0.0,
+                                detected=False, w=float(w), h=float(h), source="predicted"))
+    return bridge
+
+
 @dataclass
 class _Track:
     track_id: int
@@ -244,6 +342,9 @@ class _Track:
     yolo_hits: int = 0
     alive: bool = True
     last_yolo: int = -10**9   # frame_idx of the last YOLO match (liveness gate)
+    death_frame: Optional[int] = None   # frame_idx the track gapped out on
+    stitched_from: Optional[int] = None  # track_id of the dead track this one continues
+    reseeded: bool = False    # this dead track already spawned a successor
 
     @property
     def hits(self) -> int:
@@ -351,6 +452,7 @@ class BallTracker:
         total_frames = 0
         active: List[_Track] = []
         finished: List[_Track] = []
+        zombies: List[_Track] = []
         next_id = 0
 
         for idx, ts, frame in frames:
@@ -359,14 +461,16 @@ class BallTracker:
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             prev_gray = gray
 
-            active, done, next_id = self._step_all(idx, ts, cands, active, next_id)
+            active, done, next_id = self._step_all(idx, ts, cands, active, next_id, zombies)
             finished.extend(done)
 
         finished.extend(t for t in active if t.hits >= MIN_TRACK_FRAMES)
 
         survivors = [t for t in finished if t.hits >= MIN_TRACK_FRAMES]
         if not survivors:
-            stats = {"total_frames": total_frames, "n_tracks_considered": len(finished)}
+            model_error = getattr(self, "model_error", None)
+            stats = {"total_frames": total_frames, "n_tracks_considered": len(finished),
+                     "outcome": "no_yolo_model" if model_error else "track_too_short"}
             stats.update(summarize([], fps=fps))
             return [], stats
 
@@ -391,16 +495,37 @@ class BallTracker:
                 break
 
         if chosen is None:
-            stats = {"total_frames": total_frames, "n_tracks_considered": len(finished)}
+            model_error = getattr(self, "model_error", None)
+            stats = {"total_frames": total_frames, "n_tracks_considered": len(finished),
+                     "outcome": "no_yolo_model" if model_error else "track_too_short"}
             stats.update(summarize([], fps=fps))
             return [], stats
 
+        # Stitch a re-seeded chain back together (whichever endpoint won), so
+        # a delivery that gapped out mid-flight (occlusion, missed detections)
+        # still spans release -> impact as one trajectory.
+        owner = _owner_of(chosen, finished)
+        if owner is not None:
+            chain = _resolve_chain(owner, finished)
+            if len(chain) > 1:
+                merged = _full_chain_points(chain)
+                if len(merged) >= len(chosen) and self._valid_track(merged):
+                    chosen = merged
+
         _trimmed, window_info = self._trim_to_release_impact(chosen)
+        impact_found = window_info.get("impact_idx") is not None
+        if impact_found:
+            outcome = "ok"
+        elif window_info.get("release_idx") is None:
+            outcome = "no_release_found"
+        else:
+            outcome = "release_no_impact"
         stats = {
             "total_frames": total_frames,
             "n_tracks_considered": len(finished),
             "winning_track_yolo_hits": best_yolo_hits_of(chosen),
             "winning_track_hits": len(chosen),
+            "outcome": outcome,
         }
         stats.update(window_info)
         stats.update(summarize(chosen, fps=fps))
@@ -425,10 +550,13 @@ class BallTracker:
         return (spread >= MIN_TRACK_SPREAD_PX and path >= MIN_TRACK_PATH_PX
                 and not (growth > BOX_GROWTH_LIMIT and net_speed < MIN_AVG_SPEED_PX_S))
 
-    def _step_all(self, idx: int, ts: float, cands, active: List[_Track], next_id: int
+    def _step_all(self, idx: int, ts: float, cands, active: List[_Track], next_id: int,
+                  zombies: Optional[List[_Track]] = None
                   ) -> Tuple[List[_Track], List[_Track], int]:
         """Advance every active track one frame, spawn new hypotheses from
-        unclaimed candidates, and retire tracks that have gapped out."""
+        unclaimed candidates, and retire tracks that have gapped out.
+        `zombies` (when given) receives gapped-out tracks so the re-seed pass
+        below can re-acquire the ball a few frames later."""
         # 1. Predict every active track's next position.
         for t in active:
             t.kf.predict()
@@ -497,15 +625,67 @@ class BallTracker:
                                            detected=False, w=w, h=h, source="predicted"))
             if t.misses > MAX_GAP_FRAMES:
                 t.alive = False
+                t.death_frame = idx
                 done.append(t)
+                if zombies is not None:
+                    zombies.append(t)
             else:
                 still_active.append(t)
 
-        # 5. Spawn new hypotheses from unclaimed candidates, bounded by
+        # 5. One-time re-seed (runs BEFORE spawning so a gapped-out ball gets
+        #    first claim on a fresh detection): a track that gapped out
+        #    mid-flight may be the real ball that simply wasn't detected for a
+        #    stretch (occlusion, fast ball, YOLO dropout). While its ballistic
+        #    prediction is still fresh, spawn a successor at the first confident
+        #    YOLO detection near that prediction and remember the stitch.
+        spawned_cands: set = set()
+        if zombies is not None and len(still_active) < MAX_ACTIVE_TRACKS:
+            still_zombies = []
+            for z in zombies:
+                if z.reseeded:
+                    continue
+                if z.death_frame is not None and idx - z.death_frame > RESEED_LOOKAHEAD_FRAMES:
+                    continue
+                still_zombies.append(z)
+                # Fit the extrapolation on the REAL detections only: noise
+                # motion blobs that latched on during the gap (and the
+                # Kalman-predicted tail) can carry a corrupted velocity that
+                # points the prediction at the wrong corner of the frame.
+                yolo_pts = [p for p in z.points if p.source == "yolo"]
+                pred = _predict_quadratic(yolo_pts, idx)
+                if pred is None:
+                    continue
+                best, best_ci, best_d = None, None, None
+                for ci, (cx, cy, conf, cw, ch, src) in enumerate(cands):
+                    if ci in claimed_cands or src != "yolo" or conf < self.seed_min_conf:
+                        continue
+                    d = float(np.hypot(cx - pred[0], cy - pred[1]))
+                    if d <= RESEED_RADIUS_PX and (best_d is None or d < best_d):
+                        best, best_ci, best_d = (cx, cy, conf, cw, ch), ci, d
+                if best is None:
+                    continue
+                cx, cy, conf, cw, ch = best
+                if any(np.hypot(cx - o.points[-1].x, cy - o.points[-1].y)
+                       <= DUPLICATE_SUPPRESS_RADIUS_PX for o in still_active if o.points):
+                    continue
+                kf = _CVKalman(cx, cy)
+                new_t = _Track(track_id=next_id, kf=kf, stitched_from=z.track_id)
+                next_id += 1
+                new_t.points.append(BallPoint(idx, ts, float(cx), float(cy), conf,
+                                               detected=True, w=cw, h=ch, source="yolo"))
+                new_t.yolo_hits += 1
+                new_t.last_yolo = idx
+                still_active.append(new_t)
+                spawned_cands.add(best_ci)
+                z.reseeded = True
+            zombies[:] = still_zombies
+
+        # 6. Spawn new hypotheses from unclaimed candidates, bounded by
         #    MAX_ACTIVE_TRACKS. Only YOLO candidates may originate a track
         #    when a real model is loaded (validated v1 rule).
         if len(still_active) < MAX_ACTIVE_TRACKS:
-            unclaimed = [(ci, c) for ci, c in enumerate(cands) if ci not in claimed_cands]
+            unclaimed = [(ci, c) for ci, c in enumerate(cands)
+                         if ci not in claimed_cands and ci not in spawned_cands]
             if self._model is None:
                 seedable = unclaimed
             else:
@@ -568,11 +748,15 @@ class BallTracker:
             pad, or ground.
 
         Uses windowed (median) speeds so a single jittery motion-blob point
-        can't masquerade as a bat/pad contact, and requires the velocity
-        before a candidate impact to be non-trivial (a nearly-stationary
-        point makes the angle ill-conditioned).
+        can't masquerade as a bat/pad contact: `s_next` is a 4-frame median so
+        a one-frame transient stall (a point where the ball appears to pause
+        but resumes next frame) doesn't fire the speed-drop test, while a
+        genuine bat/pad stop drops speed for several consecutive frames and
+        still registers. Requires the velocity before a candidate impact to be
+        non-trivial (a nearly-stationary point makes the angle ill-conditioned).
         """
-        info = {"release_idx": None, "impact_idx": None, "trimmed": False}
+        info = {"release_idx": None, "impact_idx": None, "release_found": False,
+                "trimmed": False}
         if len(track) < RELEASE_SUSTAIN_FRAMES + 2:
             return track, info
 
@@ -602,13 +786,14 @@ class BallTracker:
                 cos_ang = float(np.clip(np.dot(v1, v2) / (n1 * n2), -1.0, 1.0))
                 angle_deg = float(np.degrees(np.arccos(cos_ang)))
             s_prev = float(np.median(speeds[max(0, i - 2):i]))
-            s_next = float(np.median(speeds[i:i + 2]))
+            s_next = float(np.median(speeds[i:i + 4]))
             speed_drop = s_next < s_prev * IMPACT_SPEED_DROP_FACTOR
             if angle_deg >= IMPACT_ANGLE_THRESHOLD_DEG or speed_drop:
                 impact_i = i + 1
                 break
 
         release_idx = track[release_i].frame_idx
+        info["release_found"] = release_i > 0
         if impact_i is not None:
             impact_idx = track[impact_i].frame_idx
             trimmed = [p for p in track if release_idx <= p.frame_idx <= impact_idx]

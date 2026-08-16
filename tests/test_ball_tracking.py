@@ -229,3 +229,75 @@ def test_slow_growing_object_rejected():
     t.seed_min_conf = 0.3
     track, stats = t.track(_blank_frames(31), fps=30.0)
     assert track == []
+
+
+def _delivery_positions():
+    """Slow jitter -> straight release -> ball stops at the bat (impact)."""
+    return ([(100.0 + 2.0 * i, 100.0) for i in range(5)] +
+            [(110.0 + 8.0 * (i - 5), 100.0) for i in range(5, 26)] +
+            [(270.0, 100.0)] * 5)
+
+
+def test_outcome_ok_for_delivery():
+    track, stats = _run_track(_delivery_positions(), n_frames=31)
+    assert len(track) == 31
+    assert stats["outcome"] == "ok"
+
+
+def test_outcome_release_no_impact_for_straight_flight():
+    positions = [(20.0 + 8.0 * i, 100.0) for i in range(31)]
+    track, stats = _run_track(positions)
+    assert stats["outcome"] == "release_no_impact"
+
+
+def test_outcome_track_too_short_when_rejected():
+    positions = [(100.0, 100.0)] * 31
+    track, stats = _run_track(positions)
+    assert track == []
+    assert stats["outcome"] == "track_too_short"
+
+
+def _release_with_stall(deflect: bool):
+    """Fast straight release with a one-frame transient stall mid-flight
+    (a jittery motion point where the ball appears to pause), then either a
+    real impact deflection or a straight continuation."""
+    pts = [
+        (0.0, 100.0), (1.0, 99.0), (2.0, 100.0), (1.0, 101.0), (3.0, 100.0),
+        (23.0, 100.0), (43.0, 100.0), (63.0, 100.0), (83.0, 100.0),
+        (83.0, 100.0),                       # one-frame transient stall (speed 0)
+        (103.0, 100.0), (123.0, 100.0), (143.0, 100.0), (163.0, 100.0),
+        (183.0, 100.0),
+    ]
+    if deflect:
+        pts += [(183.0, 140.0), (203.0, 180.0)]
+    else:
+        pts += [(203.0, 100.0)]
+    return _ball(pts)
+
+
+def test_transient_stall_does_not_false_fire_impact():
+    """A one-frame stall (speed 0) inside the flight must NOT be taken as
+    bat/pad impact; the real deflection later is the impact."""
+    track = _release_with_stall(deflect=True)
+    _trimmed, info = BallTracker._trim_to_release_impact(track)
+    assert info["impact_idx"] == 15, info
+
+
+def test_transient_stall_without_deflection_keeps_no_impact():
+    """Stall then straight continuation: no impact at all (old 2-frame median
+    window false-fired on the stall at frame 8)."""
+    track = _release_with_stall(deflect=False)
+    _trimmed, info = BallTracker._trim_to_release_impact(track)
+    assert info["impact_idx"] is None, info
+
+
+def test_genuine_stop_still_detected_as_impact():
+    """A real bat/pad stop drops speed for several frames and must still
+    register even with the widened median window."""
+    pts = [
+        (0.0, 100.0), (1.0, 99.0), (2.0, 100.0), (1.0, 101.0), (3.0, 100.0),
+        (23.0, 100.0), (43.0, 100.0), (63.0, 100.0), (83.0, 100.0),
+        (83.0, 100.0), (83.0, 100.0), (83.0, 100.0), (83.0, 100.0),
+    ]
+    _trimmed, info = BallTracker._trim_to_release_impact(_ball(pts))
+    assert info["impact_idx"] == 7, info

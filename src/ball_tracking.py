@@ -274,7 +274,16 @@ class BallTracker:
 
         trimmed, window_info = self._trim_to_release_impact(longest) if longest else ([], {})
 
-        stats = {"total_frames": total_frames}
+        if not longest:
+            outcome = "no_yolo_model" if getattr(self, "model_error", None) else "track_too_short"
+        elif window_info.get("impact_idx") is not None:
+            outcome = "ok"
+        elif window_info.get("release_idx") is None:
+            outcome = "no_release_found"
+        else:
+            outcome = "release_no_impact"
+
+        stats = {"total_frames": total_frames, "outcome": outcome}
         stats.update(window_info)
         stats.update(summarize(longest, fps=fps))
         return longest, stats
@@ -436,7 +445,8 @@ class BallTracker:
         given. `info["trimmed"]` tells the caller whether trimming actually
         did anything.
         """
-        info = {"release_idx": None, "impact_idx": None, "trimmed": False}
+        info = {"release_idx": None, "impact_idx": None, "release_found": False,
+                "trimmed": False}
         if len(track) < RELEASE_SUSTAIN_FRAMES + 2:
             return track, info
 
@@ -457,10 +467,12 @@ class BallTracker:
 
         # --- locate impact (search after release) ----------------------- #
         # Use windowed (median) speeds so a single jittery motion-blob point
-        # can't masquerade as a bat/pad contact, and require both velocities
-        # to be non-trivial before trusting an angle (a nearly-stationary
-        # point makes the angle ill-conditioned). A real ball stopping at the
-        # bat is still caught by the windowed speed-drop test.
+        # can't masquerade as a bat/pad contact. `s_next` is a 4-frame median
+        # so a one-frame transient stall (ball appears to pause, resumes next
+        # frame) doesn't false-fire the speed-drop test; a genuine bat/pad
+        # stop drops speed for several consecutive frames and still registers.
+        # Also require both velocities to be non-trivial before trusting an
+        # angle (a nearly-stationary point makes the angle ill-conditioned).
         speeds = np.asarray(speed, dtype=float)
         impact_i = None
         for i in range(release_i + 1, len(speed) - 1):
@@ -473,13 +485,14 @@ class BallTracker:
                 cos_ang = float(np.clip(np.dot(v1, v2) / (n1 * n2), -1.0, 1.0))
                 angle_deg = float(np.degrees(np.arccos(cos_ang)))
             s_prev = float(np.median(speeds[max(0, i - 2):i]))
-            s_next = float(np.median(speeds[i:i + 2]))
+            s_next = float(np.median(speeds[i:i + 4]))
             speed_drop = s_next < s_prev * IMPACT_SPEED_DROP_FACTOR
             if angle_deg >= IMPACT_ANGLE_THRESHOLD_DEG or speed_drop:
                 impact_i = i + 1  # the point *after* the deflection is the impact point
                 break
 
         release_idx = track[release_i].frame_idx
+        info["release_found"] = release_i > 0
         if impact_i is not None:
             impact_idx = track[impact_i].frame_idx
             trimmed = [p for p in track if release_idx <= p.frame_idx <= impact_idx]
