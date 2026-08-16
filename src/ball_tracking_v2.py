@@ -858,14 +858,42 @@ def annotate_frames(frames, track: List[BallPoint], box_color=BOX_COLOR) -> List
         if pt is not None:
             w = pt.w if pt.w > 0 else DEFAULT_BALL_DIAMETER_PX
             h = pt.h if pt.h > 0 else DEFAULT_BALL_DIAMETER_PX
-            x1, y1 = int(round(pt.x - w / 2)), int(round(pt.y - h / 2))
-            x2, y2 = int(round(pt.x + w / 2)), int(round(pt.y + h / 2))
+            hh, ww = img.shape[:2]
+            x1 = int(round(pt.x - w / 2))
+            y1 = int(round(pt.y - h / 2))
+            x2 = int(round(pt.x + w / 2))
+            y2 = int(round(pt.y + h / 2))
+            x1 = max(0, min(ww - 1, x1))
+            y1 = max(0, min(hh - 1, y1))
+            x2 = max(0, min(ww - 1, x2))
+            y2 = max(0, min(hh - 1, y2))
             if pt.detected:
                 cv2.rectangle(img, (x1, y1), (x2, y2), box_color, 2)
+                label = "ball" + (f" {pt.confidence:.2f}" if pt.confidence > 0 else "")
+                _draw_label_tag(img, x1, y1, label, box_color)
             else:
                 _draw_dashed_rect(img, (x1, y1), (x2, y2), box_color, 1)
+                _draw_label_tag(img, x1, y1, "ball (est)", box_color)
         out.append((idx, ts, img))
     return out
+
+
+def _draw_label_tag(img, x1, y1, text, color):
+    """Filled label strip just above the box, sized with cv2.getTextSize.
+
+    The canonical detection-render pattern (OpenCV's mask_rcnn sample /
+    Roboflow's bbox-label tutorial): measure the text, draw a filled
+    background strip above the box, then the text in it. Clamped to the top
+    edge so balls near the top of the frame don't push the tag off-screen.
+    """
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    scale, thick = 0.45, 1
+    (tw, th), base = cv2.getTextSize(text, font, scale, thick)
+    tag_h = th + base + 6
+    top = max(0, y1 - tag_h)
+    cv2.rectangle(img, (x1, top), (x1 + tw + 6, top + tag_h), color, -1)
+    cv2.putText(img, text, (x1 + 3, top + th + 3), font, scale,
+                (255, 255, 255), thick, cv2.LINE_AA)
 
 
 def _draw_dashed_line(img, pt1, pt2, color, thickness, dash):

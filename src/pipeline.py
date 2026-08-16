@@ -124,6 +124,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
             ball_stats = ball_tracking.summarize(display_track, fps=target_fps)
             ball_stats["release_idx"] = track_stats.get("release_idx")
             ball_stats["impact_idx"] = impact_idx
+            ball_stats["outcome"] = track_stats.get("outcome")
             ball_stats["coverage_pct"] = (ball_stats.get("n_frames", 0) / max(1, len(frames))) * 100
             warnings.append(
                 f"Ball tracking: {ball_stats['n_detected']} detected + "
