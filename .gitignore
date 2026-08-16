@@ -19,6 +19,8 @@ data/*
 !data/synthetic_bowling_dataset.csv
 !data/cricket_injury_recovery_benchmarks.json
 !data/cricket_injury_recovery_benchmarks.csv
+!data/multimodal_sports_injury_dataset.csv
+!data/cricket_injury_dataset.csv
 
 # OS / editor
 .DS_Store

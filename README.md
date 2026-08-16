@@ -110,6 +110,7 @@ Two pages in the sidebar:
 cricket_biomech_ai/
 ├── app.py                    # Streamlit dashboard
 ├── train_demo_model.py       # trains & saves performance/injury models
+├── train_sports_injury_model.py  # trains injury models on real datasets (see below)
 ├── requirements.txt
 ├── src/
 │   ├── config.py             # paths, thresholds, feature list, landmark names
@@ -123,9 +124,11 @@ cricket_biomech_ai/
 │   ├── history_db.py         # SQLite history DB for saved analyses (stdlib sqlite3)
 │   ├── coaching.py           # rule-based coaching recommendation engine
 │   ├── synthetic_data.py     # generates a plausible demo dataset
+│   ├── sports_injury_data.py # multimodal sports-injury dataset prep + sequences
+│   ├── cricket_injury_data.py# cricket player-season dataset prep
 │   └── pipeline.py           # orchestrates the full video→coaching flow
 ├── models/                   # trained model bundles (.joblib) + pose model (.task)
-├── data/                     # synthetic_bowling_dataset.csv (generated)
+├── data/                     # synthetic_bowling_dataset.csv, injury CSVs (generated)
 └── scripts/
     ├── setup_yolo.sh          # installs ultralytics, downloads yolo11n.pt, checks bytetrack.yaml
     └── test_yolo_detection.py # verifies detection+tracking on a real clip, saves annotated frames
@@ -165,6 +168,52 @@ The ML layer reports its own honesty, so nobody is fooled by demo metrics:
 - **Circular-label warning**: synthetic labels are generated *from* the
   features, so near-perfect metrics there only measure fit to the demo
   generator — this is called out explicitly rather than presented as accuracy.
+
+## Injury models on real datasets
+
+`train_sports_injury_model.py` trains the same model family on two real,
+labeled injury datasets and exports honest, leakage-safe bundles to `models/`:
+
+```bash
+# Kaggle Multimodal Sports Injury Dataset: 15,420 per-session rows, 156 athletes,
+# 3-class risk. Grouped (by athlete) stratified CV — sessions of one athlete never
+# span train/test. Trains RF/XGB/CatBoost (+ CNN-LSTM/Transformer on per-athlete
+# session sequences that predict the NEXT session's risk).
+python train_sports_injury_model.py --dataset sports --model all
+
+# Cricket Injury Dataset: 1,272 player-season rows, binary injury_status
+# (and an ordinal severity target 0 none / 1 minor / 2 major).
+python train_sports_injury_model.py --dataset cricket --model all
+python train_sports_injury_model.py --dataset cricket --target severity --model catboost
+```
+
+Key correctness choices (all deliberate, see `src/ml_models.py`):
+
+- **No athlete leakage**: `cross_validate` uses `StratifiedGroupKFold` on
+  `athlete_id` (or `player_id`) whenever a grouping column is supplied, so
+  correlated repeated measurements can't inflate the metrics. This is why the
+  multimodal dataset's honest grouped-CV accuracy (~0.55) is far below the
+  "82-87%" that naive train/test splits report — the dataset's README splits
+  leak sessions of the same athlete across train and test.
+- **Fold-wise imputation**: `SimpleImputer(median)` is refit on each training
+  fold (2.97% missing in the sensor data), never on the full dataset.
+- **Class imbalance**: inverse-frequency sample weights are applied per fold
+  (multi-class, so minority recall is actually usable) and baselined against
+  "always predict the majority class".
+- **Temporal features without leakage**: lag/rolling features
+  (`acute_load_7`, `chronic_load_28`, `acwr`, `fatigue_delta`,
+  `recovery_trend_3`, `prev_session_high_risk`, ...) use only `shift(1)` past
+  sessions — nothing about the current or future row.
+- **Real sequence models**: `cnn_lstm` / `transformer` are now actual
+  torch models (previously MLP fallbacks) trained on rolling 10-session
+  windows to predict the next session's risk, with per-fold input
+  standardization inside the model so attention/convolution converge.
+- **Honest reporting**: every model prints accuracy / macro-F1 / precision /
+  recall / OVR ROC-AUC plus an out-of-fold per-class report, all next to the
+  trivial baseline. Feature importances are printed for the tree models.
+  The cricket dataset is genuinely hard (player-season metadata only →
+  ROC-AUC ≈ 0.5); the multimodal sensor dataset is far more informative
+  (ROC-AUC ≈ 0.69-0.72 grouped).
 
 ## Important caveats
 

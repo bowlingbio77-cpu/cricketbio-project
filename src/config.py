@@ -77,3 +77,39 @@ INJURY_RISK_HIGH = 0.66               # risk_score above this -> "high"
 
 # Elbow flexion legal delivery threshold (ICC law of cricket: <=15 degrees extension)
 ICC_ELBOW_EXTENSION_LIMIT_DEG = 15.0
+
+# --- Multimodal Sports Injury Dataset (Kaggle: anjalibhegam/multimodal-sports-injury-dataset) ---
+# 15,420 per-session rows from 156 athletes; target is 3-class injury risk.
+SPORTS_INJURY_DATA = os.path.join(DATA_DIR, "multimodal_sports_injury_dataset.csv")
+SPORTS_INJURY_TARGET = "injury_occurred"
+SPORTS_INJURY_LABEL_MAP = {0: "healthy", 1: "low_risk", 2: "high_risk_injured"}
+SPORTS_INJURY_GROUP_COL = "athlete_id"
+SPORTS_INJURY_TIME_COL = "session_id"
+SPORTS_INJURY_NUMERIC_FEATURES = [
+    "heart_rate", "body_temperature", "hydration_level", "sleep_quality",
+    "recovery_score", "stress_level", "muscle_activity", "joint_angles",
+    "gait_speed", "cadence", "step_count", "jump_height",
+    "ground_reaction_force", "range_of_motion", "ambient_temperature",
+    "humidity", "altitude", "training_intensity", "training_duration",
+    "training_load", "fatigue_index", "age", "bmi",
+]
+SPORTS_INJURY_CATEGORICAL_FEATURES = ["sport_type", "gender", "playing_surface"]
+SPORTS_INJURY_SEQUENCE_WINDOW = 10       # sessions of context for sequence models
+SPORTS_INJURY_ROLLING_WINDOW = 3         # short rolling stats (lag-based, no leakage)
+
+# --- Cricket Injury Dataset (player-season level, one row per player per season) ---
+CRICKET_INJURY_DATA = os.path.join(DATA_DIR, "cricket_injury_dataset.csv")
+CRICKET_INJURY_TARGET = "injury_status"                       # binary 0/1
+CRICKET_INJURY_GROUP_COL = "player_id"
+CRICKET_INJURY_SEASON_COL = "season"
+CRICKET_INJURY_NUMERIC_FEATURES = ["age", "match_exposure_hours", "player_match_days"]
+CRICKET_INJURY_CATEGORICAL_FEATURES = [
+    "playing_level", "playing_role", "match_format",
+]
+# Ordinal severity derived from match_days_lost: 0 none, 1 minor (<7 days), 2 major (>=7 days)
+CRICKET_INJURY_SEVERITY_TARGET = "injury_severity"
+CRICKET_INJURY_SEVERITY_LABEL_MAP = {0: "none", 1: "minor", 2: "major"}
+CRICKET_INJURY_SEVERITY_DAYS = {"minor": 7}
+# High-detail injury columns only present on injured rows (used for explainability, not as features)
+CRICKET_INJURY_DETAIL_COLUMNS = ["injury_type", "body_site", "new_or_recurrent",
+                                 "match_or_training", "recovered", "match_days_lost"]

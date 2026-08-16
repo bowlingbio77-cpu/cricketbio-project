@@ -1,0 +1,104 @@
+{
+  "model_name": "random_forest",
+  "task": "injury",
+  "data_source": "real",
+  "trained_at": "2026-08-16T06:40:49.321782+00:00",
+  "n_samples": 15420,
+  "label_map": {
+    "0": "healthy",
+    "1": "low_risk",
+    "2": "high_risk_injured"
+  },
+  "feature_names": [
+    "heart_rate",
+    "body_temperature",
+    "hydration_level",
+    "sleep_quality",
+    "recovery_score",
+    "stress_level",
+    "muscle_activity",
+    "joint_angles",
+    "gait_speed",
+    "cadence",
+    "step_count",
+    "jump_height",
+    "ground_reaction_force",
+    "range_of_motion",
+    "ambient_temperature",
+    "humidity",
+    "altitude",
+    "training_intensity",
+    "training_duration",
+    "training_load",
+    "fatigue_index",
+    "age",
+    "bmi",
+    "acute_load_7",
+    "chronic_load_28",
+    "acwr",
+    "prev_fatigue_index",
+    "fatigue_delta",
+    "recovery_trend_3",
+    "prev_session_high_risk",
+    "cumulative_load",
+    "sport_type_Basketball",
+    "sport_type_Other",
+    "sport_type_Soccer",
+    "sport_type_Track",
+    "gender_Female",
+    "gender_Male",
+    "playing_surface_0",
+    "playing_surface_1",
+    "playing_surface_2",
+    "playing_surface_3",
+    "playing_surface_4"
+  ],
+  "cv_metrics": {
+    "folds": 5,
+    "n_samples": 15420,
+    "accuracy_mean": 0.523135543419009,
+    "accuracy_std": 0.011392015247694651,
+    "f1_mean": 0.47039126257892905,
+    "f1_std": 0.0068471407961508916,
+    "precision_mean": 0.45887806108043117,
+    "recall_mean": 0.5476121633989862,
+    "roc_auc_mean": 0.7141919918867761,
+    "per_class_report": {
+      "0": {
+        "precision": 0.7297110465920088,
+        "recall": 0.5348601540332387,
+        "f1-score": 0.6172738436348751,
+        "support": 9868.0
+      },
+      "1": {
+        "precision": 0.23722627737226276,
+        "recall": 0.24088943792464484,
+        "f1-score": 0.23904382470119523,
+        "support": 3238.0
+      },
+      "2": {
+        "precision": 0.40987956725862423,
+        "recall": 0.867761452031115,
+        "f1-score": 0.5567724941078608,
+        "support": 2314.0
+      },
+      "accuracy": 0.5230869001297017,
+      "macro avg": {
+        "precision": 0.45893896374096527,
+        "recall": 0.5478370146629995,
+        "f1-score": 0.47103005414797705,
+        "support": 15420.0
+      },
+      "weighted avg": {
+        "precision": 0.578300169425278,
+        "recall": 0.5230869001297017,
+        "f1-score": 0.5287713193733469,
+        "support": 15420.0
+      }
+    }
+  },
+  "baseline_metrics": {
+    "accuracy": 0.6399481193255512,
+    "f1_macro": 0.26014974164293997
+  }
+}

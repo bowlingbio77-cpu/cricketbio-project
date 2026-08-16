@@ -8,9 +8,12 @@ short gaps by linear extrapolation, and renders an H.264 MP4 with a red
 bounding box drawn around the ball for display in the Streamlit app.
 
 When ultralytics is unavailable (or the ball is missed by YOLO), a lightweight
-frame-difference motion detector contributes candidate blobs: YOLO detections
-*seed* the track, motion blobs only *extend* an already-running track so the
-tracker doesn't latch onto the bowler's moving limbs.
+frame-difference motion detector contributes candidate blobs. Candidates are
+source-tagged ("yolo" / "motion") and the matcher is source-gated: YOLO
+detections *seed* tracks and always outrank motion blobs when extending them,
+so the box cannot drift onto the bowler's moving limbs; motion blobs only
+*extend* an already-running track (bridging YOLO's short gaps) or seed a new
+track after persisting across two consecutive frames.
 
 The raw trajectory is then trimmed down to the release -> impact window (ball
 leaving the bowler's hand through contact with the bat/pad/ground). There is
@@ -103,8 +106,14 @@ class BallTracker:
     # ------------------------------------------------------------------ #
     # Detection
     # ------------------------------------------------------------------ #
-    def _candidates(self, frame: np.ndarray, prev_gray: np.ndarray) -> List[Tuple[float, float, float, float, float]]:
-        """(x, y, confidence, w, h) candidates: YOLO ball detections + motion blobs."""
+    def _candidates(self, frame: np.ndarray, prev_gray: np.ndarray) -> List[Tuple[float, float, float, float, float, str]]:
+        """(x, y, confidence, w, h, source) candidates: YOLO ball detections + motion blobs.
+
+        `source` is "yolo" or "motion" -- the matching logic in `_step` uses it
+        so motion/color blobs can never outrank a YOLO detection just for being
+        closer to the predicted position (this is what used to let the bowler's
+        glove/pad drift the box onto a limb mid-delivery).
+        """
         dets = []
         if self._model is not None:
             try:
@@ -119,14 +128,14 @@ class BallTracker:
                         # Keep the real confidence -- do NOT clamp it up to
                         # seed_min_conf here, or every detection above
                         # conf_threshold would silently qualify as a "seed".
-                        dets.append(((x1 + x2) / 2.0, (y1 + y2) / 2.0, conf, x2 - x1, y2 - y1))
+                        dets.append(((x1 + x2) / 2.0, (y1 + y2) / 2.0, conf, x2 - x1, y2 - y1, "yolo"))
             except Exception:
                 pass
         dets.extend(self._motion_candidates(frame, prev_gray))
         return dets
 
     @staticmethod
-    def _motion_candidates(frame: np.ndarray, prev_gray: Optional[np.ndarray]) -> List[Tuple[float, float, float, float, float]]:
+    def _motion_candidates(frame: np.ndarray, prev_gray: Optional[np.ndarray]) -> List[Tuple[float, float, float, float, float, str]]:
         """Small fast-moving blobs between consecutive frames (ball-sized)."""
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         if prev_gray is None:
@@ -146,22 +155,26 @@ class BallTracker:
             if m["m00"] <= 0:
                 continue
             bx, by, bw, bh = cv2.boundingRect(c)
-            out.append((m["m10"] / m["m00"], m["m01"] / m["m00"], MOTION_CONF, float(bw), float(bh)))
+            out.append((m["m10"] / m["m00"], m["m01"] / m["m00"], MOTION_CONF,
+                        float(bw), float(bh), "motion"))
         return out
 
     # ------------------------------------------------------------------ #
     # Tracking
     # ------------------------------------------------------------------ #
-    def track(self, frames) -> Tuple[List[BallPoint], dict]:
+    def track(self, frames, fps: Optional[float] = None) -> Tuple[List[BallPoint], dict]:
         """
         `frames`: iterable of (frame_idx, timestamp_sec, frame_bgr).
 
         Returns (trajectory, stats). The returned trajectory is the longest
         contiguous tracking segment (NOT trimmed) so the annotated video shows
         the box for every frame the ball was followed; the release -> impact
-        window (release_idx / impact_idx / trimmed) is reported in `stats`.
-        The trajectory is empty when no track survived the minimum-length
-        check (MIN_TRACK_FRAMES).
+        window (release_idx / impact_idx / trimmed) is reported in `stats`
+        (callers that want the box to stop at bat/pad/ground contact clip the
+        track at `impact_idx` themselves). The trajectory is empty when no
+        track survived the minimum-length check (MIN_TRACK_FRAMES).
+        `fps`, when given, makes `summarize` report speeds in px/sec rather
+        than px/frame.
         """
         track: List[BallPoint] = []
         state = {"last": None, "velocity": np.zeros(2), "gaps": 0, "box_size": None, "pending": None}
@@ -186,21 +199,35 @@ class BallTracker:
 
         stats = {"total_frames": total_frames}
         stats.update(window_info)
-        stats.update(summarize(longest, fps=None))
+        stats.update(summarize(longest, fps=fps))
         return longest, stats
 
     def _step(self, idx: int, ts: float, cands, state: dict) -> Optional[BallPoint]:
         """Advance the tracker one frame; returns a BallPoint or None."""
-        # Extend an existing track (any candidate within the predicted radius).
+        # Extend an existing track. YOLO candidates within radius always win
+        # over motion/color candidates, regardless of distance -- otherwise a
+        # closer glove/pad/sock blob can hijack an already-good YOLO-seeded
+        # track (this is what caused the frame-21 drift onto the bowler's
+        # sock). Motion candidates are only considered when no YOLO candidate
+        # is in radius, so they can still bridge YOLO's short gaps.
         if state["last"] is not None and state["gaps"] <= MAX_GAP_FRAMES:
             predicted = state["last"] + state["velocity"]
             radius = max(MATCH_BASE_RADIUS,
                          float(np.linalg.norm(state["velocity"])) * MATCH_VELOCITY_FACTOR + MATCH_BASE_RADIUS)
-            best, best_d = None, None
-            for cx, cy, conf, cw, ch in cands:
-                d = float(np.hypot(cx - predicted[0], cy - predicted[1]))
-                if d <= radius and (best_d is None or d < best_d):
-                    best, best_d = (cx, cy, conf, cw, ch), d
+
+            def _nearest_in_radius(source: Optional[str]):
+                best, best_d = None, None
+                for cx, cy, conf, cw, ch, src in cands:
+                    if source is not None and src != source:
+                        continue
+                    d = float(np.hypot(cx - predicted[0], cy - predicted[1]))
+                    if d <= radius and (best_d is None or d < best_d):
+                        best, best_d = (cx, cy, conf, cw, ch), d
+                return best
+
+            best = _nearest_in_radius("yolo")
+            if best is None:
+                best = _nearest_in_radius("motion")
             if best is not None:
                 cx, cy, conf, cw, ch = best
                 delta = np.array([cx, cy]) - state["last"]
@@ -221,13 +248,19 @@ class BallTracker:
             state["velocity"] = 0.9 * state["velocity"]
             return pt
 
-        # (Re)start a new track -- from a confident seed, or from a motion blob
-        # that persists across two consecutive frames (ball that YOLO missed).
-        seedable = cands if self._model is None else [c for c in cands if c[2] >= self.seed_min_conf]
-        if not seedable:
-            seedable = self._confirmed_motion_seed(cands, state, idx)
+        # (Re)start a new track. When a real model is loaded, only YOLO
+        # detections at/above seed_min_conf may originate a track -- motion
+        # blobs then need the two-frame persistence check below (so a moving
+        # limb can't re-seed us). Without a model, raw motion blobs are all
+        # we have, so they seed directly.
+        if self._model is None:
+            seedable = cands
+        else:
+            seedable = [c for c in cands if c[5] == "yolo" and c[2] >= self.seed_min_conf]
+            if not seedable:
+                seedable = self._confirmed_motion_seed(cands, state, idx)
         if seedable:
-            cx, cy, conf, cw, ch = max(seedable, key=lambda c: c[2])
+            cx, cy, conf, cw, ch = max(seedable, key=lambda c: c[2])[0:5]
             state["last"] = np.array([cx, cy])
             state["velocity"] = np.zeros(2)
             state["gaps"] = 0
@@ -364,13 +397,13 @@ class BallTracker:
         return trimmed, info
 
 
-def track_ball(frames) -> Tuple[List[BallPoint], dict]:
+def track_ball(frames, fps: Optional[float] = None) -> Tuple[List[BallPoint], dict]:
     """Convenience wrapper: build a tracker, track, return (trajectory, stats)."""
     tracker = BallTracker()
     if tracker.model_error:
         raise RuntimeError(f"Ball tracker: YOLO failed to load ({tracker.model_error}) -- "
                            "motion-only tracking disabled.")
-    return tracker.track(frames)
+    return tracker.track(frames, fps=fps)
 
 
 def summarize(track: List[BallPoint], fps: Optional[float] = None) -> dict:

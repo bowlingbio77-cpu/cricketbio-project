@@ -1,0 +1,75 @@
+{
+  "model_name": "xgboost",
+  "task": "injury",
+  "data_source": "real",
+  "trained_at": "2026-08-16T07:11:36.722158+00:00",
+  "n_samples": 1272,
+  "label_map": {
+    "0": "none",
+    "1": "minor",
+    "2": "major"
+  },
+  "feature_names": [
+    "age",
+    "match_exposure_hours",
+    "player_match_days",
+    "playing_level_Domestic",
+    "playing_level_International",
+    "playing_role_Batter",
+    "playing_role_Pace bowler",
+    "playing_role_Spin bowler",
+    "playing_role_Wicket-keeper",
+    "match_format_First class",
+    "match_format_One day",
+    "match_format_T20",
+    "match_format_Test"
+  ],
+  "cv_metrics": {
+    "folds": 5,
+    "n_samples": 1272,
+    "accuracy_mean": 0.3600741083835109,
+    "accuracy_std": 0.026327525484154325,
+    "f1_mean": 0.3112597181189105,
+    "f1_std": 0.023604107979860175,
+    "precision_mean": 0.31436127403430764,
+    "recall_mean": 0.3126745550510945,
+    "roc_auc_mean": 0.48161482403710965,
+    "per_class_report": {
+      "0": {
+        "precision": 0.5270935960591133,
+        "recall": 0.4592274678111588,
+        "f1-score": 0.4908256880733945,
+        "support": 699.0
+      },
+      "1": {
+        "precision": 0.20118343195266272,
+        "recall": 0.24548736462093862,
+        "f1-score": 0.22113821138211381,
+        "support": 277.0
+      },
+      "2": {
+        "precision": 0.2123076923076923,
+        "recall": 0.23310810810810811,
+        "f1-score": 0.2222222222222222,
+        "support": 296.0
+      },
+      "accuracy": 0.360062893081761,
+      "macro avg": {
+        "precision": 0.31352824010648944,
+        "recall": 0.3126076468467352,
+        "f1-score": 0.3113953738925768,
+        "support": 1272.0
+      },
+      "weighted avg": {
+        "precision": 0.3828689553610729,
+        "recall": 0.360062893081761,
+        "f1-score": 0.3695913665832752,
+        "support": 1272.0
+      }
+    }
+  },
+  "baseline_metrics": {
+    "accuracy": 0.5495283018867925,
+    "f1_macro": 0.23642820903094874
+  }
+}

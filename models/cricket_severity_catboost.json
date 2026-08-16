@@ -1,0 +1,75 @@
+{
+  "model_name": "catboost",
+  "task": "injury",
+  "data_source": "real",
+  "trained_at": "2026-08-16T07:11:52.837734+00:00",
+  "n_samples": 1272,
+  "label_map": {
+    "0": "none",
+    "1": "minor",
+    "2": "major"
+  },
+  "feature_names": [
+    "age",
+    "match_exposure_hours",
+    "player_match_days",
+    "playing_level_Domestic",
+    "playing_level_International",
+    "playing_role_Batter",
+    "playing_role_Pace bowler",
+    "playing_role_Spin bowler",
+    "playing_role_Wicket-keeper",
+    "match_format_First class",
+    "match_format_One day",
+    "match_format_T20",
+    "match_format_Test"
+  ],
+  "cv_metrics": {
+    "folds": 5,
+    "n_samples": 1272,
+    "accuracy_mean": 0.3915423807318203,
+    "accuracy_std": 0.03568824827946538,
+    "f1_mean": 0.33355954253722114,
+    "f1_std": 0.03345284026069026,
+    "precision_mean": 0.3345217451755117,
+    "recall_mean": 0.33393463789391115,
+    "roc_auc_mean": 0.4960050036012822,
+    "per_class_report": {
+      "0": {
+        "precision": 0.5249266862170088,
+        "recall": 0.5121602288984263,
+        "f1-score": 0.5184648805213613,
+        "support": 699.0
+      },
+      "1": {
+        "precision": 0.25,
+        "recall": 0.2563176895306859,
+        "f1-score": 0.2531194295900178,
+        "support": 277.0
+      },
+      "2": {
+        "precision": 0.22549019607843138,
+        "recall": 0.23310810810810811,
+        "f1-score": 0.2292358803986711,
+        "support": 296.0
+      },
+      "accuracy": 0.3915094339622642,
+      "macro avg": {
+        "precision": 0.33347229409848006,
+        "recall": 0.3338620088457401,
+        "f1-score": 0.33360673017001674,
+        "support": 1272.0
+      },
+      "weighted avg": {
+        "precision": 0.39537645574284974,
+        "recall": 0.3915094339622641,
+        "f1-score": 0.393376457609177,
+        "support": 1272.0
+      }
+    }
+  },
+  "baseline_metrics": {
+    "accuracy": 0.5495283018867925,
+    "f1_macro": 0.23642820903094874
+  }
+}

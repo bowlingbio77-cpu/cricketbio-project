@@ -1,0 +1,75 @@
+{
+  "model_name": "random_forest",
+  "task": "injury",
+  "data_source": "real",
+  "trained_at": "2026-08-16T07:11:30.435965+00:00",
+  "n_samples": 1272,
+  "label_map": {
+    "0": "none",
+    "1": "minor",
+    "2": "major"
+  },
+  "feature_names": [
+    "age",
+    "match_exposure_hours",
+    "player_match_days",
+    "playing_level_Domestic",
+    "playing_level_International",
+    "playing_role_Batter",
+    "playing_role_Pace bowler",
+    "playing_role_Spin bowler",
+    "playing_role_Wicket-keeper",
+    "match_format_First class",
+    "match_format_One day",
+    "match_format_T20",
+    "match_format_Test"
+  ],
+  "cv_metrics": {
+    "folds": 5,
+    "n_samples": 1272,
+    "accuracy_mean": 0.367969739076733,
+    "accuracy_std": 0.029617599846824865,
+    "f1_mean": 0.3336432895745539,
+    "f1_std": 0.030812729325421007,
+    "precision_mean": 0.3410799439474218,
+    "recall_mean": 0.33924864070882843,
+    "roc_auc_mean": 0.49410722946974206,
+    "per_class_report": {
+      "0": {
+        "precision": 0.5630885122410546,
+        "recall": 0.42775393419170243,
+        "f1-score": 0.4861788617886179,
+        "support": 699.0
+      },
+      "1": {
+        "precision": 0.2109375,
+        "recall": 0.2924187725631769,
+        "f1-score": 0.24508320726172467,
+        "support": 277.0
+      },
+      "2": {
+        "precision": 0.24649859943977592,
+        "recall": 0.2972972972972973,
+        "f1-score": 0.26952526799387444,
+        "support": 296.0
+      },
+      "accuracy": 0.36792452830188677,
+      "macro avg": {
+        "precision": 0.3401748705602768,
+        "recall": 0.33915666801739225,
+        "f1-score": 0.333595779014739,
+        "support": 1272.0
+      },
+      "weighted avg": {
+        "precision": 0.412729672162477,
+        "recall": 0.36792452830188677,
+        "f1-score": 0.38325986802510104,
+        "support": 1272.0
+      }
+    }
+  },
+  "baseline_metrics": {
+    "accuracy": 0.5495283018867925,
+    "f1_macro": 0.23642820903094874
+  }
+}

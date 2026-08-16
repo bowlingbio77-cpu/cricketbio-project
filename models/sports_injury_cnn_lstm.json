@@ -1,0 +1,72 @@
+{
+  "model_name": "cnn_lstm",
+  "task": "injury",
+  "data_source": "real",
+  "trained_at": "2026-08-16T06:58:59.294108+00:00",
+  "n_samples": 13860,
+  "label_map": {
+    "0": "healthy",
+    "1": "low_risk",
+    "2": "high_risk_injured"
+  },
+  "feature_names": [
+    "t0",
+    "t1",
+    "t2",
+    "t3",
+    "t4",
+    "t5",
+    "t6",
+    "t7",
+    "t8",
+    "t9"
+  ],
+  "cv_metrics": {
+    "folds": 5,
+    "n_samples": 13860,
+    "accuracy_mean": 0.40991953209668397,
+    "accuracy_std": 0.050340174926596475,
+    "f1_mean": 0.3996394443169539,
+    "f1_std": 0.034389927244852805,
+    "precision_mean": 0.4298588971608435,
+    "recall_mean": 0.5210870593972319,
+    "roc_auc_mean": 0.6817738153002196,
+    "per_class_report": {
+      "0": {
+        "precision": 0.7207724425887265,
+        "recall": 0.3114920491710838,
+        "f1-score": 0.43499488148673127,
+        "support": 8867.0
+      },
+      "1": {
+        "precision": 0.2373574349042393,
+        "recall": 0.37735203557988367,
+        "f1-score": 0.29141347424042274,
+        "support": 2923.0
+      },
+      "2": {
+        "precision": 0.3363687047017283,
+        "recall": 0.8743961352657005,
+        "f1-score": 0.4858408267346665,
+        "support": 2070.0
+      },
+      "accuracy": 0.40945165945165946,
+      "macro avg": {
+        "precision": 0.4314995273982314,
+        "recall": 0.5210800733388893,
+        "f1-score": 0.4040830608206068,
+        "support": 13860.0
+      },
+      "weighted avg": {
+        "precision": 0.5614118506054767,
+        "recall": 0.40945165945165946,
+        "f1-score": 0.41230820423436954,
+        "support": 13860.0
+      }
+    }
+  },
+  "baseline_metrics": {
+    "accuracy": 0.6397546897546897,
+    "f1_macro": 0.2601017878881213
+  }
+}

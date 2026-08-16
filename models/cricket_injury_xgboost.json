@@ -1,0 +1,68 @@
+{
+  "model_name": "xgboost",
+  "task": "injury",
+  "data_source": "real",
+  "trained_at": "2026-08-16T07:10:50.320548+00:00",
+  "n_samples": 1272,
+  "label_map": {
+    "0": "no_injury",
+    "1": "injury"
+  },
+  "feature_names": [
+    "age",
+    "match_exposure_hours",
+    "player_match_days",
+    "playing_level_Domestic",
+    "playing_level_International",
+    "playing_role_Batter",
+    "playing_role_Pace bowler",
+    "playing_role_Spin bowler",
+    "playing_role_Wicket-keeper",
+    "match_format_First class",
+    "match_format_One day",
+    "match_format_T20",
+    "match_format_Test"
+  ],
+  "cv_metrics": {
+    "folds": 5,
+    "n_samples": 1272,
+    "accuracy_mean": 0.4874015748031496,
+    "accuracy_std": 0.030864539073405653,
+    "f1_mean": 0.4821609732957025,
+    "f1_std": 0.03224352197017138,
+    "precision_mean": 0.4825918907835097,
+    "recall_mean": 0.4827235511362078,
+    "roc_auc_mean": 0.4854830836866957,
+    "per_class_report": {
+      "0": {
+        "precision": 0.5339105339105339,
+        "recall": 0.5293276108726752,
+        "f1-score": 0.5316091954022989,
+        "support": 699.0
+      },
+      "1": {
+        "precision": 0.4317789291882556,
+        "recall": 0.4363001745200698,
+        "f1-score": 0.4340277777777778,
+        "support": 573.0
+      },
+      "accuracy": 0.48742138364779874,
+      "macro avg": {
+        "precision": 0.4828447315493948,
+        "recall": 0.48281389269637254,
+        "f1-score": 0.48281848659003834,
+        "support": 1272.0
+      },
+      "weighted avg": {
+        "precision": 0.4879031365002623,
+        "recall": 0.48742138364779874,
+        "f1-score": 0.48765152850068677,
+        "support": 1272.0
+      }
+    }
+  },
+  "baseline_metrics": {
+    "accuracy": 0.5495283018867925,
+    "f1_macro": 0.3546423135464231
+  }
+}
