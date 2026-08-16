@@ -30,3 +30,6 @@ Thumbs.db
 
 # CatBoost training temp output
 catboost_info/
+
+# Raw bowling videos for ball-tracker labeling/eval (large, not committed)
+corrected_all_data/

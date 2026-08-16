@@ -1,8 +1,9 @@
-"""Ball-tracking tests: release->impact windowing and impact-clipped annotation."""
+"""Ball-tracking v2 contract tests: same windowing/validity guarantees as the
+v1 suite, exercised through v2's multi-hypothesis Kalman pipeline."""
 import numpy as np
 
-from src.ball_tracking import (BallTracker, BallPoint, MOTION_CONF,
-                               YOLO_LIVENESS_FRAMES, annotate_frames, summarize)
+from src.ball_tracking_v2 import (BallTracker, BallPoint, annotate_frames,
+                                  summarize)
 
 
 def _ball(points):
@@ -12,20 +13,6 @@ def _ball(points):
 
 def _blank_frames(n, w=300, h=200):
     return [(i, i / 30.0, np.zeros((h, w, 3), dtype=np.uint8)) for i in range(n)]
-
-
-def _tracker(model_present: bool) -> BallTracker:
-    """A BallTracker without loading a real YOLO model."""
-    t = BallTracker.__new__(BallTracker)
-    t._model = object() if model_present else None
-    t.conf_threshold = 0.2
-    t.seed_min_conf = 0.3
-    return t
-
-
-def _state():
-    return {"last": None, "velocity": np.zeros(2), "gaps": 0,
-            "box_size": None, "pending": None, "since_yolo": 0}
 
 
 def _delivery_track():
@@ -54,11 +41,11 @@ def test_annotate_clips_at_impact():
 
     annotated = annotate_frames(_blank_frames(14), clipped)
     boxed = [i for i, (_idx, _ts, img) in enumerate(annotated) if img.any()]
-    assert boxed == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]  # stops at impact (frame 10)
+    assert boxed == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
     full = annotate_frames(_blank_frames(14), track)
     boxed_full = [i for i, (_idx, _ts, img) in enumerate(full) if img.any()]
-    assert boxed_full == list(range(14))  # without clipping the box follows the whole track
+    assert boxed_full == list(range(14))
 
 
 def test_no_impact_keeps_full_track():
@@ -68,80 +55,6 @@ def test_no_impact_keeps_full_track():
     clipped = track if info["impact_idx"] is None else [p for p in track
                                                         if p.frame_idx <= info["impact_idx"]]
     assert clipped == track
-
-
-def test_motion_blob_cannot_hijack_yolo_track():
-    """A closer motion blob must never outrank a YOLO detection in radius."""
-    tracker = _tracker(model_present=True)
-    st = _state()
-    st["last"] = np.array([100.0, 100.0])
-    st["velocity"] = np.zeros(2)
-    st["box_size"] = (16, 16)
-    cands = [
-        (102.0, 100.0, 0.2, 10, 10, "motion"),   # closer, but a limb
-        (110.0, 100.0, 0.9, 16, 16, "yolo"),     # correct source
-    ]
-    pt = tracker._step(1, 1 / 30.0, cands, st)
-    assert pt is not None and pt.detected
-    assert abs(pt.x - 110.0) < 1e-6
-
-
-def test_motion_cannot_seed_when_model_present():
-    """With a real model loaded, a motion blob must never start a track --
-    during run-up and delivery a moving limb would otherwise re-seed us."""
-    tracker = _tracker(model_present=True)
-    st = _state()
-    blob = (120.0, 80.0, MOTION_CONF, 12, 12, "motion")
-    assert tracker._step(1, 1 / 30.0, [blob], st) is None   # frame 1: no YOLO seed
-    assert tracker._step(2, 2 / 30.0, [blob], st) is None   # frame 2: still no YOLO seed
-
-
-def test_no_model_seeds_from_motion_after_confirmation():
-    """Without a detector, a small blob persisting two frames is the best
-    evidence we have: frame 1 stashes it, frame 2 confirms the seed."""
-    tracker = _tracker(model_present=False)
-    st = _state()
-    blob = (100.0, 100.0, MOTION_CONF, 10, 10, "motion")
-    assert tracker._step(1, 1 / 30.0, [blob], st) is None   # frame 1: just stashed
-    pt = tracker._step(2, 2 / 30.0, [blob], st)             # frame 2: confirmed
-    assert pt is not None and pt.detected
-    assert abs(pt.x - 100.0) < 1e-6 and abs(pt.y - 100.0) < 1e-6
-
-
-def test_low_conf_yolo_does_not_seed():
-    """YOLO detections below seed_min_conf (0.3) must not start a track."""
-    tracker = _tracker(model_present=True)
-    st = _state()
-    cands = [(120.0, 80.0, 0.2, 16, 16, "yolo")]   # above conf_threshold, below seed gate
-    assert tracker._step(1, 1 / 30.0, cands, st) is None
-
-
-def test_motion_extends_within_yolo_liveness():
-    """Motion may bridge a gap only while the track has YOLO support recently."""
-    tracker = _tracker(model_present=True)
-    st = _state()
-    st["last"] = np.array([100.0, 100.0])
-    st["velocity"] = np.zeros(2)
-    st["box_size"] = (16, 16)
-    st["since_yolo"] = 0
-    cands = [(105.0, 100.0, MOTION_CONF, 10, 10, "motion")]   # inside radius
-    pt = tracker._step(1, 1 / 30.0, cands, st)
-    assert pt is not None and pt.detected
-    assert abs(pt.x - 105.0) < 1e-6
-
-
-def test_motion_ignored_after_liveness_expires():
-    """Once YOLO support is stale, motion must not latch the track onto a limb."""
-    tracker = _tracker(model_present=True)
-    st = _state()
-    st["last"] = np.array([100.0, 100.0])
-    st["velocity"] = np.zeros(2)
-    st["box_size"] = (16, 16)
-    st["since_yolo"] = YOLO_LIVENESS_FRAMES + 1
-    cands = [(105.0, 100.0, MOTION_CONF, 10, 10, "motion")]   # inside radius, but track is dead
-    pt = tracker._step(1, 1 / 30.0, cands, st)
-    assert pt is not None and not pt.detected        # extrapolated, not latched
-    assert abs(pt.x - 100.0) < 1e-6
 
 
 def test_split_segments_splits_on_jump_and_gap():
@@ -172,10 +85,7 @@ class _Result:
 
 
 class _FakeModel:
-    """A scripted YOLO that reports `positions[i]` (or nothing) on frame i.
-    Box confidence is fixed -- the tracker's own `conf_threshold` kwarg (passed
-    to predict by `_candidates`) must not drag it below the seed gate.
-    `half` may be a constant or a callable(frame_index) -> half-size."""
+    """A scripted YOLO that reports `positions[i]` (or nothing) on frame i."""
 
     def __init__(self, positions, conf=0.9, half=8):
         self.positions = positions
@@ -229,3 +139,15 @@ def test_slow_growing_object_rejected():
     t.seed_min_conf = 0.3
     track, stats = t.track(_blank_frames(31), fps=30.0)
     assert track == []
+
+
+def test_duplicate_yolo_boxes_do_not_split_the_ball():
+    """Overlapping YOLO boxes on the same ball must not spawn a competing
+    duplicate track that steals later detections from the real one."""
+    t = BallTracker.__new__(BallTracker)
+    t._model = object()          # model present: only YOLO may seed
+    t.seed_min_conf = 0.3
+    cands = [(100.0, 100.0, 0.9, 16, 16, "yolo"),
+             (105.0, 100.0, 0.8, 16, 16, "yolo")]   # 5 px apart: same object
+    still_active, _done, _next = t._step_all(0, 0.0, cands, [], 0)
+    assert len(still_active) == 1

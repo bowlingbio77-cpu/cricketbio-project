@@ -16,7 +16,7 @@ from typing import Optional
 import numpy as np
 
 from . import config, preprocessing, tracking, pose_estimation
-from . import ball_tracking
+from . import ball_tracking_v2 as ball_tracking
 from . import feature_engineering as feateng
 from . import ml_models, explainability, coaching
 

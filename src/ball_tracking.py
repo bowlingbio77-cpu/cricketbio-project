@@ -9,11 +9,19 @@ bounding box drawn around the ball for display in the Streamlit app.
 
 When ultralytics is unavailable (or the ball is missed by YOLO), a lightweight
 frame-difference motion detector contributes candidate blobs. Candidates are
-source-tagged ("yolo" / "motion") and the matcher is source-gated: YOLO
-detections *seed* tracks and always outrank motion blobs when extending them,
-so the box cannot drift onto the bowler's moving limbs; motion blobs only
-*extend* an already-running track (bridging YOLO's short gaps) or seed a new
-track after persisting across two consecutive frames.
+source-tagged ("yolo" / "motion") and the matcher is source-gated so the box
+cannot drift onto the bowler's moving limbs:
+  - YOLO detections at/above `seed_min_conf` *seed* tracks (a running up /
+    delivery arm is never the ball, so motion blobs are not allowed to start
+    a track when a detector is loaded);
+  - when extending a track, a YOLO candidate inside the search radius always
+    wins; motion blobs only bridge short gaps, and only while the track has
+    seen a YOLO detection within the last `YOLO_LIVENESS_FRAMES` frames --
+    otherwise the track just extrapolates and dies instead of following limbs;
+  - motion blobs are also size-filtered to ball-like blobs (compact and small),
+    which drops the large/elongated blobs a moving arm or leg produces.
+Without a YOLO model, motion-only tracking still works: a small blob that
+persists two frames running is allowed to start a track.
 
 The raw trajectory is then trimmed down to the release -> impact window (ball
 leaving the bowler's hand through contact with the bat/pad/ground). There is
@@ -55,6 +63,26 @@ MAX_GAP_FRAMES = 8          # longest gap (frames) the tracker bridges by extrap
 MIN_TRACK_FRAMES = 3        # below this many frames the track is discarded
 MATCH_BASE_RADIUS = 30.0    # px -- minimum matching radius
 MATCH_VELOCITY_FACTOR = 1.8  # radius grows with the ball's speed
+YOLO_LIVENESS_FRAMES = 3    # frames of YOLO support needed for motion to extend a track
+
+# Motion-blob size limits: the cricket ball is a small, roughly circular blob
+# even at release, whereas a moving limb produces a large or elongated blob.
+MOTION_MIN_AREA = 8.0       # px^2 -- below this it's frame noise
+MOTION_MAX_AREA = 1200.0    # px^2 -- above this it's a limb/body part
+MOTION_MAX_ASPECT = 2.5     # width/height ratio -- elongated blobs are limbs
+
+# Track-validity limits: a ball in flight always travels a meaningful distance
+# across the frame, so a "track" that stays in one spot is a false positive --
+# YOLO firing repeatedly on a fixed round object (a stump, helmet, or lens
+# flare). MIN_TRACK_SPREAD = the flight must span this much of the frame;
+# MIN_TRACK_PATH = and travel at least this far in total. A slow object whose
+# box keeps growing (a person walking toward the camera) is rejected by the
+# combined box-growth + speed rule.
+MIN_TRACK_SPREAD_PX = 60.0
+MIN_TRACK_PATH_PX = 100.0
+MAX_SEGMENT_JUMP_PX = 80.0   # a same-track point can't teleport this far in 1 frame
+BOX_GROWTH_LIMIT = 2.8       # box grew more than this AND moved slowly => a person
+MIN_AVG_SPEED_PX_S = 400.0
 
 # -- release / impact windowing ------------------------------------------- #
 # Heuristic constants: release is where the ball's frame-to-frame speed
@@ -67,6 +95,7 @@ RELEASE_MIN_SPEED_FACTOR = 1.6   # release speed must exceed this x the pre-rele
 RELEASE_SUSTAIN_FRAMES = 3       # consecutive fast frames needed to confirm release
 IMPACT_ANGLE_THRESHOLD_DEG = 35.0  # velocity-direction change (deg) that signals impact
 IMPACT_SPEED_DROP_FACTOR = 0.55    # or: speed suddenly drops to this fraction of prior speed
+IMPACT_MIN_SPEED_PX_FRAME = 6.0    # ignore impact candidates with tiny prior speed (jitter)
 
 # -- rendering -------------------------------------------------------------- #
 BOX_COLOR = (0, 0, 255)          # BGR red
@@ -89,9 +118,13 @@ class BallTracker:
     """Detect + track the ball through a sequence of frames."""
 
     def __init__(self, weights: str = config.YOLO_WEIGHTS,
-                 conf_threshold: float = 0.2,
+                 conf_threshold: float = 0.1,
                  seed_min_conf: float = SEED_MIN_CONF,
                  model=None):
+        # conf_threshold is deliberately low (0.1): at delivery-cam resolution
+        # the ball is a small fast object that COCO's generic "sports ball"
+        # class only scores at 0.05-0.35. The 0.3 seed gate keeps low-conf
+        # false positives from starting a track.
         self.conf_threshold = conf_threshold
         self.seed_min_conf = seed_min_conf
         self._model = model
@@ -136,7 +169,7 @@ class BallTracker:
 
     @staticmethod
     def _motion_candidates(frame: np.ndarray, prev_gray: Optional[np.ndarray]) -> List[Tuple[float, float, float, float, float, str]]:
-        """Small fast-moving blobs between consecutive frames (ball-sized)."""
+        """Small fast-moving ball-sized blobs between consecutive frames."""
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         if prev_gray is None:
             return []
@@ -149,12 +182,16 @@ class BallTracker:
         out = []
         for c in contours:
             area = cv2.contourArea(c)
-            if area < 3.0 or area > 0.01 * h * w:   # ignore noise & large body movement
+            if area < MOTION_MIN_AREA or area > MOTION_MAX_AREA:
                 continue
+            bx, by, bw, bh = cv2.boundingRect(c)
+            if bw <= 0 or bh <= 0:
+                continue
+            if max(bw, bh) / min(bw, bh) > MOTION_MAX_ASPECT:
+                continue  # elongated blob: a limb, bat, or seam, not the ball
             m = cv2.moments(c)
             if m["m00"] <= 0:
                 continue
-            bx, by, bw, bh = cv2.boundingRect(c)
             out.append((m["m10"] / m["m00"], m["m01"] / m["m00"], MOTION_CONF,
                         float(bw), float(bh), "motion"))
         return out
@@ -177,7 +214,8 @@ class BallTracker:
         than px/frame.
         """
         track: List[BallPoint] = []
-        state = {"last": None, "velocity": np.zeros(2), "gaps": 0, "box_size": None, "pending": None}
+        state = {"last": None, "velocity": np.zeros(2), "gaps": 0,
+                 "box_size": None, "pending": None, "since_yolo": 0}
         prev_gray = None
         total_frames = 0
 
@@ -191,9 +229,48 @@ class BallTracker:
             if pt is not None:
                 track.append(pt)
 
-        longest = self._longest_segment(track)
-        if len(longest) < MIN_TRACK_FRAMES:
-            longest = []
+        # The longest raw segment is the natural candidate, but a longer
+        # segment can be a fake track (a person walking toward the camera,
+        # a stationary object YOLO keeps re-firing on) while a shorter one is
+        # the real ball. So validate every segment longest-first and return
+        # the first one that looks like a genuine ball flight.
+        h, w = frames[0][2].shape[:2]
+        margin = 8
+        longest = []
+        for cand in sorted(self._split_segments(track), key=len, reverse=True):
+            if len(cand) < MIN_TRACK_FRAMES:
+                continue
+            # The ball can't be followed after it leaves the frame: drop
+            # trailing extrapolated points that run off the image edge
+            # (otherwise the box keeps drifting out of view after the ball is
+            # hit past the batsman).
+            while cand and (cand[-1].x < -margin or cand[-1].x > w + margin
+                            or cand[-1].y < -margin or cand[-1].y > h + margin):
+                cand.pop()
+            if len(cand) < MIN_TRACK_FRAMES:
+                continue
+            # A delivery ball always moves: reject segments pinned to one spot
+            # (YOLO confidently re-firing on a fixed round object every frame),
+            # and reject slow segments whose box balloons out -- that's a
+            # person walking toward the camera (or a motion-blob takeover),
+            # not a ball in flight. Box growth is max/min so a segment that
+            # *starts* on an already-big object is still caught; the speed
+            # gate is NET speed (end-to-end), which is immune to zig-zag
+            # Kalman/noise paths inflating a segment's path length.
+            pts = np.array([[p.x, p.y] for p in cand], dtype=float)
+            span = np.max(pts, axis=0) - np.min(pts, axis=0)
+            spread = float(np.hypot(span[0], span[1]))
+            seg = np.diff(pts, axis=0)
+            path = float(np.sum(np.hypot(seg[:, 0], seg[:, 1])))
+            dt = cand[-1].timestamp_sec - cand[0].timestamp_sec
+            net_speed = (float(np.hypot(cand[-1].x - cand[0].x, cand[-1].y - cand[0].y)) / dt
+                         if dt > 0 else 0.0)
+            ws = [p.w for p in cand]
+            growth = max(ws) / max(min(ws), 1.0)
+            if (spread >= MIN_TRACK_SPREAD_PX and path >= MIN_TRACK_PATH_PX
+                    and not (growth > BOX_GROWTH_LIMIT and net_speed < MIN_AVG_SPEED_PX_S)):
+                longest = cand
+                break
 
         trimmed, window_info = self._trim_to_release_impact(longest) if longest else ([], {})
 
@@ -208,8 +285,10 @@ class BallTracker:
         # over motion/color candidates, regardless of distance -- otherwise a
         # closer glove/pad/sock blob can hijack an already-good YOLO-seeded
         # track (this is what caused the frame-21 drift onto the bowler's
-        # sock). Motion candidates are only considered when no YOLO candidate
-        # is in radius, so they can still bridge YOLO's short gaps.
+        # sock). Motion candidates are only allowed to bridge short gaps while
+        # the track has been YOLO-supported recently (`since_yolo`); after that
+        # the track just extrapolates until it dies rather than latching onto
+        # a moving limb.
         if state["last"] is not None and state["gaps"] <= MAX_GAP_FRAMES:
             predicted = state["last"] + state["velocity"]
             radius = max(MATCH_BASE_RADIUS,
@@ -226,7 +305,8 @@ class BallTracker:
                 return best
 
             best = _nearest_in_radius("yolo")
-            if best is None:
+            yolo_match = best is not None
+            if best is None and state.get("since_yolo", 0) <= YOLO_LIVENESS_FRAMES:
                 best = _nearest_in_radius("motion")
             if best is not None:
                 cx, cy, conf, cw, ch = best
@@ -237,6 +317,7 @@ class BallTracker:
                     state["velocity"] = delta
                 state["gaps"] = 0
                 state["last"] = np.array([cx, cy])
+                state["since_yolo"] = 0 if yolo_match else state.get("since_yolo", 0) + 1
                 w, h = self._update_box_size(state, cw, ch)
                 return BallPoint(idx, ts, float(cx), float(cy), conf, detected=True, w=w, h=h)
 
@@ -245,20 +326,19 @@ class BallTracker:
             pt = BallPoint(idx, ts, float(predicted[0]), float(predicted[1]), 0.0, detected=False, w=w, h=h)
             state["gaps"] += 1
             state["last"] = predicted
+            state["since_yolo"] = state.get("since_yolo", 0) + 1
             state["velocity"] = 0.9 * state["velocity"]
             return pt
 
         # (Re)start a new track. When a real model is loaded, only YOLO
-        # detections at/above seed_min_conf may originate a track -- motion
-        # blobs then need the two-frame persistence check below (so a moving
-        # limb can't re-seed us). Without a model, raw motion blobs are all
-        # we have, so they seed directly.
-        if self._model is None:
-            seedable = cands
-        else:
+        # detections at/above seed_min_conf may originate a track -- a moving
+        # limb during the run-up or delivery must never re-seed us. Without a
+        # model, a small fast blob persisting two frames running is the best
+        # evidence we have, so motion-only seeding is allowed there.
+        if self._model is not None:
             seedable = [c for c in cands if c[5] == "yolo" and c[2] >= self.seed_min_conf]
-            if not seedable:
-                seedable = self._confirmed_motion_seed(cands, state, idx)
+        else:
+            seedable = self._confirmed_motion_seed(cands, state, idx)
         if seedable:
             cx, cy, conf, cw, ch = max(seedable, key=lambda c: c[2])[0:5]
             state["last"] = np.array([cx, cy])
@@ -266,6 +346,7 @@ class BallTracker:
             state["gaps"] = 0
             state["box_size"] = None
             state["pending"] = None
+            state["since_yolo"] = 0 if self._model is not None else 1
             w, h = self._update_box_size(state, cw, ch)
             return BallPoint(idx, ts, float(cx), float(cy), conf, detected=True, w=w, h=h)
 
@@ -276,11 +357,12 @@ class BallTracker:
     @staticmethod
     def _confirmed_motion_seed(cands, state: dict, idx: int) -> list:
         """
-        Motion-only fallback seed: a small fast-moving blob that appears at
-        roughly the same place two frames running is likely the ball (a limb
-        moves erratically and won't hold position across frames). Returns a
-        one-element candidate list when confirmed, otherwise [] -- and stashes
-        the strongest motion blob in `state["pending"]` for the next frame.
+        Motion-only fallback seed (used only when no detector is loaded): a
+        small fast-moving blob that appears at roughly the same place two
+        frames running is likely the ball (a limb moves erratically and won't
+        hold position across frames). Returns a one-element candidate list
+        when confirmed, otherwise [] -- and stashes the strongest motion blob
+        in `state["pending"]` for the next frame.
         """
         motion = [c for c in cands if abs(c[2] - MOTION_CONF) < 1e-6]
         if not motion:
@@ -312,21 +394,25 @@ class BallTracker:
         return state["box_size"]
 
     @staticmethod
-    def _longest_segment(track: List[BallPoint]) -> List[BallPoint]:
+    def _split_segments(track: List[BallPoint]) -> List[List[BallPoint]]:
+        # A gap in frame_idx means `_step` returned None for those frames
+        # (a full reset), so the points on either side belong to different
+        # tracking episodes and must never be merged. The jump guard catches
+        # the same-tick case where a reset and a re-seed land next to each
+        # other in index space (f41 -> f42) but are two different objects.
         if not track:
             return []
-        best = [track[0]]
+        segments: List[List[BallPoint]] = []
         cur = [track[0]]
         for a, b in zip(track, track[1:]):
-            if b.frame_idx - a.frame_idx <= MAX_GAP_FRAMES + 1:
+            jump = float(np.hypot(b.x - a.x, b.y - a.y))
+            if b.frame_idx - a.frame_idx <= 1 and jump <= MAX_SEGMENT_JUMP_PX:
                 cur.append(b)
             else:
-                if len(cur) > len(best):
-                    best = cur
+                segments.append(cur)
                 cur = [b]
-        if len(cur) > len(best):
-            best = cur
-        return best
+        segments.append(cur)
+        return segments
 
     @staticmethod
     def _trim_to_release_impact(track: List[BallPoint]) -> Tuple[List[BallPoint], dict]:
@@ -370,15 +456,25 @@ class BallTracker:
             release_i = 0  # no clear release signature; keep from the start
 
         # --- locate impact (search after release) ----------------------- #
+        # Use windowed (median) speeds so a single jittery motion-blob point
+        # can't masquerade as a bat/pad contact, and require both velocities
+        # to be non-trivial before trusting an angle (a nearly-stationary
+        # point makes the angle ill-conditioned). A real ball stopping at the
+        # bat is still caught by the windowed speed-drop test.
+        speeds = np.asarray(speed, dtype=float)
         impact_i = None
         for i in range(release_i + 1, len(speed) - 1):
             v1, v2 = vel[i - 1], vel[i]
             n1, n2 = float(np.linalg.norm(v1)), float(np.linalg.norm(v2))
-            if n1 < 1e-3 or n2 < 1e-3:
+            if n1 < IMPACT_MIN_SPEED_PX_FRAME:
                 continue
-            cos_ang = float(np.clip(np.dot(v1, v2) / (n1 * n2), -1.0, 1.0))
-            angle_deg = float(np.degrees(np.arccos(cos_ang)))
-            speed_drop = n2 < n1 * IMPACT_SPEED_DROP_FACTOR
+            angle_deg = 0.0
+            if n2 >= IMPACT_MIN_SPEED_PX_FRAME:
+                cos_ang = float(np.clip(np.dot(v1, v2) / (n1 * n2), -1.0, 1.0))
+                angle_deg = float(np.degrees(np.arccos(cos_ang)))
+            s_prev = float(np.median(speeds[max(0, i - 2):i]))
+            s_next = float(np.median(speeds[i:i + 2]))
+            speed_drop = s_next < s_prev * IMPACT_SPEED_DROP_FACTOR
             if angle_deg >= IMPACT_ANGLE_THRESHOLD_DEG or speed_drop:
                 impact_i = i + 1  # the point *after* the deflection is the impact point
                 break
