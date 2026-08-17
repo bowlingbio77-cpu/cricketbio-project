@@ -34,7 +34,10 @@ class AnalysisResult:
     camera_view: Optional[str] = None
     bowling_arm: str = "right"
     video_path: Optional[str] = None       # annotated ball-tracking MP4 (video mode)
+    reels_video_path: Optional[str] = None  # slow-mo + zoom MP4 (video mode)
     ball_stats: dict = field(default_factory=dict)
+    bowler_bboxes: Optional[dict] = None   # frame_idx -> (x1,y1,x2,y2) padded crop bbox
+    original_frame_dims: Optional[tuple] = None  # (height, width) of pre-crop frames
 
     def to_dict(self):
         return asdict(self)
@@ -73,6 +76,140 @@ def _crop_frames_to_bowler(frames, tracks, bowler) -> list:
     return cropped
 
 
+# --------------------------------------------------------------------------- #
+# Wrist-proxy pre-release ball tracking
+# --------------------------------------------------------------------------- #
+
+def _extract_wrist_pixel_positions(pose_sequence, bowling_arm, bowler_bboxes,
+                                    frame_dims):
+    """Convert per-frame wrist landmarks from cropped-normalised (0-1) to
+    full-frame pixel coordinates.
+
+    Parameters
+    ----------
+    pose_sequence : list[PoseFrame]
+        Pose landmarks (cropped-frame normalised coords).
+    bowling_arm : str
+        "right" or "left".
+    bowler_bboxes : dict
+        frame_idx -> (x1, y1, x2, y2) padded crop bbox in full-frame coords.
+    frame_dims : tuple
+        (height, width) of the original full-frame.
+
+    Returns
+    -------
+    dict  frame_idx -> (px_x, px_y)  pixel coords in the full frame.
+    """
+    from . import config as _cfg
+    wrist_name = "right_wrist" if bowling_arm == "right" else "left_wrist"
+    wrist_idx = _cfg.POSE_LANDMARK_NAMES.index(wrist_name)   # 16 or 15
+    full_h, full_w = frame_dims
+    positions = {}
+    for pf in pose_sequence:
+        bbox = bowler_bboxes.get(pf.frame_idx)
+        if bbox is None:
+            continue
+        bx1, by1, bx2, by2 = bbox
+        crop_w = max(1.0, bx2 - bx1)
+        crop_h = max(1.0, by2 - by1)
+        nx = float(pf.landmarks[wrist_idx, 0])   # 0-1 normalised in crop
+        ny = float(pf.landmarks[wrist_idx, 1])
+        px = bx1 + nx * crop_w
+        py = by1 + ny * crop_h
+        # Clamp to frame bounds
+        px = max(0.0, min(float(full_w - 1), px))
+        py = max(0.0, min(float(full_h - 1), py))
+        positions[pf.frame_idx] = (px, py)
+    return positions
+
+
+def _augment_trajectory_with_wrist_proxy(trajectory, wrist_positions,
+                                          release_frame, handoff_frames=3):
+    """Merge wrist-proxy points into the ball trajectory for pre-release frames.
+
+    For frames *before* the release where no YOLO ball detection exists,
+    the bowling wrist is a physically accurate stand-in (the ball is in hand
+    and travels with the wrist).  At the release point a short linear blend
+    avoids a visible jump between the proxy and the real tracker.
+
+    Parameters
+    ----------
+    trajectory : list[BallPoint]
+        Existing ball-tracking trajectory (may start at or after release).
+    wrist_positions : dict
+        frame_idx -> (x, y) pixel coords from _extract_wrist_pixel_positions.
+    release_frame : int or None
+        Index of the release frame (from feature engineering).
+    handoff_frames : int
+        Number of frames over which to blend wrist -> ball at release.
+
+    Returns
+    -------
+    list[BallPoint]  Merged trajectory (sorted by frame_idx).
+    """
+    if not wrist_positions or release_frame is None:
+        return trajectory
+
+    bt_mod = __import__("src.ball_tracking_v2", fromlist=["BallPoint"])
+    BallPoint = bt_mod.BallPoint
+
+    existing = {p.frame_idx: p for p in trajectory}
+    merged = {}
+
+    # --- wrist-proxy for pre-release frames --------------------------------
+    for fidx, (wx, wy) in wrist_positions.items():
+        if fidx > release_frame:
+            continue
+        # EMA smoothing of wrist position (alpha=0.5 across consecutive frames)
+        prev = merged.get(fidx - 1)
+        if prev and prev.source == "wrist_proxy":
+            sx = 0.5 * prev.x + 0.5 * wx
+            sy = 0.5 * prev.y + 0.5 * wy
+        else:
+            sx, sy = wx, wy
+        merged[fidx] = BallPoint(
+            frame_idx=fidx, timestamp_sec=0.0,
+            x=sx, y=sy, confidence=0.0, detected=False,
+            w=12.0, h=12.0, source="wrist_proxy",
+        )
+
+    # --- handoff blending at release ± handoff_frames ----------------------
+    blend_start = max(0, release_frame - handoff_frames)
+    blend_end = release_frame + handoff_frames
+    for fidx in range(blend_start, blend_end + 1):
+        wp = merged.get(fidx)
+        bp = existing.get(fidx)
+        if wp is None and bp is None:
+            continue
+        if bp is not None and wp is None:
+            # Ball tracker already has this frame; keep it
+            merged[fidx] = bp
+            continue
+        if bp is None:
+            # Only wrist proxy available (pre-release or gap)
+            continue
+        # Both exist: linear blend based on proximity to release_frame
+        alpha = max(0.0, min(1.0, (fidx - blend_start) / max(1, blend_end - blend_start)))
+        # alpha=0 at blend_start -> mostly wrist; alpha=1 at blend_end -> mostly ball
+        bx = (1.0 - alpha) * wp.x + alpha * bp.x
+        by = (1.0 - alpha) * wp.y + alpha * bp.y
+        merged[fidx] = BallPoint(
+            frame_idx=fidx, timestamp_sec=bp.timestamp_sec,
+            x=bx, y=by,
+            confidence=max(bp.confidence, 0.1),
+            detected=bp.detected,
+            w=max(bp.w, wp.w), h=max(bp.h, wp.h),
+            source="blended" if 0.1 < alpha < 0.9 else bp.source,
+        )
+
+    # --- fill in remaining ball-tracking points (post-release) -------------
+    for fidx, bp in existing.items():
+        if fidx not in merged:
+            merged[fidx] = bp
+
+    return sorted(merged.values(), key=lambda p: p.frame_idx)
+
+
 def analyze_video(video_path: str, bowling_arm: str = "right",
                    performance_bundle: ml_models.TrainedBundle = None,
                    injury_bundle: ml_models.TrainedBundle = None,
@@ -80,6 +217,8 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
                    resize_dim=config.RESIZE_DIM,
                    denoise: bool = config.DENOISE,
                    camera_view: str = "behind",
+                   slow_factor: float = 2.5,
+                   zoom_end: float = 1.8,
                    run_ml: bool = True) -> AnalysisResult:
     """
     Full pipeline on a single delivery video clip. Requires:
@@ -108,6 +247,9 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     # frames BEFORE the bowler crop, so the ball is never cut out of frame).
     video_path = None
     ball_stats = {}
+    track = None
+    display_track = None
+    track_stats = {}
     t0 = time.perf_counter()
     try:
         track, track_stats = ball_tracking.track_ball(frames)
@@ -145,14 +287,40 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         warnings.append(f"Ball tracking skipped ({exc}).")
     timings["ball_tracking"] = time.perf_counter() - t0
 
+    # Fallback: display_track = track (will be overridden by wrist-proxy if applied)
+    if display_track is None:
+        display_track = track
+
     # 2-3: detection + tracking + bowler crop (best effort)
     t0 = time.perf_counter()
     crop_stats = None
+    bowler_bboxes = None
+    original_frame_dims = None
     try:
+        # Snapshot full-frame dimensions before any cropping
+        if frames:
+            original_frame_dims = (frames[0][2].shape[0], frames[0][2].shape[1])
         tracker = tracking.BowlerTracker()
         tracks = tracker.track_frames([(idx, fr) for idx, ts, fr in frames])
         bowler = tracking.select_bowler_track(tracks)
         if bowler is not None and len(bowler) >= 3:
+            # Reconstruct padded bboxes (same logic as _crop_to_bbox)
+            bbox_by_frame = dict(zip(bowler.frames, bowler.bboxes))
+            padded = {}
+            h, w = frames[0][2].shape[:2]
+            last_bb = None
+            for idx, _ts, _fr in frames:
+                bb = bbox_by_frame.get(idx, last_bb)
+                if bb is not None:
+                    last_bb = bb
+                    bx1, by1, bx2, by2 = bb
+                    bw, bh = max(1.0, bx2 - bx1), max(1.0, by2 - by1)
+                    pad_x, pad_y = 0.3 * bw, 0.3 * bh
+                    padded[idx] = (
+                        max(0, int(bx1 - pad_x)), max(0, int(by1 - pad_y)),
+                        min(w, int(bx2 + pad_x)), min(h, int(by2 + pad_y)),
+                    )
+            bowler_bboxes = padded
             frames = _crop_frames_to_bowler(frames, tracks, bowler)
             crop_stats = {"track_id": bowler.track_id, "frames_tracked": len(bowler)}
             warnings.append(
@@ -186,6 +354,46 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     if crop_stats is not None and diagnostics.get("n_frames", 0) < 10:
         warnings.append("Few pose frames after cropping -- consider tighter framing.")
 
+    # 6b: wrist-proxy pre-release ball trajectory augmentation
+    if (track is not None and bowler_bboxes is not None
+            and original_frame_dims is not None and pose_sequence):
+        release_frame = diagnostics.get("release_frame_idx")
+        wrist_pos = _extract_wrist_pixel_positions(
+            pose_sequence, bowling_arm, bowler_bboxes, original_frame_dims)
+        if wrist_pos and release_frame is not None:
+            track = _augment_trajectory_with_wrist_proxy(
+                track, wrist_pos, release_frame, handoff_frames=3)
+            # Re-clip at impact and re-annotate the video
+            impact_idx = track_stats.get("impact_idx")
+            display_track = ([p for p in track if p.frame_idx <= impact_idx]
+                             if impact_idx is not None else track)
+            annotated = ball_tracking.annotate_frames(frames, display_track)
+            video_path = ball_tracking.write_mp4(
+                annotated, ball_tracking.make_output_path(), fps=target_fps)
+            ball_stats = ball_tracking.summarize(display_track, fps=target_fps)
+            ball_stats["release_idx"] = track_stats.get("release_idx")
+            ball_stats["impact_idx"] = impact_idx
+            ball_stats["outcome"] = track_stats.get("outcome")
+            ball_stats["coverage_pct"] = (
+                ball_stats.get("n_frames", 0) / max(1, len(frames))) * 100
+            wrist_count = sum(1 for p in display_track if p.source == "wrist_proxy")
+            if wrist_count:
+                warnings.append(
+                    f"Wrist proxy: {wrist_count} pre-release frames augmented "
+                    f"from bowling-arm wrist landmark.")
+                ball_stats["wrist_proxy_frames"] = wrist_count
+        else:
+            warnings.append("Wrist-proxy skipped: no wrist landmarks or release frame detected.")
+    elif track is not None:
+        missing = []
+        if bowler_bboxes is None:
+            missing.append("no bowler crop (detection needed)")
+        if original_frame_dims is None:
+            missing.append("no frame dimensions")
+        if not pose_sequence:
+            missing.append("no pose data")
+        warnings.append(f"Wrist-proxy skipped: {', '.join(missing)}.")
+
     # 7: ML predictions
     performance_score = None
     injury_risk = None
@@ -217,6 +425,21 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     if run_ml:
         timings["coaching"] = time.perf_counter() - t0
 
+    # 10: slow-mo + zoom post-processing (reels effect)
+    reels_video_path = None
+    if track and video_path is not None and display_track:
+        try:
+            reels_video_path = ball_tracking.make_output_path(prefix="reels_")
+            render_stats = ball_tracking.render_slowmo_zoom(
+                video_path, reels_video_path, display_track,
+                slow_factor=slow_factor, zoom_end=zoom_end)
+            ball_stats["has_reels"] = True
+            ball_stats["reels_stats"] = render_stats
+            warnings.append("Slow-motion + zoom replay generated (see below).")
+        except Exception as exc:
+            warnings.append(f"Reels effect skipped ({exc}).")
+            reels_video_path = None
+
     timings["total"] = time.perf_counter() - t_start
 
     return AnalysisResult(
@@ -231,7 +454,10 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         camera_view=camera_view,
         bowling_arm=bowling_arm,
         video_path=video_path,
+        reels_video_path=reels_video_path,
         ball_stats=ball_stats,
+        bowler_bboxes=bowler_bboxes,
+        original_frame_dims=original_frame_dims,
     )
 
 

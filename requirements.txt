@@ -27,6 +27,9 @@ catboost==1.2.10
 shap==0.52.0
 numba==0.67.0
 
+# HTTP client for the sidebar Ollama chat assistant (chat_assistant.py)
+requests==2.34.2
+
 # Optional: enables true CNN-LSTM / Transformer sequence models
 # (falls back to sklearn MLP if absent)
 # NOT installed on Streamlit Cloud -- torch's ~800MB wheel blows up the build

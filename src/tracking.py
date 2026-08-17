@@ -10,7 +10,7 @@ Falls back to a lightweight IoU-based tracker (greedy nearest-bbox matching)
 when ultralytics isn't installed, so the pipeline still runs end-to-end offline.
 """
 from dataclasses import dataclass, field
-from typing import Dict, List
+from typing import Dict, List, Optional
 import numpy as np
 from . import config
 from .detection import Detection, _bbox_area
@@ -146,7 +146,7 @@ class BowlerTracker:
         return self._iou_tracks
 
 
-def select_bowler_track(tracks: Dict[int, Track]) -> Track | None:
+def select_bowler_track(tracks: Dict[int, Track]) -> Optional[Track]:
     """Bowler = the track with the most frames and largest average bbox
     (filters out momentary detections of fielders/spectators)."""
     if not tracks:

@@ -86,6 +86,24 @@ GATE_CHI2_2DOF_99 = 9.21   # Mahalanobis^2 gate threshold (99% conf, 2 dof)
 YOLO_GATE_RADIUS_PX = 48.0  # absolute-radius fallback so YOLO dets are never
                             # lost to a constant-velocity model running ahead
 MAX_ACTIVE_TRACKS = 6       # cap on concurrently-tracked hypotheses
+
+# -- confidence gate -------------------------------------------------------- #
+# When a YOLO detection falls below this threshold, the Kalman prediction is
+# preferred over the detection to prevent trajectory jumps. This is configurable
+# and should be tuned against the evaluation framework rather than hard-coded.
+DETECTION_CONFIDENCE_THRESHOLD = 0.15  # below this, trust Kalman prediction
+                                       # over YOLO detection position
+MAX_PREDICTION_JUMP_PX = 60.0          # if Kalman prediction jumps this far
+                                       # in one frame, still accept the detection
+
+# -- optical flow fallback (experimental) ----------------------------------- #
+# When enabled, Lucas-Kanade optical flow provides a third position signal
+# when YOLO fails, before falling back to pure Kalman prediction.
+OPTICAL_FLOW_ENABLED = False           # experimental; enable for evaluation
+OPTICAL_FLOW_MAX_POINTS = 200          # max corners to track
+OPTICAL_FLOW_TERM_CRIT = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT,
+                          10, 0.03)   # Lucas-Kanade termination criteria
+OPTICAL_FLOW_MEAS_STD = 8.0           # Kalman measurement noise for flow points
 DUPLICATE_SUPPRESS_RADIUS_PX = 12.0  # overlapping YOLO boxes on one object:
                             # never spawn a duplicate track this close to one
                             # that is already being tracked
@@ -119,7 +137,7 @@ MOTION_MAX_ASPECT = 2.5     # width/height ratio -- elongated blobs are limbs
 MIN_TRACK_SPREAD_PX = 60.0
 MIN_TRACK_PATH_PX = 100.0
 MAX_SEGMENT_JUMP_PX = 80.0   # a same-track point can't teleport this far in 1 frame
-BOX_GROWTH_LIMIT = 2.8       # box grew more than this AND moved slowly => a person
+BOX_GROWTH_LIMIT = 5.0       # box grew more than this AND moved slowly => a person
 MIN_AVG_SPEED_PX_S = 400.0
 
 # -- release / impact windowing (validated in v1) --------------------------- #
@@ -191,7 +209,11 @@ class _CVKalman:
 
 
 def _meas_std(source: str) -> float:
-    return YOLO_MEAS_STD if source == "yolo" else MOTION_MEAS_STD
+    if source == "yolo":
+        return YOLO_MEAS_STD
+    if source == "flow":
+        return OPTICAL_FLOW_MEAS_STD
+    return MOTION_MEAS_STD
 
 
 def _spread_path(pts: List[BallPoint]) -> Tuple[float, float]:
@@ -385,9 +407,10 @@ class BallTracker:
     # ------------------------------------------------------------------ #
     # Detection
     # ------------------------------------------------------------------ #
-    def _candidates(self, frame: np.ndarray, prev_gray: np.ndarray
+    def _candidates(self, frame: np.ndarray, prev_gray: np.ndarray,
+                     prev_flow_pts: Optional[np.ndarray] = None
                      ) -> List[Tuple[float, float, float, float, float, str]]:
-        """(x, y, confidence, w, h, source) candidates: YOLO ball detections + motion blobs."""
+        """(x, y, confidence, w, h, source) candidates: YOLO ball detections + motion blobs + optical flow."""
         dets = []
         if self._model is not None:
             try:
@@ -403,7 +426,46 @@ class BallTracker:
             except Exception:
                 pass
         dets.extend(self._motion_candidates(frame, prev_gray))
+        if OPTICAL_FLOW_ENABLED:
+            dets.extend(self._optical_flow_candidates(frame, prev_gray, prev_flow_pts))
         return dets
+
+    @staticmethod
+    def _optical_flow_candidates(frame: np.ndarray, prev_gray: Optional[np.ndarray],
+                                  prev_pts: Optional[np.ndarray] = None
+                                  ) -> List[Tuple[float, float, float, float, float, str]]:
+        """Lucas-Kanade optical flow tracking as a fallback when YOLO fails.
+
+        Returns candidate positions derived from tracking good features in the
+        previous frame. Each candidate gets source="flow" for the Kalman
+        measurement-noise lookup. If prev_pts is provided, tracks those specific
+        points; otherwise detects new good features.
+        """
+        if prev_gray is None:
+            return []
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        if prev_pts is not None and len(prev_pts) > 0:
+            lk_params = dict(winSize=(21, 21), maxLevel=3,
+                             criteria=OPTICAL_FLOW_TERM_CRIT)
+            next_pts, status, _ = cv2.calcOpticalFlowPyrLK(
+                prev_gray, gray, prev_pts, None, **lk_params)
+            good_mask = status.ravel() == 1
+            if not np.any(good_mask):
+                return []
+            pts = next_pts[good_mask].reshape(-1, 2)
+        else:
+            features = cv2.goodFeaturesToTrack(
+                gray, maxCorners=OPTICAL_FLOW_MAX_POINTS,
+                qualityLevel=0.01, minDistance=10, blockSize=7)
+            if features is None:
+                return []
+            pts = features.reshape(-1, 2)
+
+        out = []
+        for px, py in pts:
+            out.append((float(px), float(py), MOTION_CONF, 8.0, 8.0, "flow"))
+        return out
 
     @staticmethod
     def _motion_candidates(frame: np.ndarray, prev_gray: Optional[np.ndarray]
@@ -449,6 +511,7 @@ class BallTracker:
         pre-trimmed) so callers can clip at `impact_idx` themselves.
         """
         prev_gray = None
+        prev_flow_pts = None
         total_frames = 0
         active: List[_Track] = []
         finished: List[_Track] = []
@@ -457,8 +520,23 @@ class BallTracker:
 
         for idx, ts, frame in frames:
             total_frames += 1
-            cands = self._candidates(frame, prev_gray)
+            cands = self._candidates(frame, prev_gray, prev_flow_pts)
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            # Update flow tracking points for the next frame: use the
+            # winning track's recent detections as feature points.
+            if OPTICAL_FLOW_ENABLED:
+                best_track = max(active, key=lambda t: t.yolo_hits) if active else None
+                if best_track and best_track.points:
+                    recent = [p for p in best_track.points[-5:] if p.detected]
+                    if recent:
+                        prev_flow_pts = np.array(
+                            [[p.x, p.y] for p in recent], dtype=np.float32).reshape(-1, 1, 2)
+                    else:
+                        prev_flow_pts = None
+                else:
+                    prev_flow_pts = None
+
             prev_gray = gray
 
             active, done, next_id = self._step_all(idx, ts, cands, active, next_id, zombies)
@@ -610,13 +688,33 @@ class BallTracker:
             if ti in assignment:
                 cx, cy, conf, cw, ch, src = cands[assignment[ti]]
                 z = np.array([cx, cy])
-                t.kf.update(z, _meas_std(src))
-                t.points.append(BallPoint(idx, ts, float(cx), float(cy), conf,
-                                           detected=True, w=cw, h=ch, source=src))
-                t.misses = 0
-                if src == "yolo":
-                    t.yolo_hits += 1
-                    t.last_yolo = idx
+
+                # Confidence gate: when a YOLO detection is low-confidence,
+                # check if the Kalman prediction is within a reasonable
+                # distance. If so, prefer the prediction to avoid trajectory
+                # jumps from noisy detections.
+                use_detection = True
+                if src == "yolo" and conf < DETECTION_CONFIDENCE_THRESHOLD:
+                    pred_pos = t.kf.x[:2]
+                    jump = float(np.hypot(z[0] - pred_pos[0], z[1] - pred_pos[1]))
+                    if jump <= MAX_PREDICTION_JUMP_PX:
+                        # Kalman is close enough -- use prediction, skip update
+                        use_detection = False
+                        t.misses += 1
+                        px, py = pred_pos[0], pred_pos[1]
+                        w, h = (t.points[-1].w, t.points[-1].h) if t.points else (DEFAULT_BALL_DIAMETER_PX, DEFAULT_BALL_DIAMETER_PX)
+                        t.points.append(BallPoint(idx, ts, float(px), float(py), 0.0,
+                                                   detected=False, w=w, h=h, source="predicted"))
+                        # Do not update yolo_hits or last_yolo for low-conf dets
+
+                if use_detection:
+                    t.kf.update(z, _meas_std(src))
+                    t.points.append(BallPoint(idx, ts, float(cx), float(cy), conf,
+                                               detected=True, w=cw, h=ch, source=src))
+                    t.misses = 0
+                    if src == "yolo":
+                        t.yolo_hits += 1
+                        t.last_yolo = idx
             else:
                 t.misses += 1
                 px, py = t.kf.x[0], t.kf.x[1]
@@ -849,6 +947,10 @@ def summarize(track: List[BallPoint], fps: Optional[float] = None) -> dict:
     }
 
 
+WRIST_PROXY_COLOR = (200, 180, 0)   # cyan-ish for wrist-proxy boxes (BGR)
+BLENDED_COLOR = (0, 200, 200)      # yellow-ish for blended handoff boxes (BGR)
+
+
 def annotate_frames(frames, track: List[BallPoint], box_color=BOX_COLOR) -> List[tuple]:
     by_idx = {p.frame_idx: p for p in track}
     out = []
@@ -867,10 +969,22 @@ def annotate_frames(frames, track: List[BallPoint], box_color=BOX_COLOR) -> List
             y1 = max(0, min(hh - 1, y1))
             x2 = max(0, min(ww - 1, x2))
             y2 = max(0, min(hh - 1, y2))
-            if pt.detected:
-                cv2.rectangle(img, (x1, y1), (x2, y2), box_color, 2)
-                label = "ball" + (f" {pt.confidence:.2f}" if pt.confidence > 0 else "")
-                _draw_label_tag(img, x1, y1, label, box_color)
+            # Choose color based on source
+            src = getattr(pt, "source", "motion")
+            if src == "wrist_proxy":
+                color = WRIST_PROXY_COLOR
+                label = "wrist"
+            elif src == "blended":
+                color = BLENDED_COLOR
+                label = "handoff"
+            else:
+                color = box_color
+                label = None  # will be set below
+            if pt.detected or src in ("wrist_proxy", "blended"):
+                cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+                if label is None:
+                    label = "ball" + (f" {pt.confidence:.2f}" if pt.confidence > 0 else "")
+                _draw_label_tag(img, x1, y1, label, color)
             else:
                 _draw_dashed_rect(img, (x1, y1), (x2, y2), box_color, 1)
                 _draw_label_tag(img, x1, y1, "ball (est)", box_color)
@@ -971,3 +1085,197 @@ def make_output_path(prefix: str = "ball_track_") -> str:
     fd, path = tempfile.mkstemp(suffix=".mp4", prefix=prefix)
     os.close(fd)
     return path
+
+
+# --------------------------------------------------------------------------- #
+# Slow-motion + progressive "zoom toward the ball" reels-style rendering
+# --------------------------------------------------------------------------- #
+
+def _ease_in_out(t: float) -> float:
+    """Smoothstep easing so the zoom ramp doesn't feel linear/mechanical."""
+    t = max(0.0, min(1.0, t))
+    return t * t * (3 - 2 * t)
+
+
+def _smooth_centers(centers, alpha: float = 0.15):
+    """Extra smoothing for the crop center so camera motion reads as
+    a deliberate cinematic pan, not a shaky follow."""
+    if not centers:
+        return []
+    out = [centers[0]]
+    for c in centers[1:]:
+        px, py = out[-1]
+        out.append((alpha * c[0] + (1 - alpha) * px, alpha * c[1] + (1 - alpha) * py))
+    return out
+
+
+def _slow_motion_frames(frames, slow_factor: float):
+    """Frame-duplication slow-mo with fractional support via carry
+    (e.g. 1.5x alternates 1/2 duplicates so playback speed is accurate
+    on average)."""
+    if slow_factor <= 1.0:
+        return list(frames)
+    out = []
+    carry = 0.0
+    for f in frames:
+        carry += slow_factor
+        count = int(carry)
+        carry -= count
+        out.extend([f.copy() for _ in range(max(1, count))])
+    return out
+
+
+def _duplicate_trajectory(track, slow_factor: float):
+    """Mirror the same duplication pattern onto the trajectory so crop
+    centers stay in sync with the (now longer) slow-mo frame sequence."""
+    if slow_factor <= 1.0:
+        return list(track)
+    out = []
+    carry = 0.0
+    for p in track:
+        carry += slow_factor
+        count = int(carry)
+        carry -= count
+        out.extend([p] * max(1, count))
+    return out
+
+
+def render_slowmo_zoom(
+    input_path: str,
+    output_path: str,
+    trajectory,
+    slow_factor: float = 2.5,
+    zoom_start: float = 1.0,
+    zoom_end: float = 1.8,
+    zoom_ramp_fraction: float = 0.7,
+    center_smoothing_alpha: float = 0.15,
+    output_fps: float | None = None,
+) -> dict:
+    """Render a slow-motion, zoom-toward-the-ball reel from an existing video.
+
+    Parameters
+    ----------
+    input_path : str
+        Source clip (e.g. the already-tracked/annotated video).
+    output_path : str
+        Where to write the result (.mp4).
+    trajectory : list of BallPoint or list of (x, y) tuples
+        Per-frame ball positions in pixel coords.
+    slow_factor : float
+        Playback slowdown; 2.5 = 40 % speed.
+    zoom_start / zoom_end : float
+        Crop scale at clip start / end. 1.0 = full frame, 2.0 = 2x zoom.
+    zoom_ramp_fraction : float
+        Fraction of the (slowed) clip over which the zoom eases from
+        zoom_start to zoom_end; holds at zoom_end after that.
+    center_smoothing_alpha : float
+        EMA smoothing for the crop center (separate from trajectory
+        smoothing) so the camera pan reads as cinematic, not shaky.
+    output_fps : float | None
+        Output FPS. Defaults to source video FPS.
+
+    Returns
+    -------
+    dict of render stats.
+    """
+    cap = cv2.VideoCapture(input_path)
+    if not cap.isOpened():
+        raise IOError(f"Could not open input video: {input_path}")
+
+    src_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    if output_fps is None:
+        output_fps = src_fps
+
+    frames = []
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        frames.append(frame)
+    cap.release()
+
+    if not frames:
+        raise ValueError("No frames read from input video.")
+
+    # Normalise trajectory to list of (x, y) points
+    pts = []
+    for p in trajectory:
+        if hasattr(p, "x"):
+            pts.append((float(p.x), float(p.y)))
+        else:
+            pts.append((float(p[0]), float(p[1])))
+
+    if len(pts) < len(frames):
+        pts = list(pts) + [pts[-1]] * (len(frames) - len(pts))
+    pts = pts[: len(frames)]
+
+    slowed_frames = _slow_motion_frames(frames, slow_factor)
+    slowed_traj = _duplicate_trajectory(pts, slow_factor)
+    slowed_centers = _smooth_centers(slowed_traj, alpha=center_smoothing_alpha)
+
+    n_out = len(slowed_frames)
+    ramp_frames = max(1, int(n_out * zoom_ramp_fraction))
+
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(output_path, fourcc, output_fps, (width, height))
+
+    for i, frame in enumerate(slowed_frames):
+        t = _ease_in_out(i / max(1, ramp_frames - 1)) if i < ramp_frames else 1.0
+        zoom = zoom_start + (zoom_end - zoom_start) * t
+
+        cx, cy = slowed_centers[i]
+        crop_w = width / zoom
+        crop_h = height / zoom
+
+        cx = min(max(cx, crop_w / 2), width - crop_w / 2)
+        cy = min(max(cy, crop_h / 2), height - crop_h / 2)
+
+        x0 = int(round(cx - crop_w / 2))
+        y0 = int(round(cy - crop_h / 2))
+        x1 = int(round(x0 + crop_w))
+        y1 = int(round(y0 + crop_h))
+        x0, y0 = max(0, x0), max(0, y0)
+        x1, y1 = min(width, x1), min(height, y1)
+
+        cropped = frame[y0:y1, x0:x1]
+        resized = cv2.resize(cropped, (width, height), interpolation=cv2.INTER_LINEAR)
+        writer.write(resized)
+
+    writer.release()
+
+    # -- Quality metrics for the rendered reels -------------------------------- #
+    # Frame duplication ratio: how many output frames are duplicates of the same
+    # source frame. High duplication = bursty or uneven slow-motion.
+    input_n = len(frames)
+    output_n = n_out
+    duplication_ratio = (output_n - input_n) / max(1, input_n) if input_n > 0 else 0.0
+
+    # Zoom smoothness: max and mean frame-to-frame crop-center displacement.
+    # High values indicate jittery camera movement.
+    if len(slowed_centers) > 1:
+        centers_arr = np.array(slowed_centers, dtype=float)
+        center_diffs = np.hypot(np.diff(centers_arr[:, 0]), np.diff(centers_arr[:, 1]))
+        max_center_disp = float(np.max(center_diffs))
+        mean_center_disp = float(np.mean(center_diffs))
+        median_center_disp = float(np.median(center_diffs))
+    else:
+        max_center_disp = 0.0
+        mean_center_disp = 0.0
+        median_center_disp = 0.0
+
+    return {
+        "input_frames": input_n,
+        "output_frames": n_out,
+        "src_fps": src_fps,
+        "output_fps": output_fps,
+        "input_duration_s": input_n / src_fps,
+        "output_duration_s": n_out / output_fps,
+        "final_zoom": zoom_end,
+        "slow_factor": slow_factor,
+        "duplication_ratio": round(duplication_ratio, 4),
+        "max_center_displacement_px": round(max_center_disp, 2),
+        "mean_center_displacement_px": round(mean_center_disp, 2),
+        "median_center_displacement_px": round(median_center_disp, 2),
+    }

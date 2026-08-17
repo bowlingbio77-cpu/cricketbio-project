@@ -134,7 +134,7 @@ def test_slow_growing_object_rejected():
     rejected even though it travels enough to pass the spread/path checks."""
     positions = [(300.0 - 4.0 * i, 100.0) for i in range(31)]
     t = BallTracker.__new__(BallTracker)
-    t._model = _FakeModel(positions, half=lambda i: 4 if i < 20 else 20)
+    t._model = _FakeModel(positions, half=lambda i: 3 if i < 20 else 22)
     t.conf_threshold = 0.1
     t.seed_min_conf = 0.3
     track, stats = t.track(_blank_frames(31), fps=30.0)

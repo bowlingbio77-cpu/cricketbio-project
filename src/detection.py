@@ -10,7 +10,7 @@ so the rest of the pipeline can still be exercised offline/without a GPU.
 """
 import os
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 import numpy as np
 import cv2
 from . import config
@@ -82,7 +82,7 @@ class BowlerDetector:
             dets.append(Detection(frame_idx, (x, y, x + w, y + h), float(conf), 0))
         return dets
 
-    def select_primary_bowler(self, detections: List[Detection]) -> Detection | None:
+    def select_primary_bowler(self, detections: List[Detection]) -> Optional[Detection]:
         """Heuristic: the bowler is usually the largest, most-confident detection
         near the centre of frame during the run-up/delivery."""
         if not detections:

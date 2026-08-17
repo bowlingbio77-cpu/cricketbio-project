@@ -18,6 +18,7 @@ import os
 import json
 import tempfile
 import time
+import html as _html_mod
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -26,6 +27,21 @@ import plotly.graph_objects as go
 
 from src import config, ml_models, explainability, pipeline, history_db, injury_knowledge_base as injury_kb
 from src.synthetic_data import generate_clinical_synthetic_dataset
+from src.auth_login import render_login_page, is_authenticated
+from chat_assistant import render_chat_widget
+
+
+def _esc(text) -> str:
+    """HTML-escape a value for safe injection into an HTML template.
+
+    Every ``unsafe_allow_html=True`` call that interpolates user-controlled
+    or model-output strings (feature values, coaching notes, athlete names,
+    risk levels) MUST pass through this helper first.  Static / trusted HTML
+    (CSS blocks, hero banners with no dynamic content) does NOT need escaping.
+    """
+    if text is None:
+        return ""
+    return _html_mod.escape(str(text))
 
 # ---------------- PAGE CONFIGURATION ----------------
 st.set_page_config(
@@ -35,6 +51,11 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ---------------- AUTH GATE (disabled -- uncomment to re-enable) ----------------
+# if not is_authenticated():
+#     render_login_page()
+#     st.stop()
+
 # ---------------- CUSTOM CSS STYLING ----------------
 st.markdown("""
 <style>
@@ -42,6 +63,19 @@ st.markdown("""
 
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
+    }
+
+    /* --- Skip to content (visible on focus for keyboard nav) --- */
+    .skip-link {
+        position: absolute; left: -9999px; top: auto;
+        width: 1px; height: 1px; overflow: hidden;
+        z-index: 999999; padding: 12px 20px; margin: 8px;
+        background: #29b6f6; color: #0d1117; font-weight: 700;
+        border-radius: 8px; text-decoration: none; font-size: 0.95rem;
+    }
+    .skip-link:focus {
+        position: fixed; left: 12px; top: 12px;
+        width: auto; height: auto; overflow: visible;
     }
 
     /* Main background & headers */
@@ -127,62 +161,159 @@ st.markdown("""
         background-color: #161b22;
         border-right: 1px solid #30363d;
     }
+
+    /* --- Accessibility --- */
+    .sr-only {
+        position: absolute; width: 1px; height: 1px;
+        padding: 0; margin: -1px; overflow: hidden;
+        clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+    :focus-visible {
+        outline: 2px solid #29b6f6;
+        outline-offset: 2px;
+    }
+    /* Ensure focus is visible on Streamlit widgets */
+    .stSelectbox:focus-within,
+    .stSlider:focus-within,
+    .stRadio:focus-within,
+    .stButton:focus-within,
+    .stTextInput:focus-within,
+    .stNumberInput:focus-within {
+        box-shadow: 0 0 0 2px rgba(41, 182, 246, 0.4);
+        border-radius: 6px;
+    }
+    /* Status badges include text labels alongside color for non-color-dependent info */
+    .status-badge::before {
+        content: none; /* text is already inside the badge element */
+    }
+    /* Improved contrast for secondary text (WCAG AA: ≥4.5:1 on #0d1117) */
+    .hero-subtitle, .metric-card span[style*="8b949e"] {
+        color: #9ca3af !important;
+    }
+
+    /* --- Responsive: Tablet (768px) --- */
+    @media (max-width: 900px) {
+        .hero-title { font-size: 1.5rem; }
+        .hero-subtitle { font-size: 0.85rem; }
+        .hero-banner { padding: 16px 18px; }
+        .metric-card { padding: 14px; }
+    }
+
+    /* --- Responsive: Mobile (480px) --- */
+    @media (max-width: 600px) {
+        .hero-title { font-size: 1.2rem; }
+        .hero-subtitle { font-size: 0.8rem; }
+        .hero-banner { padding: 12px 14px; border-radius: 10px; }
+        .metric-card { padding: 12px; font-size: 0.85rem; }
+        .drill-card { padding: 10px 12px; font-size: 0.85rem; }
+        .guide-tag { font-size: 0.6rem; padding: 1px 6px; }
+        /* Stack status badges vertically on very small screens */
+        .hero-banner span.status-badge { display: block; margin: 4px 0; }
+    }
+
+    /* --- Streamlit column stacking on narrow viewports --- */
+    @media (max-width: 768px) {
+        /* Force Streamlit columns to stack on tablet/mobile */
+        [data-testid="stHorizontalBlock"] > div {
+            flex-basis: 100% !important;
+            max-width: 100% !important;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
+# --- Accessibility: skip-to-content link + lang attribute ---
+st.markdown(
+    '<a href="#main-content" class="skip-link">Skip to main content</a>'
+    '<script>document.documentElement.lang="en";</script>',
+    unsafe_allow_html=True,
+)
+
 
 # ---------------- LOADING OVERLAY ----------------
-@st.cache_data
-def _loader_html() -> str:
-    path = os.path.join(config.ASSETS_DIR, "loading_overlay.html")
-    with open(path, encoding="utf-8") as f:
-        return f.read()
+# Pure-CSS PaceAI preloader (no JS needed): orbiting spinner -> success check
+# -> self-fading overlay. Used both for the boot splash and inline loading.
+_PRELOADER_CSS = """
+<style>
+    @keyframes paceaiFadeOut { to { opacity:0; visibility:hidden; pointer-events:none; } }
+    @keyframes paceaiPulse { 0%,100% { opacity:.75; transform:scale(1); } 50% { opacity:1; transform:scale(1.06); } }
+    @keyframes paceaiOrbit { to { transform:rotate(360deg); } }
+    @keyframes paceaiHide { to { opacity:0; visibility:hidden; } }
+    @keyframes paceaiSuccessIn { 0% { opacity:0; transform:scale(.6); } 40% { opacity:1; transform:scale(1.15); } 100% { opacity:1; transform:scale(1); } }
+    @keyframes paceaiSuccessGlow { 0% { opacity:0; transform:scale(.6); } 40% { opacity:1; transform:scale(1.15); } 100% { opacity:0; transform:scale(1.4); } }
+    @keyframes paceaiDrawCheck { to { stroke-dashoffset:0; } }
+
+    .pace-preloader { position:fixed; inset:0; z-index:99999; background:#0b0f16;
+        display:flex; align-items:center; justify-content:center; overflow:hidden;
+        font-family:'Segoe UI',Arial,sans-serif;
+        animation:paceaiFadeOut .6s ease 3.3s forwards; opacity:1; }
+    .pace-preloader .glow { position:absolute; width:min(420px,80vw); height:min(420px,80vw); border-radius:50%;
+        background:radial-gradient(circle, rgba(41,182,246,.16) 0%, rgba(124,77,255,.10) 45%, rgba(0,0,0,0) 72%);
+        animation:paceaiPulse 4.5s ease-in-out infinite; }
+    .pace-preloader .stage { position:relative; width:180px; height:180px; display:flex; align-items:center; justify-content:center; }
+    .pace-preloader .orbit-ring { position:absolute; width:132px; height:132px; border-radius:50%; border:1px solid rgba(148,163,184,.18); }
+    .pace-preloader .orbit-spin { position:absolute; width:132px; height:132px; will-change:transform;
+        animation:paceaiOrbit 2.6s linear infinite, paceaiHide .35s ease 2.5s forwards; }
+    .pace-preloader .orbit-dot { position:absolute; top:-4px; left:50%; margin-left:-4px; width:8px; height:8px; border-radius:50%;
+        background:#7dd3fc; box-shadow:0 0 6px 2px rgba(125,211,252,.85), 0 0 16px 6px rgba(124,77,255,.45); }
+    .pace-preloader .logo-badge { position:relative; width:64px; height:64px; border-radius:50%;
+        background:linear-gradient(145deg,#161b22 0%,#21262d 100%); border:1px solid #30363d;
+        display:flex; align-items:center; justify-content:center; font-size:26px; box-shadow:0 4px 24px rgba(0,0,0,.45);
+        animation:paceaiHide .35s ease 2.5s forwards; }
+    .pace-preloader .loading-text { position:absolute; bottom:-64px; left:50%; transform:translateX(-50%);
+        color:#8b949e; font-size:13px; letter-spacing:1.5px; text-transform:uppercase;
+        white-space:nowrap; text-align:center; max-width:80vw; }
+    .pace-preloader .success { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+        opacity:0; visibility:hidden; animation:paceaiSuccessIn .35s ease 2.5s forwards; }
+    .pace-preloader .success .sglow { position:absolute; width:110px; height:110px; border-radius:50%;
+        background:radial-gradient(circle, rgba(0,230,118,.30) 0%, rgba(0,230,118,0) 70%);
+        animation:paceaiSuccessGlow .6s ease-out 2.5s both; }
+    .pace-preloader .check-badge { width:64px; height:64px; border-radius:50%;
+        background:linear-gradient(145deg,#161b22 0%,#21262d 100%); border:1px solid rgba(0,230,118,.55);
+        display:flex; align-items:center; justify-content:center; box-shadow:0 4px 24px rgba(0,0,0,.45); }
+    .pace-preloader .checkmark-path { stroke-dasharray:28; stroke-dashoffset:28; animation:paceaiDrawCheck .32s ease-out 2.56s forwards; }
+
+    @media (prefers-reduced-motion: reduce) {
+        .pace-preloader .glow, .pace-preloader .orbit-spin { animation:none; }
+        .pace-preloader .glow { opacity:.85; }
+        .pace-preloader .success { animation:paceaiHide 0s linear 2.5s forwards; }
+        .pace-preloader .checkmark-path { stroke-dashoffset:0; }
+    }
+</style>
+"""
 
 
-def render_loader(message: str = "Extracting 33 3D Pose Landmarks...",
-                  fps: str = "120", knee: str = "OPTIMAL", risk: str = "CALC..."):
-    """Render the animated Biomech AI loading overlay (self-playing CSS/JS)."""
-    html = (_loader_html()
-            .replace("{{MESSAGE}}", message)
-            .replace("{{FPS}}", fps)
-            .replace("{{KNEE}}", knee)
-            .replace("{{RISK}}", risk))
-    components.html(html, height=560, scrolling=False)
-
-
-def render_fullscreen_splash(message: str = "Loading...",
-                             fps: str = "—", knee: str = "BOOTING", risk: str = "BOOT"):
-    """Full-viewport splash used during app/model startup (self-fading CSS)."""
-    html = f"""
-    <div style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;
-         background:#0b0f19;display:flex;align-items:center;justify-content:center;
-         flex-direction:column;font-family:Arial,sans-serif;
-         animation:splashFade 0.5s ease 2.6s forwards;opacity:1;">
-      <style>
-        @keyframes splashFade {{ to {{ opacity:0; visibility:hidden; pointer-events:none; }} }}
-        @keyframes ballSpin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
-        .splash-ball {{ animation: ballSpin 1.2s linear infinite; }}
-      </style>
-      <svg class="splash-ball" viewBox="0 0 100 100" width="120" height="120" aria-label="Cricket ball">
-        <defs>
-          <radialGradient id="ballGrad" cx="35%" cy="30%" r="85%">
-            <stop offset="0%" stop-color="#e34c4c"/>
-            <stop offset="100%" stop-color="#8f1a1a"/>
-          </radialGradient>
-        </defs>
-        <circle cx="50" cy="50" r="46" fill="url(#ballGrad)"/>
-        <path d="M 24 32 A 46 46 0 0 1 76 32" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2.5"/>
-        <path d="M 24 32 A 46 46 0 0 1 76 32" fill="none" stroke="none"/>
-        <path d="M 30 35 L 34 47 M 38 40 L 42 52 M 46 44 L 50 56 M 54 47 L 58 59 M 62 49 L 66 61" stroke="rgba(255,255,255,0.85)" stroke-width="2" stroke-linecap="round"/>
-        <path d="M 24 32 A 46 46 0 0 0 76 32" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2.5"/>
-        <path d="M 30 35 L 34 23 M 38 40 L 42 28 M 46 44 L 50 32 M 54 47 L 58 35 M 62 49 L 66 37" stroke="rgba(255,255,255,0.85)" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-      <div style="margin-top:18px;font-size:20px;font-weight:bold;color:#e6edf3;letter-spacing:2px;">
-        {message}
-      </div>
+def _paceai_preloader(message: str) -> str:
+    return f"""
+<div class="pace-preloader" role="status" aria-live="polite" aria-label="{message}">
+    <div class="glow"></div>
+    <div class="stage">
+        <div class="orbit-ring"></div>
+        <div class="orbit-spin"><div class="orbit-dot"></div></div>
+        <div class="logo-badge">⚡</div>
+        <div class="loading-text">{message}</div>
+        <div class="success">
+            <div class="sglow"></div>
+            <div class="check-badge">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                    <path class="checkmark-path" d="M4 12.5 L9.5 18 L20 5.5"
+                          stroke="#00e676" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+        </div>
     </div>
-    """
-    st.markdown(html, unsafe_allow_html=True)
+</div>
+"""
+
+
+def render_loader(message: str = "Loading PaceAI..."):
+    """Inline PaceAI preloader (used while models train on first run)."""
+    components.html(_PRELOADER_CSS + _paceai_preloader(message), height=560, scrolling=False)
+
+
+def render_fullscreen_splash(message: str = "Loading PaceAI..."):
+    """Full-viewport PaceAI preloader shown during app/model startup (self-fading)."""
+    components.html(_PRELOADER_CSS + _paceai_preloader(message), height=560, scrolling=False)
 
 
 # ---------------- HELPERS ----------------
@@ -204,8 +335,7 @@ def load_or_train_models(model_name: str = "random_forest"):
 
     st.info(f"No saved '{model_name}' models found -- training on synthetic demo data now "
             f"(run `python train_demo_model.py` once to cache this).")
-    render_loader(message=f"Training {model_name} models on synthetic demo data...",
-                  fps="—", knee="BOOTING", risk="TRAIN")
+    render_loader(message=f"Training {model_name} models on synthetic demo data...")
     df = generate_clinical_synthetic_dataset()
     X = df[config.FEATURE_NAMES].values
     perf_bundle = ml_models.train_performance_model(X, df[config.PERFORMANCE_TARGET].values, model_name)
@@ -535,7 +665,13 @@ def render_plain_language_summary(result, risk_level, is_icc_legal, elbow_flex):
         bullets.append(f"**Ball tracking:** the ball was followed for {n_tracked} frames "
                        f"({bstats.get('coverage_pct', 0):.0f}% of the clip) — watch the video above.")
 
-    st.success("### What this means for you\n" + "\n".join(f"- {b}" for b in bullets))
+    summary_text = "### What this means for you\n" + "\n".join(f"- {b}" for b in bullets)
+    if risk_level == "high":
+        st.error(summary_text)
+    elif risk_level == "moderate":
+        st.warning(summary_text)
+    else:
+        st.success(summary_text)
 
 
 # Every feature in the app, explained in plain English (tag, title, description).
@@ -564,10 +700,10 @@ FEATURES_GUIDE = [
 
 def render_features_guide():
     """Plain-English, tag-labeled explanation of every feature in the app."""
-    st.markdown("#### 🗂️ Every feature explained")
+    st.markdown("#### \U0001f5c2\ufe0f Every feature explained")
     for tag, title, desc in FEATURES_GUIDE:
         st.markdown(
-            f"<span class='guide-tag'>{tag}</span> &nbsp; **{title}** — {desc}",
+            f"<span class='guide-tag' aria-hidden='true'>{_esc(tag)}</span> &nbsp; <strong>{_esc(title)}</strong> &mdash; {_esc(desc)}",
             unsafe_allow_html=True,
         )
 
@@ -806,9 +942,21 @@ def render_history_page():
             rerun()
     with m3:
         if st.button("Clear all history", width='stretch'):
+            _confirm_clear_history()
+
+
+@st.dialog("Clear All History", width="medium")
+def _confirm_clear_history():
+    st.warning("This will **permanently delete** all saved analysis results. This action cannot be undone.")
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("Cancel", use_container_width=True):
+            st.rerun()
+    with c2:
+        if st.button("Clear All History", type="primary", use_container_width=True):
             history_db.clear_all()
-            st.toast("History cleared.")
-            rerun()
+            st.toast("All history cleared.")
+            st.rerun()
 
 
 # ---------------- SIDEBAR CONTROLS ----------------
@@ -841,6 +989,7 @@ with st.sidebar:
     # Video-only processing controls (kept for CV speed/accuracy tuning)
     camera_view = "behind"
     target_fps, resize_choice, denoise = 20, (640, 360), False
+    slow_factor, zoom_end = 2.5, 1.8
     with st.expander("🎥 Video Processing (CV speed/accuracy)"):
         camera_view = st.selectbox(
             "Camera view", ["behind", "side"],
@@ -868,13 +1017,28 @@ with st.sidebar:
         denoise = st.checkbox("Denoise frames", value=denoise,
                               help="On = more accurate on noisy footage but much slower.")
 
-    st.markdown("---")
-    st.markdown("#### 🔍 System Status")
-    st.caption(f"⚡ XGBoost: **{'Active' if ml_models.BACKEND_INFO['xgboost_available'] else 'Scikit Fallback'}**")
-    st.caption(f"🐱 CatBoost: **{'Active' if ml_models.BACKEND_INFO['catboost_available'] else 'Scikit Fallback'}**")
-    st.caption(f"🧠 PyTorch: **{'Active' if ml_models.BACKEND_INFO['torch_available'] else 'Disabled'}**")
-    st.caption(f"🔬 SHAP Engine: **{'Active' if explainability.SHAP_AVAILABLE else 'Finite Diff'}**")
-    st.caption(f"📚 History entries: **{history_db.count()}**")
+    with st.expander("🎬 Reels Settings"):
+        slow_factor = st.slider(
+            "Slow-motion factor", 1.5, 4.0, 2.5, step=0.1,
+            help="How much to slow down the replay. 2.5x = 40% playback speed.")
+        zoom_end = st.slider(
+            "Final zoom", 1.2, 3.0, 1.8, step=0.1,
+            help="How much to zoom in at the end of the clip. 1.8x = crop to 56% of frame.")
+
+    # st.markdown("---")
+    # if st.button("🚪 Log Out"):
+    #     st.session_state["authenticated"] = False
+    #     st.rerun()
+
+render_chat_widget()
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("#### 🔍 System Status")
+st.sidebar.caption(f"⚡ XGBoost: **{'Active' if ml_models.BACKEND_INFO['xgboost_available'] else 'Scikit Fallback'}**")
+st.sidebar.caption(f"🐱 CatBoost: **{'Active' if ml_models.BACKEND_INFO['catboost_available'] else 'Scikit Fallback'}**")
+st.sidebar.caption(f"🧠 PyTorch: **{'Active' if ml_models.BACKEND_INFO['torch_available'] else 'Disabled'}**")
+st.sidebar.caption(f"🔬 SHAP Engine: **{'Active' if explainability.SHAP_AVAILABLE else 'Finite Diff'}**")
+st.sidebar.caption(f"📚 History entries: **{history_db.count()}**")
 
 # ---------------- PAGE DISPATCH ----------------
 if page == "📚 History & Compare":
@@ -885,7 +1049,7 @@ perf_bundle, injury_bundle = load_or_train_models(model_choice)
 
 # ---------------- HERO BANNER ----------------
 st.markdown("""
-<div class="hero-banner">
+<div class="hero-banner" role="banner" id="main-content">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
         <div>
             <h1 class="hero-title">⚡ Fast-Bowling Biomechanics AI</h1>
@@ -954,6 +1118,8 @@ else:
                             resize_dim=resize_choice,
                             denoise=denoise,
                             camera_view=camera_view,
+                            slow_factor=slow_factor,
+                            zoom_end=zoom_end,
                             run_ml=False,
                         )
                         st.write("Calculating knee brace & shoulder counter-rotation...")
@@ -964,11 +1130,16 @@ else:
                         st.session_state["video_upload_time"] = upload_time
                         st.session_state["last_warnings"] = list(result.warnings or [])
                         st.session_state["video_output_path"] = getattr(result, "video_path", None)
+                        st.session_state["reels_video_path"] = getattr(result, "reels_video_path", None)
                         st.session_state["ball_stats"] = getattr(result, "ball_stats", {})
                         st.success(f"✅ Delivery processed ({target_fps} FPS)")
                     except Exception as e:
                         status.update(label="Analysis failed", state="error", expanded=True)
-                        st.error(f"Pipeline error: {e}")
+                        st.error(
+                            "Video analysis failed. Please check that the file is a valid bowling "
+                            "delivery clip (MP4/MOV/AVI) and try again. If the problem persists, "
+                            f"try a shorter clip or different resolution. (Error type: {type(e).__name__})"
+                        )
         finally:
             try:
                 os.remove(video_path)
@@ -982,7 +1153,9 @@ if input_mode.startswith("📹") and st.session_state.get("video_output_path") a
     st.markdown("### 🎯 Ball Tracking Visualization")
     st.caption("YOLO 'sports ball' detection + constant-velocity tracking. "
                "Solid red box = detected ball, dashed red box = predicted through short gaps. "
-               "The box stops at bat/pad/ground contact so it doesn't chase the ball after impact.")
+               "Cyan box = wrist-proxy (pre-release, from pose landmark), "
+               "yellow box = blended handoff (transition from wrist-proxy to detection). "
+               "The tracking stops at bat/pad/ground contact.")
     bstats = st.session_state.get("ball_stats") or {}
     c_vid, c_side = st.columns([3, 1])
     with c_vid:
@@ -995,11 +1168,44 @@ if input_mode.startswith("📹") and st.session_state.get("video_output_path") a
         st.metric("Detected", n_det)
         st.metric("Predicted (gaps)", n_pred)
         st.metric("Avg speed (px/s)", f"{bstats.get('avg_speed_px_s', 0):.0f}")
+
+        # Tracking quality flag
+        coverage = bstats.get("coverage_pct", 0)
+        total_frames = bstats.get("n_frames", 1)
+        det_ratio = n_det / max(1, total_frames)
+        if det_ratio >= 0.7 and coverage >= 70:
+            quality_badge = "🟢 Tracking quality: HIGH"
+        elif det_ratio >= 0.4 and coverage >= 40:
+            quality_badge = "🟡 Tracking quality: MODERATE"
+        else:
+            quality_badge = "🔴 Tracking quality: LOW"
+        st.caption(quality_badge)
+
+        wrist_count = sum(
+            1 for p in (bstats.get("trajectory") or [])
+            if isinstance(p, dict) and p.get("source") == "wrist_proxy")
+        if not wrist_count:
+            # also check BallPoint objects from pipeline
+            wrist_count = bstats.get("wrist_proxy_frames", 0)
+        if wrist_count:
+            st.metric("Wrist-proxy frames", wrist_count,
+                      help="Pre-release frames estimated from bowling-arm wrist pose landmark")
         if traj:
             xs = [p[0] for p in traj]
             ys = [p[1] for p in traj]
+
+            # Left/right arm normalization: mirror trajectory horizontally
+            # for left-arm bowlers so visualization is consistent
+            bowling_arm_val = bowling_arm.lower().split("-")[0] if "bowling_arm" in dir() else "right"
+            if bowling_arm_val == "left":
+                frame_width = 640  # default RESIZE_DIM
+                xs = [frame_width - x for x in xs]
+                traj_label = "Ball path (mirrored for left-arm)"
+            else:
+                traj_label = "Ball path"
+
             fig = go.Figure(go.Scatter(x=xs, y=ys, mode="lines",
-                                       line=dict(color="#00e676", width=2), name="Ball path"))
+                                       line=dict(color="#00e676", width=2), name=traj_label))
             fig.add_trace(go.Scatter(x=[xs[0]], y=[ys[0]], mode="markers",
                                      marker=dict(color="#00e676", size=10), name="Start"))
             fig.add_trace(go.Scatter(x=[xs[-1]], y=[ys[-1]], mode="markers",
@@ -1008,8 +1214,31 @@ if input_mode.startswith("📹") and st.session_state.get("video_output_path") a
             fig.update_layout(height=260, paper_bgcolor="rgba(0,0,0,0)",
                               plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#c9d1d9"),
                               margin=dict(l=10, r=10, t=30, b=10),
-                              title="Ball trajectory (image coords)")
+                              title=traj_label + " (image coords)")
             st.plotly_chart(fig, width='stretch')
+    # Reels: slow-mo + zoom replay
+    reels_path = st.session_state.get("reels_video_path")
+    if reels_path and os.path.exists(reels_path):
+        st.markdown("#### Slow-Motion Zoom Replay")
+        reels_stats = bstats.get("reels_stats", {})
+        sf = reels_stats.get("slow_factor", slow_factor)
+        ze = reels_stats.get("final_zoom", zoom_end)
+        st.caption(f"{sf:.1f}x slow-motion with {ze:.1f}x progressive zoom toward the ball "
+                   f"- cinematic reels-style render for social media.")
+        st.video(reels_path)
+        # Reels quality diagnostics
+        dup_ratio = reels_stats.get("duplication_ratio", 0)
+        max_disp = reels_stats.get("max_center_displacement_px", 0)
+        mean_disp = reels_stats.get("mean_center_displacement_px", 0)
+        if dup_ratio > 0 or max_disp > 0:
+            with st.expander("Reels quality diagnostics", expanded=False):
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Frame duplication", f"{dup_ratio:.0%}",
+                          help="Extra frames generated by slow-motion (0% = no duplication)")
+                c2.metric("Max center jump", f"{max_disp:.1f} px",
+                          help="Largest frame-to-frame camera pan jump (lower = smoother)")
+                c3.metric("Mean center jump", f"{mean_disp:.1f} px",
+                          help="Average frame-to-frame camera pan jump")
 
 # ---------------- ANALYSIS & VISUALIZATION ----------------
 if feature_vector:
@@ -1018,6 +1247,16 @@ if feature_vector:
     risk_level = str(risk.get("risk_level", "low")).lower()
     risk_score = {"low": 22, "moderate": 58, "high": 88}.get(risk_level, 22)
     risk_probs = risk.get("probabilities") or []
+
+    # Make the latest analysis available to the sidebar chat assistant.
+    merged_shap = dict(result.shap_contributions_performance or {})
+    for k, v in (result.shap_contributions_injury or {}).items():
+        merged_shap[f"{k} [injury]"] = v
+    st.session_state["features"] = dict(result.feature_vector)
+    st.session_state["performance_score"] = result.performance_score
+    st.session_state["injury_risk"] = result.injury_risk
+    st.session_state["shap_values"] = merged_shap
+    st.session_state["recommendations"] = result.coaching_notes
 
     # Merge video pipeline timings (if this run came from a video). The ML-only
     # `total` from the second call is ADDED to the CV pipeline's total, not
@@ -1037,7 +1276,7 @@ if feature_vector:
         stage_times = dict(result.stage_times or {})
 
     elbow_flex = feature_vector.get("elbow_flexion_deg", 10.0)
-    is_icc_legal = elbow_flex <= 15.0
+    is_icc_legal = elbow_flex <= config.ICC_ELBOW_EXTENSION_LIMIT_DEG
 
     st.markdown("---")
 
@@ -1048,7 +1287,7 @@ if feature_vector:
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     with col_m1:
         st.markdown(f"""
-        <div class="metric-card">
+        <div class="metric-card" role="region" aria-label="Performance Rating">
             <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">PERFORMANCE RATING</span>
             <h2 style="margin:4px 0; color:#00e676;">{result.performance_score:.1f}<span style="font-size:1rem;color:#8b949e"> / 100</span></h2>
             <span style="color:#8b949e; font-size:0.78rem;">Pace Potential Index</span>
@@ -1058,28 +1297,28 @@ if feature_vector:
         badge_cls = f"badge-{risk_level}"
         p_high = f"{risk_probs[2]:.2f}" if len(risk_probs) > 2 else "n/a"
         st.markdown(f"""
-        <div class="metric-card">
+        <div class="metric-card" role="region" aria-label="Injury Risk Level">
             <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">INJURY RISK LEVEL</span>
-            <div style="margin:8px 0;"><span class="status-badge {badge_cls}">{risk_level.upper()} RISK</span></div>
-            <span style="color:#8b949e; font-size:0.78rem;">P(High Risk) = {p_high}</span>
+            <div style="margin:8px 0;"><span class="status-badge {badge_cls}">{_esc(risk_level.upper())} RISK</span></div>
+            <span style="color:#8b949e; font-size:0.78rem;">P(High Risk) = {_esc(p_high)}</span>
         </div>
         """, unsafe_allow_html=True)
     with col_m3:
         icc_badge = "badge-legal" if is_icc_legal else "badge-illegal"
-        icc_text = "LEGAL (≤15°)" if is_icc_legal else "SUSPECT (>15°)"
+        icc_text = "LEGAL (\u226415\u00b0)" if is_icc_legal else "SUSPECT (>15\u00b0)"
         st.markdown(f"""
-        <div class="metric-card">
+        <div class="metric-card" role="region" aria-label="ICC Action Legality">
             <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">ICC ACTION LEGALITY</span>
-            <div style="margin:8px 0;"><span class="status-badge {icc_badge}">{icc_text}</span></div>
-            <span style="color:#8b949e; font-size:0.78rem;">Flexion: <b>{elbow_flex:.1f}°</b></span>
+            <div style="margin:8px 0;"><span class="status-badge {icc_badge}">{_esc(icc_text)}</span></div>
+            <span style="color:#8b949e; font-size:0.78rem;">Flexion: <b>{elbow_flex:.1f}\u00b0</b></span>
         </div>
         """, unsafe_allow_html=True)
     with col_m4:
         st.markdown(f"""
-        <div class="metric-card">
+        <div class="metric-card" role="region" aria-label="Front Knee Brace">
             <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">FRONT KNEE BRACE</span>
-            <h2 style="margin:4px 0; color:#29b6f6;">{feature_vector.get('knee_flexion_deg', 0):.1f}°</h2>
-            <span style="color:#8b949e; font-size:0.78rem;">Ideal: &lt; 15° for lever efficiency</span>
+            <h2 style="margin:4px 0; color:#29b6f6;">{feature_vector.get('knee_flexion_deg', 0):.1f}\u00b0</h2>
+            <span style="color:#8b949e; font-size:0.78rem;">Ideal: &lt; 15\u00b0 for lever efficiency</span>
         </div>
         """, unsafe_allow_html=True)
 
@@ -1087,6 +1326,13 @@ if feature_vector:
 
     render_ood_warnings(feature_vector, perf_bundle)
     render_ood_warnings(feature_vector, injury_bundle)
+
+    # Model confidence disclaimer
+    data_source = getattr(perf_bundle, "data_source", "synthetic")
+    if data_source == "synthetic":
+        st.info("**Note:** Performance and injury-risk predictions are trained on "
+                "synthetic biomechanical data. Scores are experimental and should "
+                "not be treated as clinical diagnoses. Use for technique feedback only.")
 
     # ---------------- DETAILED BREAKDOWN (deep dive, collapsed by default) ----------------
     with st.expander("🔍 Deep-dive analysis — gauges, radar, SHAP, drills, clinical, report", expanded=False):
@@ -1164,12 +1410,14 @@ if feature_vector:
             
             # Categorized recommendations
             if result.coaching_notes:
+                st.markdown('<div role="list" aria-label="Coaching recommendations">', unsafe_allow_html=True)
                 for note in result.coaching_notes:
                     st.markdown(f"""
-                    <div class="drill-card">
-                        <b>🎯 Biomechanics Note:</b> {note}
+                    <div class="drill-card" role="listitem">
+                        <b>\U0001f3af Biomechanics Note:</b> {_esc(note)}
                     </div>
                     """, unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
             else:
                 st.success("Action mechanics are well within optimal ranges.")
     
@@ -1197,31 +1445,33 @@ if feature_vector:
             risks = injury_kb.assess_biomechanical_risks(clinical_feats)
     
             if risks:
+                st.markdown('<div role="list" aria-label="Clinical injury risk assessments">', unsafe_allow_html=True)
                 for r in risks:
                     badge_cls = "badge-high" if r["severity"] == "High" else "badge-moderate"
-                    trig_text = "".join(f"<li>{t}</li>" for t in r["trigger_detected"])
+                    trig_text = "".join(f"<li>{_esc(t)}</li>" for t in r["trigger_detected"])
                     st.markdown(f"""
-                    <div class="drill-card">
-                        <b>🩺 {r['injury']}</b>
-                        &nbsp;<span class="status-badge {badge_cls}">{r['severity'].upper()} RISK</span>
+                    <div class="drill-card" role="listitem">
+                        <b>\U0001fa7a {_esc(r['injury'])}</b>
+                        &nbsp;<span class="status-badge {badge_cls}">{_esc(r['severity'].upper())} RISK</span>
                         <div style="margin-top:6px; color:#8b949e; font-size:0.85rem;">
-                            <b>Site:</b> {r['anatomical_site']} &nbsp;•&nbsp;
-                            <b>Incidence:</b> {r['clinical_incidence']}
+                            <b>Site:</b> {_esc(r['anatomical_site'])} &nbsp;\u2022&nbsp;
+                            <b>Incidence:</b> {_esc(r['clinical_incidence'])}
                         </div>
                         <div style="margin-top:4px; font-size:0.9rem;">
                             <b>Trigger:</b>
                             <ul style="margin:4px 0 4px 18px; color:#e6edf3;">{trig_text}</ul>
                         </div>
                         <div style="color:#8b949e; font-size:0.85rem;">
-                            <b>Recovery:</b> {r['est_recovery_timeline']}
-                            (median <b style="color:#ef5350">{r['median_days_to_match']}</b> days to match fitness)
+                            <b>Recovery:</b> {_esc(r['est_recovery_timeline'])}
+                            (median <b style="color:#ef5350">{_esc(r['median_days_to_match'])}</b> days to match fitness)
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
             else:
                 st.success("No clinical benchmark trigger thresholds exceeded for this delivery.")
     
-            st.markdown("#### 🧬 Workload & ACWR (optional inputs)")
+            st.markdown("#### \U0001f9ec Workload & ACWR (optional inputs)")
             w1, w2, w3 = st.columns(3)
             with w1:
                 acwr = st.number_input("ACWR (acute:chronic workload ratio)", 0.0, 3.0, 1.0, 0.05,

@@ -114,7 +114,7 @@ def clip_metrics(track, stats, gt):
     }
     m.update(recalls)
     gt_rel, gt_imp = gt.get("release_idx"), gt.get("impact_idx")
-    m["release_err"] = abs(m["release"] - gt_rel) if m["release"] is not None else None
+    m["release_err"] = abs(m["release"] - gt_rel) if (m["release"] is not None and gt_rel is not None) else None
     if gt_imp is not None:
         m["impact_err"] = abs(m["impact"] - gt_imp) if m["impact"] is not None else None
     else:
@@ -149,7 +149,10 @@ def main():
     print("-" * 40 + "-" * len(want) * 9)
     for d in dirs:
         clip_dir = os.path.join(args.dir, d)
-        gt = json.load(open(os.path.join(clip_dir, "gt.json")))
+        gt_path = os.path.join(clip_dir, "gt.json")
+        if not os.path.exists(gt_path):
+            continue
+        gt = json.load(open(gt_path))
         spec = os.path.join(clip_dir, "spec.json")
         oracle_mode = os.path.exists(spec)
         spec = json.load(open(spec)) if oracle_mode else {}
@@ -173,7 +176,7 @@ def main():
                 return "-" if x is None else f"{x:{suffix}}"
             print(f"    [{m}] r15={met['recall@15']*100:.0f}% "
                   f"err_mean={fmt(met['err_mean'])} err_med={fmt(met['err_med'])} "
-                  f"rel={met['release']}->gt{gt['release_idx']} "
+                  f"rel={met['release']}->gt{gt.get('release_idx')} "
                   f"imp={met['impact']}->gt{gt.get('impact_idx')} "
                   f"outcome={met['outcome']}")
 

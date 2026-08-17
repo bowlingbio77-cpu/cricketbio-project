@@ -188,7 +188,7 @@ def assistant_report(result, include_timings: bool = True) -> str:
         parts.append(f"- **Frames**: {ball_stats.get('n_frames', 'n/a')} "
                      f"(detected {ball_stats.get('n_detected', 'n/a')}, "
                      f"interpolated {ball_stats.get('n_interpolated', 'n/a')})")
-        parts.append(f"- **YOLO coverage**: {ball_stats.get('coverage_pct', 'n/a')}%")
+        parts.append(f"- **YOLO coverage**: {_fmt(ball_stats.get('coverage_pct'))}%")
         parts.append(f"- **Avg speed**: {_fmt(ball_stats.get('avg_speed_px_s'))} px/s")
         parts.append(f"- **Max speed**: {_fmt(ball_stats.get('max_speed_px_s'))} px/s")
         parts.append("")
