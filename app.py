@@ -1134,12 +1134,16 @@ else:
                         st.session_state["ball_stats"] = getattr(result, "ball_stats", {})
                         st.success(f"✅ Delivery processed ({target_fps} FPS)")
                     except Exception as e:
+                        import traceback
+                        tb = traceback.format_exc()
                         status.update(label="Analysis failed", state="error", expanded=True)
                         st.error(
                             "Video analysis failed. Please check that the file is a valid bowling "
                             "delivery clip (MP4/MOV/AVI) and try again. If the problem persists, "
-                            f"try a shorter clip or different resolution. (Error type: {type(e).__name__})"
+                            f"try a shorter clip or different resolution. (Error type: {type(e).__name__}: {e})"
                         )
+                        with st.expander("Full traceback", expanded=False):
+                            st.code(tb, language="python")
         finally:
             try:
                 os.remove(video_path)
