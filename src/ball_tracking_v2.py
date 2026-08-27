@@ -1038,6 +1038,8 @@ def write_mp4(frames, path: str, fps: float) -> str:
     if not frames:
         raise ValueError("No frames to write")
     h, w = frames[0][2].shape[:2]
+    # On Windows, ffmpeg needs forward-slash paths to avoid backslash escaping issues
+    win_path = path.replace("\\", "/") if os.name == "nt" else path
 
     if imageio_ffmpeg is not None:
         try:
@@ -1049,15 +1051,23 @@ def write_mp4(frames, path: str, fps: float) -> str:
                 "-i", "-",
                 "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
                 "-crf", "23", "-preset", "veryfast",
-                path,
+                win_path,
             ]
+            creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
             proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                                    stderr=subprocess.DEVNULL)
-            for _idx, _ts, frame in frames:
-                proc.stdin.write(np.ascontiguousarray(frame).tobytes())
-            proc.stdin.close()
+                                    stderr=subprocess.PIPE,
+                                    creationflags=creation_flags)
+            try:
+                for _idx, _ts, frame in frames:
+                    proc.stdin.write(np.ascontiguousarray(frame).tobytes())
+            except (BrokenPipeError, OSError):
+                pass
+            try:
+                proc.stdin.close()
+            except (BrokenPipeError, OSError):
+                pass
             proc.wait()
-            if proc.returncode == 0 and os.path.getsize(path) > 0:
+            if proc.returncode == 0 and os.path.exists(path) and os.path.getsize(path) > 0:
                 return path
         except Exception:
             pass

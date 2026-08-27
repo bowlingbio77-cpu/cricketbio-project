@@ -19,6 +19,7 @@ from . import config, preprocessing, tracking, pose_estimation
 from . import ball_tracking_v2 as ball_tracking
 from . import feature_engineering as feateng
 from . import ml_models, explainability, coaching
+from . import video_validity as validity
 
 
 @dataclass
@@ -210,6 +211,43 @@ def _augment_trajectory_with_wrist_proxy(trajectory, wrist_positions,
     return sorted(merged.values(), key=lambda p: p.frame_idx)
 
 
+class CricketPrecheckError(RuntimeError):
+    """Raised when a video fails the lightweight cricket-validity pre-check.
+
+    Used to stop analysis early (before the expensive ball tracking, bowler
+    cropping and full pose stages) so a non-cricket clip never wastes compute
+    and never yields meaningless biomechanics numbers."""
+
+
+def _precheck_cricket(frames, bowling_arm: str = "right",
+                      max_frames: int = 60,
+                      step: int = 1) -> validity.CheckResult:
+    """Cheap, sub-sampled human-pose gate run before the heavy CV stages.
+
+    Runs MediaPipe pose estimation on (at most) `max_frames` sampled frames
+    and checks for a human torso + arms via `video_validity.check_human_pose`.
+    This is deliberately subsampled and limited so the gate is much cheaper
+    than the full-clip analysis it protects.
+    """
+    sampled = []
+    n = len(frames)
+    if n == 0:
+        return validity.check_human_pose([])
+    # Evenly sample up to `max_frames` frames across the clip.
+    idxs = sorted({int(round(i)) for i in
+                   np.linspace(0, n - 1, min(n, max_frames))})
+    step = max(1, step)
+    grabbed = []
+    total = len(frames)
+    for k in range(0, len(idxs), step):
+        grabbed.append(frames[idxs[k]])
+    if len(grabbed) < 3:
+        grabbed = frames[: min(3, total)]
+    with pose_estimation.PoseEstimator() as estimator:
+        pose_seq = estimator.process_video_frames(iter(grabbed))
+    return validity.check_human_pose(pose_seq)
+
+
 def analyze_video(video_path: str, bowling_arm: str = "right",
                    performance_bundle: ml_models.TrainedBundle = None,
                    injury_bundle: ml_models.TrainedBundle = None,
@@ -219,7 +257,8 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
                    camera_view: str = "behind",
                    slow_factor: float = 2.5,
                    zoom_end: float = 1.8,
-                   run_ml: bool = True) -> AnalysisResult:
+                   run_ml: bool = True,
+                   precheck: bool = True) -> AnalysisResult:
     """
     Full pipeline on a single delivery video clip. Requires:
       - models/pose_landmarker_heavy.task (MediaPipe pose model, download separately)
@@ -242,6 +281,21 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     frames = list(preprocessing.preprocess_video(video_path, target_fps=target_fps,
                                                   resize_dim=resize_dim, denoise=denoise))
     timings["preprocess"] = time.perf_counter() - t0
+
+    # 1c: lightweight cricket-validity pre-check (hard gate). Runs a cheap,
+    # sub-sampled human-pose pass BEFORE the expensive ball tracking, bowler
+    # detection/cropping and full pose stages, so a non-cricket clip fails fast
+    # instead of wasting compute or producing meaningless numbers.
+    if not frames:
+        raise CricketPrecheckError("Video produced no frames to analyse.")
+    if precheck:
+        t0 = time.perf_counter()
+        pre_ok = _precheck_cricket(frames, bowling_arm=bowling_arm)
+        timings["cricket_precheck"] = time.perf_counter() - t0
+        if not pre_ok.ok:
+            raise CricketPrecheckError(
+                "This clip does not appear to be a cricket bowling video: "
+                f"{pre_ok.reason} Analysis stopped before the CV stages.")
 
     # 1b: ball detection + tracking -> annotated output video (run on the full
     # frames BEFORE the bowler crop, so the ball is never cut out of frame).
@@ -363,13 +417,10 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         if wrist_pos and release_frame is not None:
             track = _augment_trajectory_with_wrist_proxy(
                 track, wrist_pos, release_frame, handoff_frames=3)
-            # Re-clip at impact and re-annotate the video
+            # Re-clip at impact and update stats (single video output)
             impact_idx = track_stats.get("impact_idx")
             display_track = ([p for p in track if p.frame_idx <= impact_idx]
                              if impact_idx is not None else track)
-            annotated = ball_tracking.annotate_frames(frames, display_track)
-            video_path = ball_tracking.write_mp4(
-                annotated, ball_tracking.make_output_path(), fps=target_fps)
             ball_stats = ball_tracking.summarize(display_track, fps=target_fps)
             ball_stats["release_idx"] = track_stats.get("release_idx")
             ball_stats["impact_idx"] = impact_idx
@@ -425,20 +476,8 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     if run_ml:
         timings["coaching"] = time.perf_counter() - t0
 
-    # 10: slow-mo + zoom post-processing (reels effect)
+    # 10: slow-mo + zoom post-processing (reels effect) — disabled
     reels_video_path = None
-    if track and video_path is not None and display_track:
-        try:
-            reels_video_path = ball_tracking.make_output_path(prefix="reels_")
-            render_stats = ball_tracking.render_slowmo_zoom(
-                video_path, reels_video_path, display_track,
-                slow_factor=slow_factor, zoom_end=zoom_end)
-            ball_stats["has_reels"] = True
-            ball_stats["reels_stats"] = render_stats
-            warnings.append("Slow-motion + zoom replay generated (see below).")
-        except Exception as exc:
-            warnings.append(f"Reels effect skipped ({exc}).")
-            reels_video_path = None
 
     timings["total"] = time.perf_counter() - t_start
 

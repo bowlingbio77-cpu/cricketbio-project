@@ -51,7 +51,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ---------------- AUTH GATE (disabled -- uncomment to re-enable) ----------------
+# ---------------- AUTH GATE (disabled for now) ----------------
 # if not is_authenticated():
 #     render_login_page()
 #     st.stop()
@@ -290,7 +290,7 @@ def _paceai_preloader(message: str) -> str:
     <div class="stage">
         <div class="orbit-ring"></div>
         <div class="orbit-spin"><div class="orbit-dot"></div></div>
-        <div class="logo-badge">⚡</div>
+        <div class="logo-badge">&#9889;</div>
         <div class="loading-text">{message}</div>
         <div class="success">
             <div class="sglow"></div>
@@ -1105,45 +1105,39 @@ else:
             if not os.path.exists(config.POSE_MODEL_PATH):
                 st.warning("MediaPipe pose task model missing. Run pose downloader or manual entry.")
             else:
-                with st.status(f"Analyzing delivery kinematics: '{uploaded.name}'...", expanded=True) as status:
-                    st.write("Tracking bowler ROI & cropping crease...")
-                    st.write("Extracting 33 3D landmarks (MediaPipe)...")
-                    try:
-                        result = pipeline.analyze_video(
-                            video_path,
-                            bowling_arm=bowling_arm.lower().split("-")[0],
-                            performance_bundle=perf_bundle,
-                            injury_bundle=injury_bundle,
-                            target_fps=target_fps,
-                            resize_dim=resize_choice,
-                            denoise=denoise,
-                            camera_view=camera_view,
-                            slow_factor=slow_factor,
-                            zoom_end=zoom_end,
-                            run_ml=False,
-                        )
-                        st.write("Calculating knee brace & shoulder counter-rotation...")
-                        st.write("Evaluating clinical lumbar stress risk...")
-                        status.update(label="Analysis complete", state="complete", expanded=False)
-                        feature_vector = result.feature_vector
-                        st.session_state["video_stage_times"] = dict(result.stage_times or {})
-                        st.session_state["video_upload_time"] = upload_time
-                        st.session_state["last_warnings"] = list(result.warnings or [])
-                        st.session_state["video_output_path"] = getattr(result, "video_path", None)
-                        st.session_state["reels_video_path"] = getattr(result, "reels_video_path", None)
-                        st.session_state["ball_stats"] = getattr(result, "ball_stats", {})
-                        st.success(f"✅ Delivery processed ({target_fps} FPS)")
-                    except Exception as e:
-                        import traceback
-                        tb = traceback.format_exc()
-                        status.update(label="Analysis failed", state="error", expanded=True)
-                        st.error(
-                            "Video analysis failed. Please check that the file is a valid bowling "
-                            "delivery clip (MP4/MOV/AVI) and try again. If the problem persists, "
-                            f"try a shorter clip or different resolution. (Error type: {type(e).__name__}: {e})"
-                        )
-                        with st.expander("Full traceback", expanded=False):
-                            st.code(tb, language="python")
+                render_loader(f"Analyzing '{uploaded.name}'...")
+                try:
+                    result = pipeline.analyze_video(
+                        video_path,
+                        bowling_arm=bowling_arm.lower().split("-")[0],
+                        performance_bundle=perf_bundle,
+                        injury_bundle=injury_bundle,
+                        target_fps=target_fps,
+                        resize_dim=resize_choice,
+                        denoise=denoise,
+                        camera_view=camera_view,
+                        slow_factor=slow_factor,
+                        zoom_end=zoom_end,
+                        run_ml=False,
+                    )
+                    feature_vector = result.feature_vector
+                    st.session_state["video_stage_times"] = dict(result.stage_times or {})
+                    st.session_state["video_upload_time"] = upload_time
+                    st.session_state["last_warnings"] = list(result.warnings or [])
+                    st.session_state["video_output_path"] = getattr(result, "video_path", None)
+                    st.session_state["reels_video_path"] = getattr(result, "reels_video_path", None)
+                    st.session_state["ball_stats"] = getattr(result, "ball_stats", {})
+                    st.success(f"Delivery processed ({target_fps} FPS)")
+                except Exception as e:
+                    import traceback
+                    tb = traceback.format_exc()
+                    st.error(
+                        "Video analysis failed. Please check that the file is a valid bowling "
+                        "delivery clip (MP4/MOV/AVI) and try again. If the problem persists, "
+                        f"try a shorter clip or different resolution. (Error type: {type(e).__name__}: {e})"
+                    )
+                    with st.expander("Full traceback", expanded=False):
+                        st.code(tb, language="python")
         finally:
             try:
                 os.remove(video_path)
@@ -1220,29 +1214,7 @@ if input_mode.startswith("📹") and st.session_state.get("video_output_path") a
                               margin=dict(l=10, r=10, t=30, b=10),
                               title=traj_label + " (image coords)")
             st.plotly_chart(fig, width='stretch')
-    # Reels: slow-mo + zoom replay
-    reels_path = st.session_state.get("reels_video_path")
-    if reels_path and os.path.exists(reels_path):
-        st.markdown("#### Slow-Motion Zoom Replay")
-        reels_stats = bstats.get("reels_stats", {})
-        sf = reels_stats.get("slow_factor", slow_factor)
-        ze = reels_stats.get("final_zoom", zoom_end)
-        st.caption(f"{sf:.1f}x slow-motion with {ze:.1f}x progressive zoom toward the ball "
-                   f"- cinematic reels-style render for social media.")
-        st.video(reels_path)
-        # Reels quality diagnostics
-        dup_ratio = reels_stats.get("duplication_ratio", 0)
-        max_disp = reels_stats.get("max_center_displacement_px", 0)
-        mean_disp = reels_stats.get("mean_center_displacement_px", 0)
-        if dup_ratio > 0 or max_disp > 0:
-            with st.expander("Reels quality diagnostics", expanded=False):
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Frame duplication", f"{dup_ratio:.0%}",
-                          help="Extra frames generated by slow-motion (0% = no duplication)")
-                c2.metric("Max center jump", f"{max_disp:.1f} px",
-                          help="Largest frame-to-frame camera pan jump (lower = smoother)")
-                c3.metric("Mean center jump", f"{mean_disp:.1f} px",
-                          help="Average frame-to-frame camera pan jump")
+    # Reels: slow-mo + zoom replay — disabled
 
 # ---------------- ANALYSIS & VISUALIZATION ----------------
 if feature_vector:
