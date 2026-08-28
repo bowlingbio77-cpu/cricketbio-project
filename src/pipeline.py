@@ -20,6 +20,7 @@ from . import ball_tracking_v2 as ball_tracking
 from . import feature_engineering as feateng
 from . import ml_models, explainability, coaching
 from . import video_validity as validity
+from . import analysis_replay
 
 
 @dataclass
@@ -35,10 +36,14 @@ class AnalysisResult:
     camera_view: Optional[str] = None
     bowling_arm: str = "right"
     video_path: Optional[str] = None       # annotated ball-tracking MP4 (video mode)
+    pose_video_path: Optional[str] = None  # pose-skeleton overlay MP4 (ball-tracking fallback)
     reels_video_path: Optional[str] = None  # slow-mo + zoom MP4 (video mode)
+    analysis_replay_path: Optional[str] = None  # unified Analysis Replay MP4 (hero video)
     ball_stats: dict = field(default_factory=dict)
     bowler_bboxes: Optional[dict] = None   # frame_idx -> (x1,y1,x2,y2) padded crop bbox
     original_frame_dims: Optional[tuple] = None  # (height, width) of pre-crop frames
+    bowler_track_id: Optional[int] = None  # locked bowler track id (identity lock)
+    bowler_confidence: Optional[float] = None  # cricket-evidence confidence 0..1
 
     def to_dict(self):
         return asdict(self)
@@ -59,22 +64,63 @@ def _crop_to_bbox(frame, bbox, pad_frac: float = 0.3) -> Optional[np.ndarray]:
     return frame[ny1:ny2, nx1:nx2]
 
 
-def _crop_frames_to_bowler(frames, tracks, bowler) -> list:
-    """Return a new frame list cropped to the bowler's track bbox (carrying the
-    previous bbox forward over brief gaps). Bboxes must be in frame coordinates."""
+BOWLER_CARRY_GAP_FRAMES = 5  # frames a bowler bbox may be carried over a brief
+                             # gap; beyond that the bowler is "gone" -- no box,
+                             # no crop, no substitute (identity is not swapped).
+
+
+def _crop_frames_to_bowler(frames, tracks, bowler, gap_frames: int = BOWLER_CARRY_GAP_FRAMES) -> list:
+    """Return a new frame list cropped to the bowler's track bbox, carrying the
+    previous bbox forward only over brief (<= gap_frames) gaps. Bboxes must be in
+    frame coordinates. Frames after the bowler is lost are kept uncropped -- and
+    pose estimation later runs only on the bowler-bound frames, so a missing
+    bowler never silently becomes a batsman."""
     bbox_by_frame = dict(zip(bowler.frames, bowler.bboxes))
-    last_bbox = None
+    last_bbox, last_seen = None, -10 ** 9
     cropped = []
     for idx, ts, frame in frames:
-        bbox = bbox_by_frame.get(idx, last_bbox)
+        bbox = bbox_by_frame.get(idx)
         if bbox is not None:
-            last_bbox = bbox
+            last_bbox, last_seen = bbox, idx
             cut = _crop_to_bbox(frame, bbox)
+            if cut is not None:
+                cropped.append((idx, ts, cut))
+                continue
+        elif last_bbox is not None and idx - last_seen <= gap_frames:
+            cut = _crop_to_bbox(frame, last_bbox)
             if cut is not None:
                 cropped.append((idx, ts, cut))
                 continue
         cropped.append((idx, ts, frame))
     return cropped
+
+
+def _padded_bowler_bboxes(bowler, n_frames, frame_h, frame_w,
+                          pad_frac: float = 0.3,
+                          gap_frames: int = BOWLER_CARRY_GAP_FRAMES) -> dict:
+    """Full-frame padded crop bboxes for the locked bowler track, carried over
+    brief (<= gap_frames) gaps only. Frames outside the bowler's presence get
+    NO bbox, so the Analysis Replay stops drawing the bowler box the moment the
+    bowler leaves the frame -- it never swaps in a batsman/keeper/fielder."""
+    bbox_by_frame = dict(zip(bowler.frames, bowler.bboxes))
+    out = {}
+    last_bb, last_seen = None, -10 ** 9
+    for idx in range(n_frames):
+        bb = bbox_by_frame.get(idx)
+        if bb is None and (last_bb is None or idx - last_seen > gap_frames):
+            continue
+        if bb is None:
+            bb = last_bb
+        else:
+            last_bb, last_seen = bb, idx
+        bx1, by1, bx2, by2 = bb
+        bw, bh = max(1.0, bx2 - bx1), max(1.0, by2 - by1)
+        pad_x, pad_y = pad_frac * bw, pad_frac * bh
+        out[idx] = (
+            max(0, int(bx1 - pad_x)), max(0, int(by1 - pad_y)),
+            min(frame_w, int(bx2 + pad_x)), min(frame_h, int(by2 + pad_y)),
+        )
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -258,7 +304,9 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
                    slow_factor: float = 2.5,
                    zoom_end: float = 1.8,
                    run_ml: bool = True,
-                   precheck: bool = True) -> AnalysisResult:
+                   precheck: bool = True,
+                   progress_cb=None,
+                   debug_overlay: bool = False) -> AnalysisResult:
     """
     Full pipeline on a single delivery video clip. Requires:
       - models/pose_landmarker_heavy.task (MediaPipe pose model, download separately)
@@ -271,16 +319,30 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     feature engineering (2D fallbacks assume a rear/behind view).
     `run_ml=False` skips the prediction/SHAP/coaching stages (when the caller
     will re-run them on the same feature vector) -- avoids a wasted ML pass.
+    `progress_cb(done: int, total: int, label: str)` is invoked as each major
+    stage completes, letting a UI render a live staged checklist.
+    `debug_overlay=True` adds a diagnostic text overlay (locked bowler track id +
+    cricket-evidence confidence, ball state) to the Analysis Replay.
     """
     timings = {}
     warnings = []
     t_start = time.perf_counter()
+    _stages = ["Video loaded", "Cricket pre-check", "Ball detection", "Bowler detection",
+               "Pose extraction", "Ball tracking", "Biomechanics", "ML analysis", "Complete"]
+    _done = 0
+
+    def _progress(label):
+        nonlocal _done
+        _done += 1
+        if progress_cb is not None:
+            progress_cb(_done, len(_stages), label)
 
     # 1: preprocess
     t0 = time.perf_counter()
     frames = list(preprocessing.preprocess_video(video_path, target_fps=target_fps,
                                                   resize_dim=resize_dim, denoise=denoise))
     timings["preprocess"] = time.perf_counter() - t0
+    _progress("Video loaded")
 
     # 1c: lightweight cricket-validity pre-check (hard gate). Runs a cheap,
     # sub-sampled human-pose pass BEFORE the expensive ball tracking, bowler
@@ -296,6 +358,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
             raise CricketPrecheckError(
                 "This clip does not appear to be a cricket bowling video: "
                 f"{pre_ok.reason} Analysis stopped before the CV stages.")
+    _progress("Cricket pre-check")
 
     # 1b: ball detection + tracking -> annotated output video (run on the full
     # frames BEFORE the bowler crop, so the ball is never cut out of frame).
@@ -340,6 +403,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     except Exception as exc:
         warnings.append(f"Ball tracking skipped ({exc}).")
     timings["ball_tracking"] = time.perf_counter() - t0
+    _progress("Ball detection")
 
     # Fallback: display_track = track (will be overridden by wrist-proxy if applied)
     if display_track is None:
@@ -350,49 +414,61 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     crop_stats = None
     bowler_bboxes = None
     original_frame_dims = None
+    frames_full = None
+    bowler_track_id = None
+    bowler_confidence = None
     try:
         # Snapshot full-frame dimensions before any cropping
         if frames:
             original_frame_dims = (frames[0][2].shape[0], frames[0][2].shape[1])
+            frames_full = list(frames)
         tracker = tracking.BowlerTracker()
         tracks = tracker.track_frames([(idx, fr) for idx, ts, fr in frames])
-        bowler = tracking.select_bowler_track(tracks)
+        h, w = frames[0][2].shape[:2]
+        bowler, bowler_meta = tracking.select_bowler_track_with_meta(
+            tracks, frame_dims=(h, w), total_frames=len(frames))
         if bowler is not None and len(bowler) >= 3:
-            # Reconstruct padded bboxes (same logic as _crop_to_bbox)
-            bbox_by_frame = dict(zip(bowler.frames, bowler.bboxes))
-            padded = {}
-            h, w = frames[0][2].shape[:2]
-            last_bb = None
-            for idx, _ts, _fr in frames:
-                bb = bbox_by_frame.get(idx, last_bb)
-                if bb is not None:
-                    last_bb = bb
-                    bx1, by1, bx2, by2 = bb
-                    bw, bh = max(1.0, bx2 - bx1), max(1.0, by2 - by1)
-                    pad_x, pad_y = 0.3 * bw, 0.3 * bh
-                    padded[idx] = (
-                        max(0, int(bx1 - pad_x)), max(0, int(by1 - pad_y)),
-                        min(w, int(bx2 + pad_x)), min(h, int(by2 + pad_y)),
-                    )
-            bowler_bboxes = padded
+            bowler_bboxes = _padded_bowler_bboxes(
+                bowler, len(frames), h, w,
+                gap_frames=BOWLER_CARRY_GAP_FRAMES)
             frames = _crop_frames_to_bowler(frames, tracks, bowler)
             crop_stats = {"track_id": bowler.track_id, "frames_tracked": len(bowler)}
+            bowler_track_id = bowler_meta["track_id"] if bowler_meta else bowler.track_id
+            bowler_confidence = bowler_meta.get("confidence") if bowler_meta else None
             warnings.append(
-                f"Detection/tracking: cropped to bowler track #{bowler.track_id} "
-                f"({len(bowler)} frames) before pose estimation."
+                f"Detection/tracking: locked to bowler track #{bowler_track_id} "
+                f"({len(bowler)} frames, confidence "
+                f"{bowler_confidence:.2f if bowler_confidence is not None else 'n/a'}) "
+                f"before pose estimation."
             )
         else:
-            warnings.append("Detection/tracking found no stable bowler track; "
-                            "pose estimation ran on full frames.")
+            bowler_track_id = None
+            bowler_confidence = None
+            warnings.append(
+                "Detection/tracking found no bowler: nobody in the clip moves like a "
+                "bowler (run-up + delivery). Identity is NOT inferred -- pose ran on "
+                "full frames without a bowler box."
+            )
     except Exception as exc:
         warnings.append(f"Detection/tracking skipped ({exc}); pose ran on full frames.")
+        bowler_track_id = None
+        bowler_confidence = None
     timings["detection_tracking"] = time.perf_counter() - t0
 
-    # 4-5: pose estimation -> 33 landmarks/frame
+    # 4-5: pose estimation -> 33 landmarks/frame. When a bowler crop exists, only
+    # the bowler's own frames are fed to the pose model (identity lock: a missing
+    # bowler never becomes a batsman). frame_idx is preserved by the estimator, so
+    # wrist-proxy / replay mappings (keyed by frame idx) keep working.
     t0 = time.perf_counter()
+    if bowler_bboxes:
+        frames_pose = [(idx, ts, fr) for idx, ts, fr in frames if idx in bowler_bboxes]
+    else:
+        frames_pose = list(frames)
     with pose_estimation.PoseEstimator() as estimator:
-        pose_sequence = estimator.process_video_frames(iter(frames))
+        pose_sequence = estimator.process_video_frames(iter(frames_pose))
     timings["pose_estimation"] = time.perf_counter() - t0
+    _progress("Bowler detection")
+    _progress("Pose extraction")
 
     if len(pose_sequence) < 3:
         raise RuntimeError("Not enough frames with a detected pose -- check video quality/framing.")
@@ -402,6 +478,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     feature_vector, diagnostics = feateng.analyze_delivery(
         pose_sequence, bowling_arm=bowling_arm, camera_view=camera_view)
     timings["feature_engineering"] = time.perf_counter() - t0
+    _progress("Biomechanics")
 
     if diagnostics.get("reliable") is not True:
         warnings.append(f"Delivery quality: {diagnostics.get('reliability_reason')}")
@@ -445,6 +522,26 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
             missing.append("no pose data")
         warnings.append(f"Wrist-proxy skipped: {', '.join(missing)}.")
 
+    # 6c: pose-skeleton overlay video (used as the ball-tracking fallback, and
+    # as an always-available "show the AI working" clip). Drawn on the same
+    # (bowler-cropped) frames the pose was estimated on.
+    pose_video_path = None
+    try:
+        pose_by_idx = {pf.frame_idx: pf for pf in pose_sequence}
+        overlays = []
+        for idx, ts, fr in frames:
+            pf = pose_by_idx.get(idx)
+            img = fr if pf is None else pose_estimation.draw_skeleton(fr, pf)
+            overlays.append((idx, ts, img))
+        if overlays:
+            pose_video_path = ball_tracking.write_mp4(
+                overlays, ball_tracking.make_output_path("pose"), fps=target_fps)
+    except Exception as exc:
+        warnings.append(f"Pose-overlay video skipped ({exc}).")
+    if video_path is None and pose_video_path is not None:
+        warnings.append("Ball not detected reliably; showing pose-skeleton overlay video.")
+    _progress("Ball tracking")
+
     # 7: ML predictions
     performance_score = None
     injury_risk = None
@@ -466,6 +563,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         t0 = time.perf_counter()
         shap_injury = explainability.explain_prediction(injury_bundle, feature_vector)
         timings["shap_explanation"] = timings.get("shap_explanation", 0.0) + (time.perf_counter() - t0)
+    _progress("ML analysis")
 
     # 9: coaching recommendations
     t0 = time.perf_counter()
@@ -476,10 +574,56 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     if run_ml:
         timings["coaching"] = time.perf_counter() - t0
 
-    # 10: slow-mo + zoom post-processing (reels effect) — disabled
+    # 10: slow-mo + progressive zoom-toward-the-ball (reels effect).
+    # Pure post-processing rendering on the already-tracked annotated video --
+    # it does NOT touch detection, tracking, pose, or any ML stage.
     reels_video_path = None
+    try:
+        traj = (ball_stats or {}).get("trajectory") or []
+        if video_path and traj and os.path.exists(video_path):
+            reels_video_path = ball_tracking.make_output_path("reels")
+            ball_tracking.render_slowmo_zoom(
+                video_path,
+                reels_video_path,
+                traj,
+                slow_factor=slow_factor,
+                zoom_end=zoom_end,
+                output_fps=target_fps,
+            )
+    except Exception as exc:
+        reels_video_path = None
+        warnings.append(f"Reels (slow-mo/zoom) rendering skipped ({exc}).")
+
+    # 11: unified Analysis Replay -- ONE hero video combining original footage
+    # with real, frame-synchronized overlays (ball box, trajectory, pose
+    # skeleton, release marker). Pure post-processing on real pipeline outputs;
+    # it does NOT change any detection/tracking/pose/ML result.
+    analysis_replay_path = None
+    try:
+        if frames_full:
+            release_frame = (ball_stats or {}).get("release_idx")
+            if release_frame is None:
+                release_frame = diagnostics.get("release_frame_idx")
+            analysis_replay_path = analysis_replay.render_analysis_replay(
+                frames_full,
+                display_track or [],
+                pose_sequence,
+                bowler_bboxes or {},
+                release_frame,
+                ball_tracking.make_output_path("analysis_replay"),
+                fps=float(target_fps),
+                frame_dims=original_frame_dims,
+                debug=debug_overlay,
+                bowler_track_id=bowler_track_id,
+                bowler_confidence=bowler_confidence,
+            )
+            warnings.append(f"Analysis Replay generated: {analysis_replay_path}")
+    except Exception as exc:
+        analysis_replay_path = None
+        warnings.append(f"Analysis Replay rendering skipped ({exc}).")
 
     timings["total"] = time.perf_counter() - t_start
+    _progress("Complete")
 
     return AnalysisResult(
         feature_vector=feature_vector,
@@ -494,9 +638,13 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         bowling_arm=bowling_arm,
         video_path=video_path,
         reels_video_path=reels_video_path,
+        analysis_replay_path=analysis_replay_path,
         ball_stats=ball_stats,
         bowler_bboxes=bowler_bboxes,
         original_frame_dims=original_frame_dims,
+        bowler_track_id=bowler_track_id,
+        bowler_confidence=bowler_confidence,
+        pose_video_path=pose_video_path,
     )
 
 

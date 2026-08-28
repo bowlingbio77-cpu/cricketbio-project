@@ -12,6 +12,7 @@ Usage:
 import os
 import sys
 import csv
+import json
 import argparse
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Tuple
@@ -22,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 VIDEOS_DIR = os.path.join(EVAL_DIR, "videos")
 ANNOTATIONS_DIR = os.path.join(EVAL_DIR, "annotations")
+PREDICTIONS_DIR = os.path.join(EVAL_DIR, "predictions")
 
 
 # --------------------------------------------------------------------------- #
@@ -138,6 +140,111 @@ def load_dataset() -> EvaluationDataset:
         ds.ball_annotations[vid.video_id] = load_ball_annotations(vid.video_id)
         ds.pose_annotations[vid.video_id] = load_pose_annotations(vid.video_id)
     return ds
+
+
+# --------------------------------------------------------------------------- #
+# Pipeline-prediction cache
+# --------------------------------------------------------------------------- #
+# Running the full CV pipeline on real clips is slow (~minutes). To keep the
+# eval loop fast and re-runnable, `predict_video()` runs the REAL pipeline once
+# and caches the relevant outputs to evaluation/predictions/<video_id>.json.
+# `run_evaluation()` then loads the cached predictions and feeds REAL values
+# into the metric functions below -- no fabricated data anywhere.
+
+
+class SimplePoint:
+    """Lightweight BallPoint stand-in (frame_idx/x/y/detected/source/w/h/conf)."""
+    __slots__ = ("frame_idx", "x", "y", "detected", "source", "w", "h", "confidence")
+
+    def __init__(self, frame_idx, x, y, detected, source, w, h, confidence=1.0):
+        self.frame_idx = frame_idx
+        self.x = x
+        self.y = y
+        self.detected = detected
+        self.source = source
+        self.w = w
+        self.h = h
+        self.confidence = confidence
+
+
+def predict_video(vid: VideoMetadata) -> dict:
+    """Run the real analyze_video pipeline, extract predictions, cache to JSON.
+
+    Only CONSUMES pipeline output -- does not modify the ML/CV pipeline.
+    """
+    from src import pipeline
+
+    os.makedirs(PREDICTIONS_DIR, exist_ok=True)
+
+    result = pipeline.analyze_video(
+        vid.video_path,
+        bowling_arm=vid.bowling_arm,
+        target_fps=int(vid.fps),
+        camera_view=vid.camera_view,
+        run_ml=False,
+    )
+
+    traj = []
+    for p in (result.ball_stats or {}).get("trajectory") or []:
+        traj.append({
+            "frame_idx": p.frame_idx,
+            "x": float(p.x), "y": float(p.y),
+            "detected": bool(getattr(p, "detected", True)),
+            "source": getattr(p, "source", "motion"),
+            "w": float(getattr(p, "w", 0.0)),
+            "h": float(getattr(p, "h", 0.0)),
+            "confidence": float(getattr(p, "confidence", 1.0)),
+        })
+
+    pred = {
+        "video_id": vid.video_id,
+        "fps": vid.fps,
+        "release_idx": result.ball_stats.get("release_idx"),
+        "n_frames": result.ball_stats.get("n_frames"),
+        "trajectory": traj,
+    }
+    path = os.path.join(PREDICTIONS_DIR, f"{vid.video_id}_pred.json")
+    with open(path, "w") as f:
+        json.dump(pred, f, indent=2)
+    return pred
+
+
+def load_predictions(video_id: str) -> Optional[dict]:
+    """Load cached pipeline predictions for a video (None if missing)."""
+    path = os.path.join(PREDICTIONS_DIR, f"{video_id}_pred.json")
+    if not os.path.exists(path):
+        return None
+    with open(path, "r") as f:
+        return json.load(f)
+
+
+def trajectory_to_points(traj: list) -> list:
+    """Convert cached trajectory dicts back into SimplePoint objects."""
+    out = []
+    for p in traj:
+        out.append(SimplePoint(
+            int(p["frame_idx"]),
+            float(p["x"]), float(p["y"]),
+            bool(p.get("detected", True)),
+            p.get("source", "motion"),
+            float(p.get("w", 0.0)), float(p.get("h", 0.0)),
+            float(p.get("confidence", 1.0)),
+        ))
+    return out
+
+
+def trajectory_to_boxes(traj: list, box_pad: float = 6.0):
+    """Predict per-frame ball boxes (frame_idx -> (x1,y1,x2,y2,conf)) from the
+    tracked trajectory centers, using the tracked width/height (or a small pad).
+    conf = 1.0 for YOLO-detected points, 0.5 for interpolated/predicted."""
+    boxes = {}
+    for p in traj:
+        w = float(p.get("w", 0.0)) or box_pad
+        h = float(p.get("h", 0.0)) or box_pad
+        x, y = float(p["x"]), float(p["y"])
+        conf = 1.0 if p.get("detected", True) and p.get("source", "") == "yolo" else 0.5
+        boxes[int(p["frame_idx"])] = [(x - w / 2, y - h / 2, x + w / 2, y + h / 2, conf)]
+    return boxes
 
 
 # --------------------------------------------------------------------------- #
@@ -408,7 +515,8 @@ def compute_wrist_proxy_reliability(
     """
     if not wrist_visibilities:
         return {"quality_level": "LOW", "avg_visibility": 0.0,
-                "confidence_reason": "No wrist landmark data available"}
+                "confidence_reason": "No wrist landmark data available",
+                "status": "not_available"}
 
     avg_vis = float(np.mean(wrist_visibilities))
 
@@ -510,42 +618,70 @@ def run_evaluation(video_id: Optional[str] = None) -> dict:
         "aggregate": {},
     }
 
-    all_detection = []
-    all_tracking = []
     all_release = []
 
     for vid in videos_to_eval:
         v_result = {}
+        pred = load_predictions(vid.video_id)
 
         gt = ds.ball_annotations.get(vid.video_id, [])
         v_result["ground_truth_count"] = len(gt)
+        v_result["has_predictions"] = pred is not None
 
-        v_result["detection"] = compute_detection_metrics({}, gt)
-        all_detection.append(v_result["detection"])
+        if pred is not None:
+            fps = vid.fps or pred.get("fps") or 20.0
+            traj = trajectory_to_points(pred.get("trajectory") or [])
+            boxes = trajectory_to_boxes(pred.get("trajectory") or [])
 
-        v_result["tracking"] = compute_tracking_metrics([], gt, vid.fps)
-        all_tracking.append(v_result["tracking"])
+            v_result["detection"] = compute_detection_metrics(boxes, gt)
+            v_result["tracking"] = compute_tracking_metrics(traj, gt, fps)
 
-        v_result["release_frame"] = compute_release_frame_metrics(
-            None, vid.release_frame_annotated, vid.fps)
-        if v_result["release_frame"]["status"] == "measured":
-            all_release.append(v_result["release_frame"])
+            pr_release = pred.get("release_idx")
+            v_result["release_frame"] = compute_release_frame_metrics(
+                pr_release, vid.release_frame_annotated, fps)
+            if v_result["release_frame"]["status"] == "measured":
+                all_release.append(v_result["release_frame"])
+
+            v_result["reels"] = compute_reels_quality(traj)
+            v_result["wrist_proxy"] = compute_wrist_proxy_reliability(
+                [p.confidence for p in traj if getattr(p, "source", "") == "wrist_proxy"],
+                v_result["tracking"].get("status") == "measured",
+                pr_release is not None,
+            )
+        else:
+            v_result["detection"] = compute_detection_metrics({}, gt)
+            v_result["tracking"] = compute_tracking_metrics([], gt, vid.fps)
+            v_result["release_frame"] = compute_release_frame_metrics(
+                None, vid.release_frame_annotated, vid.fps)
+            v_result["reels"] = compute_reels_quality([])
+            v_result["wrist_proxy"] = compute_wrist_proxy_reliability([], False, False)
 
         pose_gt = ds.pose_annotations.get(vid.video_id, [])
         v_result["pose"] = compute_pose_metrics({}, pose_gt, vid.width, vid.height)
-        v_result["wrist_proxy"] = compute_wrist_proxy_reliability([], False, False)
-        v_result["reels"] = compute_reels_quality([])
 
         results["videos"][vid.video_id] = v_result
 
-    if all_detection:
-        measured = [d for d in all_detection if d["status"] == "measured"]
-        if measured:
-            results["aggregate"]["detection"] = {
-                "mean_precision": round(float(np.mean([d["precision"] for d in measured])), 4),
-                "mean_recall": round(float(np.mean([d["recall"] for d in measured])), 4),
-                "mean_ap50": round(float(np.mean([d["ap50"] for d in measured])), 4),
-            }
+    # Aggregate metrics across all evaluated videos (only from measured values --
+    # videos without predictions/annotations are excluded so we never report a
+    # made-up number).
+    det_measured = [v["detection"] for v in results["videos"].values()
+                    if v["detection"].get("status") == "measured"]
+    if det_measured:
+        results["aggregate"]["detection"] = {
+            "mean_precision": round(float(np.mean([d["precision"] for d in det_measured])), 4),
+            "mean_recall": round(float(np.mean([d["recall"] for d in det_measured])), 4),
+            "mean_ap50": round(float(np.mean([d["ap50"] for d in det_measured])), 4),
+            "n_videos": len(det_measured),
+        }
+
+    trk_measured = [v["tracking"] for v in results["videos"].values()
+                    if v["tracking"].get("status") == "measured"]
+    if trk_measured:
+        results["aggregate"]["tracking"] = {
+            "mean_coverage_pct": round(float(np.mean([t["coverage_pct"] for t in trk_measured])), 1),
+            "mean_id_switches": round(float(np.mean([t["id_switches"] for t in trk_measured])), 2),
+            "n_videos": len(trk_measured),
+        }
 
     if all_release:
         errors = [r["absolute_error"] for r in all_release]
@@ -566,7 +702,23 @@ def main():
     parser = argparse.ArgumentParser(description="PaceAI Evaluation Framework")
     parser.add_argument("--video_id", type=str, default=None,
                         help="Evaluate a specific video (default: all)")
+    parser.add_argument("--predict", action="store_true",
+                        help="Run the real CV pipeline on each annotated video and "
+                             "cache predictions before evaluating (slow).")
     args = parser.parse_args()
+
+    if args.predict:
+        ds = load_dataset()
+        if not ds.videos:
+            print("No videos in evaluation/metadata.csv -- nothing to predict.")
+            return
+        ids = [args.video_id] if args.video_id else [v.video_id for v in ds.videos]
+        sel = [v for v in ds.videos if v.video_id in ids]
+        print(f"Running pipeline predictions on {len(sel)} video(s)...")
+        for vid in sel:
+            print(f"  -> {vid.video_id} ...")
+            predict_video(vid)
+        print("Predictions cached in evaluation/predictions/")
 
     results = run_evaluation(args.video_id)
 

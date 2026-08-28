@@ -211,6 +211,26 @@ st.markdown("""
         .hero-banner span.status-badge { display: block; margin: 4px 0; }
     }
 
+    /* --- Premium Analysis Replay --- */
+    .analysis-replay-shell {
+        background: linear-gradient(145deg, #111820 0%, #161b22 100%);
+        border: 1px solid #30363d; border-bottom: 0;
+        border-radius: 16px 16px 0 0; padding: 20px 22px 10px;
+        margin-top: 20px;
+    }
+    .analysis-replay-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
+    .analysis-replay-head h2 { margin:4px 0 3px; font-size:1.65rem; }
+    .analysis-replay-head p { margin:0; color:#8b949e; font-size:.9rem; }
+    .eyebrow,.priority-kicker { color:#29b6f6; font-size:.68rem; letter-spacing:.14em; font-weight:800; }
+    .replay-pill { border:1px solid rgba(41,182,246,.25); color:#8bd7ff; background:rgba(41,182,246,.07); border-radius:999px; padding:7px 10px; font-size:.68rem; font-weight:800; white-space:nowrap; }
+    .priority-card { margin:18px 0; padding:18px 20px; border:1px solid rgba(0,230,118,.22); background:linear-gradient(145deg, rgba(0,230,118,.08), rgba(17,24,32,.85)); border-radius:14px; }
+    .priority-title { font-size:1.15rem; font-weight:800; margin:4px 0 7px; }
+    .priority-copy { color:#c9d1d9; line-height:1.55; }
+    .analysis-empty { margin:20px 0; padding:30px; border:1px dashed #484f58; border-radius:16px; background:#111820; }
+    .analysis-empty-kicker { color:#8b949e; font-size:.7rem; letter-spacing:.14em; font-weight:800; }
+    .analysis-empty-title { font-size:1.3rem; font-weight:800; margin:5px 0; }
+    .analysis-empty-copy { color:#8b949e; }
+
     /* --- Streamlit column stacking on narrow viewports --- */
     @media (max-width: 768px) {
         /* Force Streamlit columns to stack on tablet/mobile */
@@ -314,6 +334,67 @@ def render_loader(message: str = "Loading PaceAI..."):
 def render_fullscreen_splash(message: str = "Loading PaceAI..."):
     """Full-viewport PaceAI preloader shown during app/model startup (self-fading)."""
     components.html(_PRELOADER_CSS + _paceai_preloader(message), height=560, scrolling=False)
+
+
+# ---------------- TERMINAL ANALYSIS BOX ----------------
+_PACEAI_STAGE_MAP = [
+    ("Video Ingestion", "Reading video frames"),
+    ("Cricket Scene Validation", "Validating pitch & cricket scene"),
+    ("Ball Detection", "Locating the ball"),
+    ("Bowler Tracking", "Tracking the bowler"),
+    ("Pose Estimation", "Detecting body landmarks..."),
+    ("Ball Trajectory", "Mapping ball trajectory"),
+    ("Biomechanical Analysis", "Extracting bowling biomechanics"),
+    ("Performance & Risk", "Scoring performance & injury risk"),
+]
+
+_PACEAI_LABEL_ORDER = ["Video loaded", "Cricket pre-check", "Ball detection",
+                       "Bowler detection", "Pose extraction", "Ball tracking",
+                       "Biomechanics", "ML analysis", "Complete"]
+
+
+def build_paceai_box(done: int, total: int, current_label: str) -> str:
+    """Render the monospace PACEAI ANALYSIS terminal box (✓ done / ● current / ○ pending)."""
+    pct = min(100, int(round(done / max(1, total) * 100)))
+    try:
+        cur = _PACEAI_LABEL_ORDER.index(current_label)
+    except ValueError:
+        cur = None
+    if cur is not None and cur < len(_PACEAI_STAGE_MAP):
+        detail = _PACEAI_STAGE_MAP[cur][1]
+        completed = cur
+    else:
+        detail = "Finalizing..."
+        completed = len(_PACEAI_STAGE_MAP)
+
+    W = 48
+
+    def _row(text="", center=False):
+        body = text.center(W - 4) if center else text.ljust(W - 4)
+        return "│ " + body + " │"
+
+    lines = [
+        "┌" + "─" * (W - 2) + "┐",
+        _row("PACEAI ANALYSIS", center=True),
+        _row(),
+        _row("ANALYZING DELIVERY", center=True),
+        _row(),
+        _row(f"{pct}%", center=True),
+        _row(),
+        _row("Extracting bowling biomechanics", center=True),
+        _row(),
+    ]
+    for i, (name, _d) in enumerate(_PACEAI_STAGE_MAP):
+        icon = "✓" if i < completed else ("●" if i == completed else "○")
+        lines.append(_row(f"{icon} {name}"))
+    lines.extend([
+        _row(),
+        "│ " + "─" * (W - 4) + " │",
+        _row("Current operation"),
+        _row(detail),
+        "└" + "─" * (W - 2) + "┘",
+    ])
+    return "\n".join(lines)
 
 
 # ---------------- HELPERS ----------------
@@ -1017,6 +1098,13 @@ with st.sidebar:
         denoise = st.checkbox("Denoise frames", value=denoise,
                               help="On = more accurate on noisy footage but much slower.")
 
+    with st.expander("🔧 Diagnostics"):
+        debug_overlay = st.checkbox(
+            "Draw debug overlay on Analysis Replay",
+            value=False,
+            help="Adds a diagnostic panel (locked bowler track id + cricket-evidence "
+                 "confidence + ball state) to the Analysis Replay video. Off by default.")
+
     with st.expander("🎬 Reels Settings"):
         slow_factor = st.slider(
             "Slow-motion factor", 1.5, 4.0, 2.5, step=0.1,
@@ -1105,7 +1193,12 @@ else:
             if not os.path.exists(config.POSE_MODEL_PATH):
                 st.warning("MediaPipe pose task model missing. Run pose downloader or manual entry.")
             else:
-                render_loader(f"Analyzing '{uploaded.name}'...")
+                _prog_ph = st.empty()
+                _prog_ph.text(build_paceai_box(0, len(_PACEAI_LABEL_ORDER), "Video loaded"))
+
+                def _stage_cb(done, total, label):
+                    _prog_ph.text(build_paceai_box(done, total, label))
+
                 try:
                     result = pipeline.analyze_video(
                         video_path,
@@ -1119,17 +1212,24 @@ else:
                         slow_factor=slow_factor,
                         zoom_end=zoom_end,
                         run_ml=False,
+                        progress_cb=_stage_cb,
+                        debug_overlay=debug_overlay,
                     )
+                    _prog_ph.empty()
                     feature_vector = result.feature_vector
                     st.session_state["video_stage_times"] = dict(result.stage_times or {})
                     st.session_state["video_upload_time"] = upload_time
                     st.session_state["last_warnings"] = list(result.warnings or [])
                     st.session_state["video_output_path"] = getattr(result, "video_path", None)
+                    st.session_state["pose_video_path"] = getattr(result, "pose_video_path", None)
                     st.session_state["reels_video_path"] = getattr(result, "reels_video_path", None)
+                    st.session_state["analysis_replay_path"] = getattr(result, "analysis_replay_path", None)
+                    st.session_state["analysis_key_moments"] = getattr(result, "key_moments", None) or getattr(result, "events", None) or []
                     st.session_state["ball_stats"] = getattr(result, "ball_stats", {})
                     st.success(f"Delivery processed ({target_fps} FPS)")
                 except Exception as e:
                     import traceback
+                    _prog_ph.empty()
                     tb = traceback.format_exc()
                     st.error(
                         "Video analysis failed. Please check that the file is a valid bowling "
@@ -1145,76 +1245,139 @@ else:
                 pass
 
 
-# ---------------- BALL TRACKING VIDEO ----------------
-if input_mode.startswith("📹") and st.session_state.get("video_output_path") and \
-        os.path.exists(st.session_state["video_output_path"]):
-    st.markdown("### 🎯 Ball Tracking Visualization")
-    st.caption("YOLO 'sports ball' detection + constant-velocity tracking. "
-               "Solid red box = detected ball, dashed red box = predicted through short gaps. "
-               "Cyan box = wrist-proxy (pre-release, from pose landmark), "
-               "yellow box = blended handoff (transition from wrist-proxy to detection). "
-               "The tracking stops at bat/pad/ground contact.")
-    bstats = st.session_state.get("ball_stats") or {}
-    c_vid, c_side = st.columns([3, 1])
-    with c_vid:
-        st.video(st.session_state["video_output_path"])
-    with c_side:
-        traj = bstats.get("trajectory") or []
-        n_det = bstats.get("n_detected", 0)
-        n_pred = bstats.get("n_interpolated", 0)
-        st.metric("Ball frames tracked", f"{n_det + n_pred}")
-        st.metric("Detected", n_det)
-        st.metric("Predicted (gaps)", n_pred)
-        st.metric("Avg speed (px/s)", f"{bstats.get('avg_speed_px_s', 0):.0f}")
+# ---------------- VIDEO OUTPUT REFERENCES ----------------
+# Keep intermediate outputs available for the technical diagnostics section.
+# The user-facing experience is rendered later, after ML results are available.
+_ball_vid = st.session_state.get("video_output_path") \
+    if os.path.exists(st.session_state.get("video_output_path") or "") else None
+_pose_vid = st.session_state.get("pose_video_path") \
+    if os.path.exists(st.session_state.get("pose_video_path") or "") else None
+_reels_vid = st.session_state.get("reels_video_path") \
+    if os.path.exists(st.session_state.get("reels_video_path") or "") else None
+_analysis_replay = st.session_state.get("analysis_replay_path") \
+    if os.path.exists(st.session_state.get("analysis_replay_path") or "") else None
 
-        # Tracking quality flag
-        coverage = bstats.get("coverage_pct", 0)
-        total_frames = bstats.get("n_frames", 1)
-        det_ratio = n_det / max(1, total_frames)
-        if det_ratio >= 0.7 and coverage >= 70:
-            quality_badge = "🟢 Tracking quality: HIGH"
-        elif det_ratio >= 0.4 and coverage >= 40:
-            quality_badge = "🟡 Tracking quality: MODERATE"
-        else:
-            quality_badge = "🔴 Tracking quality: LOW"
-        st.caption(quality_badge)
 
-        wrist_count = sum(
-            1 for p in (bstats.get("trajectory") or [])
-            if isinstance(p, dict) and p.get("source") == "wrist_proxy")
-        if not wrist_count:
-            # also check BallPoint objects from pipeline
-            wrist_count = bstats.get("wrist_proxy_frames", 0)
-        if wrist_count:
-            st.metric("Wrist-proxy frames", wrist_count,
-                      help="Pre-release frames estimated from bowling-arm wrist pose landmark")
-        if traj:
-            xs = [p[0] for p in traj]
-            ys = [p[1] for p in traj]
+def _video_key_moments(raw_events):
+    """Normalize optional pipeline event metadata without inventing events."""
+    if not raw_events:
+        return []
+    out = []
+    for item in raw_events:
+        if not isinstance(item, dict):
+            continue
+        label = item.get("label") or item.get("name") or item.get("event")
+        t = item.get("time_s", item.get("timestamp", item.get("time")))
+        if label is None or t is None:
+            continue
+        try:
+            t = max(0.0, float(t))
+        except (TypeError, ValueError):
+            continue
+        out.append({"label": str(label), "time_s": t})
+    return out
 
-            # Left/right arm normalization: mirror trajectory horizontally
-            # for left-arm bowlers so visualization is consistent
-            bowling_arm_val = bowling_arm.lower().split("-")[0] if "bowling_arm" in dir() else "right"
-            if bowling_arm_val == "left":
-                frame_width = 640  # default RESIZE_DIM
-                xs = [frame_width - x for x in xs]
-                traj_label = "Ball path (mirrored for left-arm)"
-            else:
-                traj_label = "Ball path"
 
-            fig = go.Figure(go.Scatter(x=xs, y=ys, mode="lines",
-                                       line=dict(color="#00e676", width=2), name=traj_label))
-            fig.add_trace(go.Scatter(x=[xs[0]], y=[ys[0]], mode="markers",
-                                     marker=dict(color="#00e676", size=10), name="Start"))
-            fig.add_trace(go.Scatter(x=[xs[-1]], y=[ys[-1]], mode="markers",
-                                     marker=dict(color="#ef5350", size=10), name="End"))
-            fig.update_yaxes(autorange="reversed")
-            fig.update_layout(height=260, paper_bgcolor="rgba(0,0,0,0)",
-                              plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#c9d1d9"),
-                              margin=dict(l=10, r=10, t=30, b=10),
-                              title=traj_label + " (image coords)")
-            st.plotly_chart(fig, width='stretch')
-    # Reels: slow-mo + zoom replay — disabled
+def render_analysis_replay(hero_video, result, feature_vector, ball_stats):
+    """Premium single-video analysis experience built entirely from real outputs."""
+    if not hero_video:
+        st.markdown("""
+        <div class="analysis-empty" role="status">
+          <div class="analysis-empty-kicker">ANALYSIS REPLAY</div>
+          <div class="analysis-empty-title">Replay unavailable</div>
+          <div class="analysis-empty-copy">The analysis completed, but a playable unified replay was not generated.</div>
+        </div>
+        """, unsafe_allow_html=True)
+        return
+
+    st.markdown("""
+    <section class="analysis-replay-shell" aria-label="PaceAI analysis replay">
+      <div class="analysis-replay-head">
+        <div>
+          <div class="eyebrow">PACEAI / DELIVERY ANALYSIS</div>
+          <h2>Analysis Replay</h2>
+          <p>One synchronized view of the bowling action, ball path and available pose evidence.</p>
+        </div>
+        <div class="replay-pill">● LIVE ANALYSIS DATA</div>
+      </div>
+    </section>
+    """, unsafe_allow_html=True)
+
+    st.video(hero_video)
+
+    moments = _video_key_moments(st.session_state.get("analysis_key_moments"))
+    if moments:
+        labels = [m["label"] for m in moments]
+        selected = st.selectbox("Jump to key moment", ["Start"] + labels, key="paceai_key_moment")
+        if selected != "Start":
+            selected_time = next(m["time_s"] for m in moments if m["label"] == selected)
+            st.video(hero_video, start_time=int(selected_time))
+            st.caption(f"Key moment: **{selected}** · {selected_time:.2f}s")
+    else:
+        st.caption("Use the native player controls for slow motion and frame-by-frame review. Key-event navigation will appear automatically when the pipeline provides event timestamps.")
+
+    bowler_id = getattr(result, "bowler_track_id", None)
+    bowler_conf = getattr(result, "bowler_confidence", None)
+    if bowler_id is not None:
+        conf_s = f" · confidence {bowler_conf:.2f}" if bowler_conf is not None else ""
+        st.caption(f"Bowler identity: locked to track **#{bowler_id}**{conf_s} "
+                   f"(cricket-evidence selection + identity lock; never swapped to batsman/keeper).")
+    else:
+        st.caption("Bowler identity: no bowler-like motion detected in this clip -- no bowler "
+                   "box/pose crop was applied (identity is never guessed).")
+
+    bstats = ball_stats or {}
+    n_det = int(bstats.get("n_detected", 0) or 0)
+    n_pred = int(bstats.get("n_interpolated", 0) or 0)
+    total_frames = max(1, int(bstats.get("n_frames", 1) or 1))
+    coverage = float(bstats.get("coverage_pct", 0) or 0)
+    det_ratio = n_det / total_frames
+    if det_ratio >= 0.7 and coverage >= 70:
+        quality = "HIGH"
+    elif det_ratio >= 0.4 and coverage >= 40:
+        quality = "MODERATE"
+    else:
+        quality = "LOW"
+
+    st.markdown("#### Key evidence")
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.metric("Release angle", f"{feature_vector.get('release_angle_deg', 0):.1f}°")
+    with m2:
+        st.metric("Front-knee flexion", f"{feature_vector.get('knee_flexion_deg', 0):.1f}°")
+    with m3:
+        st.metric("Tracking quality", quality)
+    with m4:
+        st.metric("Detected ball frames", n_det)
+
+    coaching = result.coaching_notes or []
+    if coaching:
+        st.markdown("""
+        <div class="priority-card" role="region" aria-label="Coaching priority">
+          <div class="priority-kicker">COACHING PRIORITY</div>
+          <div class="priority-title">What should I work on?</div>
+          <div class="priority-copy">""" + _esc(coaching[0]) + """</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with st.expander("Technical replay diagnostics", expanded=False):
+        if _ball_vid:
+            st.markdown("**Ball tracking render**")
+            st.video(_ball_vid)
+        if _pose_vid:
+            st.markdown("**Pose render**")
+            st.video(_pose_vid)
+        if _reels_vid:
+            st.markdown("**Slow-motion highlight render**")
+            st.video(_reels_vid)
+        if bstats:
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Tracked frames", n_det + n_pred)
+            c2.metric("Predicted gap frames", n_pred)
+            c3.metric("Coverage", f"{coverage:.0f}%")
+        if not (_ball_vid or _pose_vid or _reels_vid):
+            st.info("No intermediate video artifacts are available.")
+
 
 # ---------------- ANALYSIS & VISUALIZATION ----------------
 if feature_vector:
@@ -1299,6 +1462,9 @@ if feature_vector:
         """, unsafe_allow_html=True)
 
     render_plain_language_summary(result, risk_level, is_icc_legal, elbow_flex)
+
+    if input_mode.startswith("📹"):
+        render_analysis_replay(_analysis_replay, result, feature_vector, st.session_state.get("ball_stats") or {})
 
     render_ood_warnings(feature_vector, perf_bundle)
     render_ood_warnings(feature_vector, injury_bundle)

@@ -111,3 +111,55 @@ def landmark_dict(pose_frame: PoseFrame) -> dict:
         name: tuple(pose_frame.landmarks[i])
         for i, name in enumerate(config.POSE_LANDMARK_NAMES)
     }
+
+
+# MediaPipe pose bone connections (index pairs into POSE_LANDMARK_NAMES).
+# Same topology as the official PoseLandmarker POSE_CONNECTIONS.
+_SKELETON_CONNECTIONS = [
+    (11, 12),   # shoulders
+    (11, 13), (13, 15), (15, 17), (15, 19), (15, 21),  # left arm
+    (12, 14), (14, 16), (16, 18), (16, 20), (16, 22),  # right arm
+    (11, 23), (12, 24),  # shoulders -> hips
+    (23, 24),  # hips
+    (23, 25), (25, 27), (27, 29), (27, 31),  # left leg
+    (24, 26), (26, 28), (28, 30), (28, 32),  # right leg
+    (0, 11), (0, 12),   # nose -> shoulders
+    (0, 1), (1, 2), (2, 3), (0, 4), (4, 5), (5, 6),  # face
+]
+_SKELETON_POINTS = [0, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                    23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
+
+
+def draw_skeleton(frame_bgr: np.ndarray, pose_frame: PoseFrame,
+                  min_visibility: float = 0.4,
+                  bone_color=(0, 204, 255), joint_color=(255, 80, 80),
+                  thickness: int = 2) -> np.ndarray:
+    """Draw the pose skeleton (bones + joints) onto a BGR frame.
+
+    ``pose_frame.landmarks`` holds normalized (x, y, z, visibility) up to
+    (33, 4); landmarks below ``min_visibility`` are skipped so weak/temporary
+    joints don't flicker jagged bones. Returns a copy of the frame with the
+    overlay applied -- the caller decides where to draw it.
+    """
+    img = frame_bgr.copy()
+    h, w = img.shape[:2]
+    pts = {}
+    for i, name in enumerate(config.POSE_LANDMARK_NAMES):
+        if i >= pose_frame.landmarks.shape[0]:
+            break
+        x, y, z, vis = pose_frame.landmarks[i]
+        if vis < min_visibility:
+            continue
+        pts[i] = (int(round(x * w)), int(round(y * h)))
+
+    for a, b in _SKELETON_CONNECTIONS:
+        if a in pts and b in pts:
+            cv2.line(img, pts[a], pts[b], bone_color, thickness, cv2.LINE_AA)
+
+    for i in _SKELETON_POINTS:
+        if i in pts:
+            px, py = pts[i]
+            cv2.circle(img, (px, py), 4, joint_color, -1, cv2.LINE_AA)
+            cv2.circle(img, (px, py), 4, (255, 255, 255), 1, cv2.LINE_AA)
+
+    return img

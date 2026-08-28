@@ -1,6 +1,7 @@
 """Quick smoke test of the video pipeline to find what breaks."""
 import sys, os, traceback
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, PROJECT_ROOT)
 from src import config, preprocessing, tracking, pose_estimation
 from src import ball_tracking_v2 as ball_tracking
 from src import feature_engineering as feateng
@@ -8,7 +9,7 @@ from src import ml_models
 import numpy as np
 import cv2
 
-video_path = os.path.join(os.path.dirname(__file__), "test_synthetic.mp4")
+video_path = os.path.join(PROJECT_ROOT, "test_synthetic.mp4")
 
 # Create a tiny synthetic test video (no real bowler, just to test each stage)
 if not os.path.exists(video_path):

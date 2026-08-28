@@ -1032,13 +1032,135 @@ def _draw_dashed_rect(img, pt1, pt2, color, thickness, dash=6):
         _draw_dashed_line(img, a, b, color, thickness, dash)
 
 
+def _ffmpeg_transcode(src: str, dst: str, fps: float = 20.0) -> str:
+    """Re-encode any valid video to a browser-compatible H.264 MP4 (yuv420p).
+
+    Uses imageio-ffmpeg's bundled ffmpeg (guaranteed libx264). Deletes src on
+    success (it is only ever an intermediate temp file)."""
+    if imageio_ffmpeg is None:
+        raise RuntimeError("imageio-ffmpeg unavailable; cannot transcode to H.264.")
+    exe = imageio_ffmpeg.get_ffmpeg_exe()
+    src_w = src.replace("\\", "/") if os.name == "nt" else src
+    dst_w = dst.replace("\\", "/") if os.name == "nt" else dst
+    cmd = [exe, "-y", "-i", src_w, "-an",
+           "-c:v", "libx264", "-pix_fmt", "yuv420p",
+           "-r", str(float(fps)), "-crf", "23", "-preset", "veryfast",
+           "-movflags", "+faststart", dst_w]
+    creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+    proc = subprocess.run(cmd, stdin=subprocess.DEVNULL,
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          creationflags=creation_flags)
+    if proc.returncode != 0 or not os.path.exists(dst) or os.path.getsize(dst) == 0:
+        raise RuntimeError(
+            "ffmpeg transcode to H.264 failed: "
+            + (proc.stderr or b"").decode(errors="replace")[-400:])
+    try:
+        os.remove(src)
+    except OSError:
+        pass
+    return dst
+
+
+def _normalize_frames(frames):
+    """Return frames list where every image is a contiguous 3-channel BGR array
+    with identical (h, w). Invalid/None/gray/RGBA frames are skipped safely so a
+    single bad frame can never corrupt or stall the whole video."""
+    out = []
+    target_shape = None
+    for _idx, _ts, frame in frames:
+        if frame is None:
+            continue
+        arr = np.asarray(frame)
+        if arr.ndim == 2:                      # grayscale -> BGR
+            arr = cv2.cvtColor(arr, cv2.COLOR_GRAY2BGR)
+        elif arr.ndim == 3 and arr.shape[2] == 4:  # RGBA/BGRA -> BGR
+            arr = cv2.cvtColor(arr, cv2.COLOR_RGBA2BGR)
+        if arr.ndim != 3 or arr.shape[2] != 3:
+            continue
+        if not arr.flags["C_CONTIGUOUS"]:
+            arr = np.ascontiguousarray(arr)
+        arr = np.ascontiguousarray(arr)
+        h, w = arr.shape[:2]
+        if target_shape is None:
+            target_shape = (h, w)
+        elif (h, w) != target_shape:           # consistent dims required
+            arr = cv2.resize(arr, (target_shape[1], target_shape[0]),
+                             interpolation=cv2.INTER_LINEAR)
+        out.append(arr)
+    return out
+
+
+def validate_video(path: str) -> dict:
+    """Inspect a video file and confirm it is a real, decodable, non-empty MP4.
+
+    Returns a dict of detected properties. Raises a clear error if the file is
+    missing, empty, unreadable, has no decodable frames, or no valid FPS."""
+    if not os.path.exists(path):
+        raise RuntimeError(f"Video file does not exist: {path}")
+    size = os.path.getsize(path)
+    if size <= 0:
+        raise RuntimeError(f"Video file is empty: {path}")
+
+    cap = cv2.VideoCapture(path)
+    if not cap.isOpened():
+        cap.release()
+        raise RuntimeError(f"Video could not be opened (invalid container/codec): {path}")
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if not (w > 0 and h > 0):
+        cap.release()
+        raise RuntimeError(f"Video has invalid dimensions {w}x{h}: {path}")
+    if not (fps and fps > 0):
+        cap.release()
+        raise RuntimeError(f"Video has invalid FPS ({fps}): {path}")
+
+    # Actually decode at least the first frame.
+    ok, frame = cap.read()
+    cap.release()
+    if not ok or frame is None or frame.size == 0:
+        raise RuntimeError(f"Video has no decodable frames: {path}")
+
+    # Read stream info via ffmpeg, if available, to confirm it is H.264/MP4.
+    container = codec = None
+    if imageio_ffmpeg is not None:
+        try:
+            exe = imageio_ffmpeg.get_ffmpeg_exe()
+            p = subprocess.run([exe, "-hide_banner", "-i", path],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            info = (p.stderr or b"").decode(errors="replace")
+            for line in info.splitlines():
+                if "Duration:" in line and "start:" in line:
+                    container = "MP4" if line.lower().find("mp4") >= 0 else "video"
+                if "Video:" in line:
+                    codec = line.split("Video:")[-1].split(",")[0].strip()
+        except Exception:
+            pass
+
+    return {
+        "path": path, "exists": True, "size": size,
+        "fps": float(fps), "width": w, "height": h,
+        "frames": n, "duration_s": round(float(n) / float(fps), 3) if fps > 0 else 0.0,
+        "container": container, "codec": codec,
+    }
+
+
 def write_mp4(frames, path: str, fps: float) -> str:
-    """Encode frames (idx, ts, img) as an H.264 MP4 via imageio-ffmpeg's
-    bundled ffmpeg (libx264). Returns the output path."""
+    """Encode frames (idx, ts, img) to a browser-compatible H.264 MP4.
+
+    Frames are normalized to consistent BGR dimensions, then encoded with
+    imageio-ffmpeg's bundled ffmpeg (libx264). If that path fails, frames are
+    written with OpenCV to an intermediate temp file and transcoded to H.264 —
+    the final file is ALWAYS H.264/MP4 so the browser can play it. The output
+    is validated before being returned."""
     if not frames:
         raise ValueError("No frames to write")
-    h, w = frames[0][2].shape[:2]
-    # On Windows, ffmpeg needs forward-slash paths to avoid backslash escaping issues
+    fps = float(fps) if (fps and fps > 0) else 20.0
+    frames = _normalize_frames(frames)
+    if not frames:
+        raise ValueError("No valid frames to write after normalization")
+    h, w = frames[0].shape[:2]
     win_path = path.replace("\\", "/") if os.name == "nt" else path
 
     if imageio_ffmpeg is not None:
@@ -1047,19 +1169,24 @@ def write_mp4(frames, path: str, fps: float) -> str:
             cmd = [
                 exe, "-y",
                 "-f", "rawvideo", "-vcodec", "rawvideo",
-                "-s", f"{w}x{h}", "-pix_fmt", "bgr24", "-r", str(float(fps)),
+                "-s", f"{w}x{h}", "-pix_fmt", "bgr24", "-r", str(fps),
                 "-i", "-",
                 "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
                 "-crf", "23", "-preset", "veryfast",
+                "-movflags", "+faststart",
                 win_path,
             ]
             creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+            # stdout/stderr to DEVNULL: we never drain these pipes here, and an
+            # unread pipe can fill and deadlock proc.wait() (a real cause of
+            # "successful" writes that silently fall back to a broken codec).
             proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                                    stderr=subprocess.PIPE,
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL,
                                     creationflags=creation_flags)
             try:
-                for _idx, _ts, frame in frames:
-                    proc.stdin.write(np.ascontiguousarray(frame).tobytes())
+                for frame in frames:
+                    proc.stdin.write(frame.tobytes())
             except (BrokenPipeError, OSError):
                 pass
             try:
@@ -1068,26 +1195,39 @@ def write_mp4(frames, path: str, fps: float) -> str:
                 pass
             proc.wait()
             if proc.returncode == 0 and os.path.exists(path) and os.path.getsize(path) > 0:
+                validate_video(path)
                 return path
         except Exception:
             pass
 
-    # Fallback: OpenCV MPEG-4 Part 2 (plays locally but not in browsers).
-    writer = None
-    for codec in ("mp4v", "avc1"):
-        vw = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*codec), float(fps), (w, h))
-        if vw.isOpened():
-            writer = vw
-            break
-        vw.release()
-    if writer is None:
-        raise RuntimeError("Could not open any video writer for ball-tracking output")
+    # Fallback: OpenCV write to an intermediate temp, then transcode to H.264.
+    fd, tmp = tempfile.mkstemp(suffix=".mp4", prefix="paceai_intermediate_")
+    os.close(fd)
     try:
-        for _idx, _ts, frame in frames:
-            writer.write(frame)
+        writer = None
+        for codec in ("mp4v", "avc1"):
+            vw = cv2.VideoWriter(tmp, cv2.VideoWriter_fourcc(*codec), fps, (w, h))
+            if vw.isOpened():
+                writer = vw
+                break
+            vw.release()
+        if writer is None:
+            raise RuntimeError("Could not open any video writer for output")
+        try:
+            for frame in frames:
+                writer.write(frame)
+        finally:
+            writer.release()
+        _ffmpeg_transcode(tmp, path, fps=fps)
+        validate_video(path)
+        return path
     finally:
-        writer.release()
-    return path
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
 
 
 def make_output_path(prefix: str = "ball_track_") -> str:

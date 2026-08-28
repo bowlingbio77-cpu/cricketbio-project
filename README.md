@@ -39,7 +39,7 @@ wget -O models/pose_landmarker_heavy.task \
   https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task
 
 # Train demo models (synthetic data) so the dashboard has something to load
-python train_demo_model.py --model random_forest
+python scripts/train_demo_model.py --model random_forest
 ```
 
 ## Setting up YOLO11 detection + ByteTrack tracking specifically
@@ -108,16 +108,17 @@ Two pages in the sidebar:
 
 ```
 cricket_biomech_ai/
-├── app.py                    # Streamlit dashboard
-├── train_demo_model.py       # trains & saves performance/injury models
-├── train_sports_injury_model.py  # trains injury models on real datasets (see below)
+├── app.py                    # Streamlit dashboard entry point
+├── chat_assistant.py         # Sidebar Ollama chat assistant widget
 ├── requirements.txt
-├── src/
+├── pyproject.toml            # project metadata + pytest/ruff/mypy tooling
+├── src/                      # core application package
 │   ├── config.py             # paths, thresholds, feature list, landmark names
 │   ├── preprocessing.py      # frame extraction, resize, denoise
 │   ├── detection.py          # YOLOv11 bowler detection (+ HOG fallback)
 │   ├── tracking.py           # ByteTrack (+ IoU fallback)
-│   ├── pose_estimation.py    # MediaPipe 33-landmark pose extraction
+│   ├── ball_tracking_v2.py   # cricket-ball tracking + annotated video renderer
+│   ├── pose_estimation.py    # MediaPipe 33-landmark pose + skeleton overlay
 │   ├── feature_engineering.py# 10 biomechanical features from landmarks
 │   ├── ml_models.py          # RF / XGBoost / CatBoost / CNN-LSTM / Transformer
 │   ├── explainability.py     # SHAP (+ permutation-importance fallback)
@@ -126,12 +127,23 @@ cricket_biomech_ai/
 │   ├── synthetic_data.py     # generates a plausible demo dataset
 │   ├── sports_injury_data.py # multimodal sports-injury dataset prep + sequences
 │   ├── cricket_injury_data.py# cricket player-season dataset prep
-│   └── pipeline.py           # orchestrates the full video→coaching flow
-├── models/                   # trained model bundles (.joblib) + pose model (.task)
-├── data/                     # synthetic_bowling_dataset.csv, injury CSVs (generated)
-└── scripts/
-    ├── setup_yolo.sh          # installs ultralytics, downloads yolo11n.pt, checks bytetrack.yaml
-    └── test_yolo_detection.py # verifies detection+tracking on a real clip, saves annotated frames
+│   ├── pipeline.py           # orchestrates the full video→coaching flow
+│   └── video_validity.py     # cricket-video validity pre-check gate
+├── scripts/                  # one-off / training / tooling entry points
+│   ├── train_demo_model.py       # trains & saves performance/injury models
+│   ├── train_sports_injury_model.py
+│   ├── smoke_test_video_pipeline.py  # end-to-end CV stage smoke test
+│   ├── setup_yolo.sh          # installs ultralytics, downloads weights, checks bytetrack.yaml
+│   ├── test_yolo_detection.py # verifies detection+tracking on a real clip
+│   ├── train_yolo.py          # fine-tune YOLOv11 on the ball dataset
+│   └── ...                    # extract_features, auto_label, gen_gt_clips, eval, etc.
+├── tests/                    # pytest suite (run: python -m pytest)
+├── models/                   # trained model bundles (.joblib/.json) + pose model (.task) + yolo11n.pt
+├── data/                     # datasets (synthetic, injury CSVs, gt_clips, ball dataset)
+├── assets/                   # static assets (loading overlay HTML)
+├── evaluation/               # ball-tracker ground-truth evaluation harness
+├── docs/screenshots/         # screenshots
+└── README.md
 ```
 
 ## Using real data
@@ -142,7 +154,7 @@ ideally scored by a coach/biomechanist and a sports-medicine team —
 retrain with:
 
 ```bash
-python train_demo_model.py --data your_labeled_dataset.csv --model xgboost
+python scripts/train_demo_model.py --data your_labeled_dataset.csv --model xgboost
 ```
 
 CSV columns required: the 10 names in `src/config.FEATURE_NAMES`, plus

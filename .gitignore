@@ -5,13 +5,15 @@ venv/
 # Python bytecode / caches
 __pycache__/
 *.py[cod]
+.pytest_cache/
 
 # Downloaded model weights (committed so Video Motion Capture works on
-# Streamlit Cloud without a runtime download step)
+# Streamlit Cloud without a runtime download step). The YOLO weights live in
+# models/ (see src/config.py: YOLO_WEIGHTS = models/yolo11n.pt).
 !models/pose_landmarker_heavy.task
-!yolo11n.pt
+!models/yolo11n.pt
 
-# Trained model bundles ARE committed (retrain with train_demo_model.py)
+# Trained model bundles ARE committed (retrain with scripts/train_demo_model.py)
 !models/*.joblib
 
 # User-local runtime data (history DB regenerated automatically -- not committed)

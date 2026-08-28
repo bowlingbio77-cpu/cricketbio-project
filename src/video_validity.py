@@ -156,7 +156,16 @@ def check_human_pose(pose_sequence: List[PoseFrame],
     score = 3 * min(torso_frac, 1.0) + 2 * min(arm_frac, 1.0) + 1 * min(posture_frac, 1.0)
     score = min(score / 6.0, 1.0)
 
-    ok = (torso_ok >= min_frames and posture_frac >= 0.5 and arm_frac >= 0.2)
+    # A clear, upright human torso is enough to treat the clip as containing a
+    # person. Arms are a *soft* signal: a small/far-away bowler (or an
+    # occlusion) often yields undetectable wrist/elbow landmarks even though a
+    # person is plainly present, so arms must NOT be a hard requirement here.
+    # We only fall back to requiring arms when the posture is too ambiguous
+    # (neither clearly upright nor clearly prone) to call it a bowler on its own.
+    posture_good = posture_frac >= 0.5
+    arms_good = arm_frac >= 0.2
+    ok = (torso_ok >= min_frames and
+          (posture_good or arms_good))
     reason = (f"Human pose detected on {torso_ok}/{n} frames "
               f"(torso {torso_frac:.0%}, arms {arm_frac:.0%}).") if ok else \
              (f"Only {torso_ok}/{n} frames with a clear human torso "

@@ -21,7 +21,7 @@ Requirements:
 
 Configuration (environment variables):
     OLLAMA_BASE_URL  - Base URL of the Ollama server (default: http://localhost:11434)
-    OLLAMA_MODEL     - Model name to use (default: llama3.1)
+    OLLAMA_MODEL     - Model name to use (default: llama3.2:1b)
     OLLAMA_TIMEOUT   - Request timeout in seconds (default: 30)
 """
 
@@ -37,7 +37,7 @@ import streamlit as st
 
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_URL = f"{OLLAMA_BASE_URL.rstrip('/')}/api/chat"
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:1b")
 OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "30"))
 
 _MAX_RESPONSE_CHARS = 4000  # sanity cap on LLM output displayed in UI
