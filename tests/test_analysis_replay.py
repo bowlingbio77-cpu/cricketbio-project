@@ -74,6 +74,54 @@ def test_debug_panel_only_when_requested():
     assert _count_color(img2, analysis_replay._DEBUG_TEXT) == 0
 
 
+def test_landmarks_to_full_pixels_maps_through_bbox():
+    from src.pose_estimation import PoseFrame
+    lm = np.zeros((33, 4))
+    for i in range(33):
+        lm[i] = [0.5, 0.5, 0.0, 0.9]
+    pf = PoseFrame(0, 0.0, lm, np.zeros((33, 3)))
+    frame_dims = (90, 160)
+    bboxes = {0: (40, 20, 120, 80)}
+    pts = analysis_replay._landmarks_to_full_pixels(
+        pf, bboxes, frame_dims, min_visibility=0.4, in_full_frame=False)
+    # landmark 0.5,0.5 in the crop (40,20,120,80) -> center (80, 50)
+    assert pts[0] == (80, 50)
+
+
+def test_landmarks_to_full_pixels_full_frame_mode_ignores_bbox():
+    from src.pose_estimation import PoseFrame
+    lm = np.zeros((33, 4))
+    for i in range(33):
+        lm[i] = [0.5, 0.5, 0.0, 0.9]
+    pf = PoseFrame(0, 0.0, lm, np.zeros((33, 3)))
+    frame_dims = (90, 160)
+    # even with an empty bbox map, full-frame mode maps 0.5,0.5 -> center (80, 45)
+    pts = analysis_replay._landmarks_to_full_pixels(
+        pf, {}, frame_dims, min_visibility=0.4, in_full_frame=True)
+    assert pts[0] == (80, 45)
+    # default crop mode with no bbox for this frame -> nothing
+    pts2 = analysis_replay._landmarks_to_full_pixels(
+        pf, {}, frame_dims, min_visibility=0.4, in_full_frame=False)
+    assert pts2 == {}
+
+
+def test_render_analysis_replay_accepts_full_frame_pose(tmp_path):
+    from src.pose_estimation import PoseFrame
+    frames = [(0, 0.0, _frame()), (1, 0.05, _frame())]
+    lm = np.zeros((33, 4))
+    for i in range(33):
+        lm[i] = [0.3 + 0.01 * i, 0.4, 0.0, 0.9]
+    pose_seq = [PoseFrame(0, 0.0, lm, np.zeros((33, 3))),
+                PoseFrame(1, 0.05, lm, np.zeros((33, 3)))]
+    out = tmp_path / "replay_full_pose.mp4"
+    path = analysis_replay.render_analysis_replay(
+        frames, [], pose_seq, {}, release_frame=None, output_path=str(out),
+        fps=5.0, frame_dims=(90, 160), debug=False, pose_in_full_frame=True,
+    )
+    assert path == str(out)
+    assert out.exists() and out.stat().st_size > 0
+
+
 def test_render_analysis_replay_writes_playable_file(tmp_path):
     frames = [(i, 0.05 * i, _frame()) for i in range(4)]
     traj = [

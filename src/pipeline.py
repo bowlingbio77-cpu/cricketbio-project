@@ -454,23 +454,58 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         bowler_confidence = None
     timings["detection_tracking"] = time.perf_counter() - t0
 
-    # 4-5: pose estimation -> 33 landmarks/frame. When a bowler crop exists, only
-    # the bowler's own frames are fed to the pose model (identity lock: a missing
-    # bowler never becomes a batsman). frame_idx is preserved by the estimator, so
-    # wrist-proxy / replay mappings (keyed by frame idx) keep working.
-    t0 = time.perf_counter()
+    # 4-5: pose estimation -> 33 landmarks/frame.
+    #
+    # Preferred (identity-lock) path: when a bowler crop exists, ONLY the
+    # bowler's own frames are fed to the pose model (a missing bowler never
+    # becomes a batsman). If that snapshot is too weak (tiny/fast crop,
+    # occlusion) the pipeline DEGRADES instead of failing:
+    #   level 1 -> all cropped frames (matches the pre-crop-clip behaviour)
+    #   level 2 -> original pre-crop FULL frames (never needed when the cricket
+    #              pre-check already proved a visible human pose, but kept so a
+    #              genuinely hard clip still analyses instead of erroring).
+    # `pose_source` records which coordinate space the landmarks live in so the
+    # wrist-proxy / overlay / replay consumers map pixels correctly.
+    attempts = []
     if bowler_bboxes:
-        frames_pose = [(idx, ts, fr) for idx, ts, fr in frames if idx in bowler_bboxes]
-    else:
-        frames_pose = list(frames)
-    with pose_estimation.PoseEstimator() as estimator:
-        pose_sequence = estimator.process_video_frames(iter(frames_pose))
-    timings["pose_estimation"] = time.perf_counter() - t0
+        attempts.append(("bowler_crops", [
+            (idx, ts, fr) for idx, ts, fr in frames if idx in bowler_bboxes]))
+    attempts.append(("all_frames", list(frames)))
+    if frames_full is not None:
+        attempts.append(("full_frames", list(frames_full)))
+    pose_source = None
+    pose_sequence = []
+    for name, src in attempts:
+        t0 = time.perf_counter()
+        with pose_estimation.PoseEstimator() as estimator:
+            pose_sequence = estimator.process_video_frames(iter(src))
+        if name == "bowler_crops":
+            timings["pose_estimation"] = time.perf_counter() - t0
+        else:
+            timings[f"pose_fallback_{name}"] = time.perf_counter() - t0
+        if len(pose_sequence) >= 3:
+            pose_source = name
+            break
+        pose_sequence = []
+
+    if pose_source is None:
+        # No usable person pose in ANY coordinate space: genuinely not a usable
+        # bowling video (blurry, cut mid-run-up, framed too wide, no person).
+        counts = ", ".join(f"{n}: {len(s)}" for n, s in attempts)
+        raise RuntimeError(
+            "No usable pose found in this clip "
+            f"(pose frames per fallback level -> {counts}). The video may be "
+            "blurry, cut mid-run-up, or framed too wide. Please try a clip "
+            "where the bowler is clearly visible for about a second."
+        )
+    if pose_source != "bowler_crops":
+        warnings.append(
+            "Pose estimation: bowler-bound pose was too weak (<3 frames); "
+            f"fell back to {pose_source.replace('_', ' ')}. If the skeleton "
+            "looks loose, enable the debug overlay to inspect the bowler lock."
+        )
     _progress("Bowler detection")
     _progress("Pose extraction")
-
-    if len(pose_sequence) < 3:
-        raise RuntimeError("Not enough frames with a detected pose -- check video quality/framing.")
 
     # 6: biomechanical feature engineering (+ delivery-quality diagnostics)
     t0 = time.perf_counter()
@@ -486,6 +521,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
 
     # 6b: wrist-proxy pre-release ball trajectory augmentation
     if (track is not None and bowler_bboxes is not None
+            and pose_source != "full_frames"
             and original_frame_dims is not None and pose_sequence):
         release_frame = diagnostics.get("release_frame_idx")
         wrist_pos = _extract_wrist_pixel_positions(
@@ -515,6 +551,8 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         missing = []
         if bowler_bboxes is None:
             missing.append("no bowler crop (detection needed)")
+        if pose_source == "full_frames":
+            missing.append("full-frame pose (weak bowler lock)")
         if original_frame_dims is None:
             missing.append("no frame dimensions")
         if not pose_sequence:
@@ -522,13 +560,15 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         warnings.append(f"Wrist-proxy skipped: {', '.join(missing)}.")
 
     # 6c: pose-skeleton overlay video (used as the ball-tracking fallback, and
-    # as an always-available "show the AI working" clip). Drawn on the same
-    # (bowler-cropped) frames the pose was estimated on.
+    # as an always-available "show the AI working" clip). Drawn on the frames
+    # the pose was actually estimated on: bowler crops for crop-space landmarks,
+    # the original full frames when pose fell back to full-frame space.
     pose_video_path = None
     try:
         pose_by_idx = {pf.frame_idx: pf for pf in pose_sequence}
+        overlay_frames = frames if pose_source != "full_frames" else (frames_full or frames)
         overlays = []
-        for idx, ts, fr in frames:
+        for idx, ts, fr in overlay_frames:
             pf = pose_by_idx.get(idx)
             img = fr if pf is None else pose_estimation.draw_skeleton(fr, pf)
             overlays.append((idx, ts, img))
@@ -615,6 +655,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
                 debug=debug_overlay,
                 bowler_track_id=bowler_track_id,
                 bowler_confidence=bowler_confidence,
+                pose_in_full_frame=pose_source == "full_frames",
             )
             warnings.append(f"Analysis Replay generated: {analysis_replay_path}")
     except Exception as exc:

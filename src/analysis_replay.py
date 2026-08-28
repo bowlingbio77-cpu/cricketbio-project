@@ -8,7 +8,11 @@ pipeline.analyze_video():
     * full-frame frames           -> original footage
     * ball tracking trajectory    -> ball box + path            (full-frame px)
     * pose landmarks              -> skeleton                   (crop-normalized
-                                                                  -> full-frame px)
+                                                                  -> full-frame px;
+                                                                  full-frame-normalized
+                                                                  when the pipeline's
+                                                                  bowler-pose lock failed
+                                                                  and it fell back)
     * bowler crop bboxes          -> crop->full landmark mapping
     * release frame               -> release-point marker
     * ball stats                  -> real frame / speed info
@@ -54,20 +58,33 @@ def _clamp_pt(x, y, w, h):
 
 
 def _landmarks_to_full_pixels(pose_frame, bowler_bboxes, frame_dims,
-                              min_visibility=0.4):
-    """Map crop-normalized MediaPipe landmarks to full-frame pixel coords.
+                              min_visibility=0.4, in_full_frame=False):
+    """Map pose landmarks to full-frame pixel coords.
+
+    `in_full_frame=False` (default): landmarks are normalized to the bowler crop
+    bbox -- map them back through the real crop bbox of this frame.
+    `in_full_frame=True`: landmarks are normalized to the whole frame straight
+    from the pose model -- full-frame pixel coords are direct.
 
     Returns dict landmark_idx -> (px, py). Weak/out-of-bbox landmarks omitted.
     """
+    fh, fw = frame_dims
+    out = {}
+    lm = pose_frame.landmarks
+    if in_full_frame:
+        for i in range(min(lm.shape[0], len(config.POSE_LANDMARK_NAMES))):
+            x, y, z, vis = lm[i]
+            if vis < min_visibility:
+                continue
+            px, py = _clamp_pt(float(x) * fw, float(y) * fh, fw, fh)
+            out[i] = (px, py)
+        return out
     bbox = bowler_bboxes.get(pose_frame.frame_idx)
     if bbox is None:
         return {}
     bx1, by1, bx2, by2 = bbox
     crop_w = max(1.0, bx2 - bx1)
     crop_h = max(1.0, by2 - by1)
-    fh, fw = frame_dims
-    out = {}
-    lm = pose_frame.landmarks
     for i in range(min(lm.shape[0], len(config.POSE_LANDMARK_NAMES))):
         x, y, z, vis = lm[i]
         if vis < min_visibility:
@@ -181,7 +198,7 @@ def _draw_header(img, frame_idx, release_frame, frame_w):
 def render_analysis_replay(
     frames,                # list[(idx, ts, BGR_full)]
     trajectory,            # list[BallPoint] full-frame coords (merged display track)
-    pose_sequence,         # list[PoseFrame] (crop-normalized landmarks)
+    pose_sequence,         # list[PoseFrame] landmarks
     bowler_bboxes,         # dict frame_idx -> (x1,y1,x2,y2) full-frame crop bbox
     release_frame,         # int | None
     output_path,           # str
@@ -191,6 +208,7 @@ def render_analysis_replay(
     debug: bool = False,
     bowler_track_id=None,       # int | None  (locked bowler identity)
     bowler_confidence=None,     # float | None
+    pose_in_full_frame: bool = False,  # landmarks normalized to the full frame
 ) -> str:
     """Render ONE synchronized analysis video. Returns the output path.
 
@@ -220,7 +238,8 @@ def render_analysis_replay(
     pose_px = {}
     for pf in pose_sequence:
         pose_px[pf.frame_idx] = _landmarks_to_full_pixels(
-            pf, bowler_bboxes, frame_dims, min_visibility=min_visibility)
+            pf, bowler_bboxes, frame_dims, min_visibility=min_visibility,
+            in_full_frame=pose_in_full_frame)
 
     ordered_idx_set = set(ordered_idx)
 
