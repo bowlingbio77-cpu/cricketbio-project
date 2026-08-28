@@ -435,11 +435,10 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
             crop_stats = {"track_id": bowler.track_id, "frames_tracked": len(bowler)}
             bowler_track_id = bowler_meta["track_id"] if bowler_meta else bowler.track_id
             bowler_confidence = bowler_meta.get("confidence") if bowler_meta else None
+            conf_txt = f"{bowler_confidence:.2f}" if bowler_confidence is not None else "n/a"
             warnings.append(
                 f"Detection/tracking: locked to bowler track #{bowler_track_id} "
-                f"({len(bowler)} frames, confidence "
-                f"{bowler_confidence:.2f if bowler_confidence is not None else 'n/a'}) "
-                f"before pose estimation."
+                f"({len(bowler)} frames, confidence {conf_txt}) before pose estimation."
             )
         else:
             bowler_track_id = None
