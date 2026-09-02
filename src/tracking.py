@@ -177,6 +177,10 @@ BOWLER_W_STRAIGHT = 0.8  # straightness of the run-up path (not random wander)
 BOWLER_W_RANGE = 0.8     # spatial coverage of the center path in the frame
 BOWLER_W_BAND = 0.4      # mostly inside the frame's central band (the runway)
 BOWLER_W_DECEL = 0.2     # bowler slows late in the clip (plant + delivery)
+BOWLER_W_VERT = 1.5      # vertical-motion bias: bowlers run toward camera (Y-axis),
+                          # batters swing horizontally (X-axis); rewards Y-dominant paths
+BOWLER_W_DELIVERY = 1.0  # delivery-phase signature: late vertical drop + size change
+                          # unique to bowling action (not present in batting)
 
 # No-bowler gate: if the best track shows almost no real movement, the clip has
 # no confidently-detected bowler -- return None (honest) instead of boxing a
@@ -275,6 +279,31 @@ def _score_components(tr: Track, diag: float, n_total: int,
         if overall > 1e-6 and late < overall * 0.85:
             decel = float(np.clip(1.0 - late / (overall * 0.85), 0.0, 1.0))
 
+    # Vertical-motion bias: bowlers run toward/away from camera (Y-axis
+    # dominant), while batters swing bats horizontally (X-axis dominant).
+    # Compute per-step vertical fraction and average it.
+    vert = 0.0
+    if len(centers) >= 2:
+        dy = np.abs(np.diff(centers[:, 1]))
+        dx = np.abs(np.diff(centers[:, 0]))
+        total_dist = dy + dx + 1e-6
+        vert_fracs = dy / total_dist  # 1.0 = pure vertical, 0.0 = pure horizontal
+        vert = float(np.mean(vert_fracs))
+
+    # Delivery-phase signature: detect the characteristic late vertical drop
+    # (bowler's center moves DOWN as they plant and deliver) combined with
+    # size change. This is unique to bowling -- batters don't drop vertically.
+    delivery = 0.0
+    if len(centers) >= 6 and len(areas) >= 6:
+        third = max(2, len(centers) // 3)
+        late_dy = float(np.mean(np.diff(centers[-third:, 1])))  # positive = downward
+        early_dy = float(np.mean(np.diff(centers[:third, 1])))
+        # Late phase should move downward (positive dy) more than early
+        if late_dy > early_dy + 0.005 * frame_h:
+            # Also check size change in late phase
+            late_growth = float(np.mean(areas[-third:] / max(np.mean(areas[:third]), 1e-6)))
+            delivery = float(np.clip(np.tanh(late_growth - 1.0) * min(1.0, (late_dy - early_dy) / (0.02 * frame_h)), 0.0, 1.0))
+
     return {
         "motion": float(motion),
         "active": float(active),
@@ -284,6 +313,8 @@ def _score_components(tr: Track, diag: float, n_total: int,
         "range": float(range_cov),
         "band": float(band),
         "decel": float(decel),
+        "vert": float(vert),
+        "delivery": float(delivery),
     }
 
 
@@ -297,6 +328,8 @@ def _weighted_score(comps: dict) -> float:
         "range": BOWLER_W_RANGE,
         "band": BOWLER_W_BAND,
         "decel": BOWLER_W_DECEL,
+        "vert": BOWLER_W_VERT,
+        "delivery": BOWLER_W_DELIVERY,
     }
     total = float(sum(w[k] * comps[k] for k in w))
     return total / float(sum(w.values()))
@@ -429,13 +462,29 @@ def select_bowler_track_with_meta(tracks: Dict[int, Track], frame_dims=None,
     frame_diag = float(np.hypot(frame_w, frame_h))
     ranked = score_bowler_tracks(tracks, frame_dims, total_frames)
     best = ranked[0]
+    # Debug: log top-3 candidates so we can see why the wrong person won
+    import logging
+    _log = logging.getLogger(__name__)
+    if len(ranked) > 1:
+        _log.info(
+            "Bowler selection top-%d: %s",
+            min(3, len(ranked)),
+            [(r["track_id"], f"score={r['score']:.3f}",
+              f"motion={r['motion']:.3f}", f"active={r['active']:.3f}",
+              f"growth={r['growth']:.3f}", f"vert={r['vert']:.3f}",
+              f"delivery={r['delivery']:.3f}", f"frames={r['n_frames']}")
+             for r in ranked[:3]])
     if best["motion"] < BOWLER_MIN_MOTION_FRACTION and best["active"] < BOWLER_MIN_ACTIVE_FRACTION:
+        _log.info("No bowler: best motion=%.3f active=%.3f below thresholds",
+                  best["motion"], best["active"])
         return None, None
     winner = _stitch_continuations(tracks[best["track_id"]], tracks, frame_diag)
     best["track_id"] = winner.track_id
     best["n_frames"] = len(winner)
     best["start_frame"] = winner.frames[0] if winner.frames else None
     best["end_frame"] = winner.frames[-1] if winner.frames else None
+    _log.info("Selected bowler track #%d (score=%.3f, frames=%d)",
+              winner.track_id, best["score"], len(winner))
     return winner, best
 
 
