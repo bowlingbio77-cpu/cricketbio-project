@@ -384,6 +384,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
             ball_stats["release_idx"] = track_stats.get("release_idx")
             ball_stats["impact_idx"] = impact_idx
             ball_stats["outcome"] = track_stats.get("outcome")
+            ball_stats["total_frames"] = int(track_stats.get("total_frames") or len(frames))
             ball_stats["coverage_pct"] = (ball_stats.get("n_frames", 0) / max(1, len(frames))) * 100
             warnings.append(
                 f"Ball tracking: {ball_stats['n_detected']} detected + "
@@ -537,6 +538,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
             ball_stats["release_idx"] = track_stats.get("release_idx")
             ball_stats["impact_idx"] = impact_idx
             ball_stats["outcome"] = track_stats.get("outcome")
+            ball_stats["total_frames"] = int(track_stats.get("total_frames") or len(frames))
             ball_stats["coverage_pct"] = (
                 ball_stats.get("n_frames", 0) / max(1, len(frames))) * 100
             wrist_count = sum(1 for p in display_track if p.source == "wrist_proxy")

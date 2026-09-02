@@ -25,8 +25,36 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
-from src import config, ml_models, explainability, pipeline, history_db, injury_knowledge_base as injury_kb
+import importlib
+
+
+class _LazyModule:
+    """Defer a heavy module's import until its first attribute is accessed.
+
+    Used for the GPU/CV/ML stack (ml_models, explainability, pipeline) so the
+    dashboard's first paint doesn't wait for torch/xgboost/catboost/mediapipe.
+    """
+    def __init__(self, name: str):
+        self._name = name
+        self._mod = None
+
+    def _get(self):
+        if self._mod is None:
+            self._mod = importlib.import_module(self._name)
+        return self._mod
+
+    def __getattr__(self, item):
+        return getattr(self._get(), item)
+
+
+from src import config, history_db, injury_knowledge_base as injury_kb
+from src import analysis_ui
 from src.synthetic_data import generate_clinical_synthetic_dataset
+
+# Heavy modules loaded lazily (only on first use), see _LazyModule above.
+ml_models = _LazyModule("src.ml_models")
+explainability = _LazyModule("src.explainability")
+pipeline = _LazyModule("src.pipeline")
 from src.auth_login import render_login_page, is_authenticated
 from chat_assistant import render_chat_widget
 
@@ -336,73 +364,150 @@ def render_fullscreen_splash(message: str = "Loading PaceAI..."):
     components.html(_PRELOADER_CSS + _paceai_preloader(message), height=560, scrolling=False)
 
 
-# ---------------- TERMINAL ANALYSIS BOX ----------------
-_PACEAI_STAGE_MAP = [
-    ("Video Ingestion", "Reading video frames"),
-    ("Cricket Scene Validation", "Validating pitch & cricket scene"),
-    ("Ball Detection", "Locating the ball"),
-    ("Bowler Tracking", "Tracking the bowler"),
-    ("Pose Estimation", "Detecting body landmarks..."),
-    ("Ball Trajectory", "Mapping ball trajectory"),
-    ("Biomechanical Analysis", "Extracting bowling biomechanics"),
-    ("Performance & Risk", "Scoring performance & injury risk"),
-]
-
-_PACEAI_LABEL_ORDER = ["Video loaded", "Cricket pre-check", "Ball detection",
-                       "Bowler detection", "Pose extraction", "Ball tracking",
-                       "Biomechanics", "ML analysis", "Complete"]
-
-
-def build_paceai_box(done: int, total: int, current_label: str) -> str:
-    """Render the monospace PACEAI ANALYSIS terminal box (✓ done / ● current / ○ pending)."""
-    pct = min(100, int(round(done / max(1, total) * 100)))
-    try:
-        cur = _PACEAI_LABEL_ORDER.index(current_label)
-    except ValueError:
-        cur = None
-    if cur is not None and cur < len(_PACEAI_STAGE_MAP):
-        detail = _PACEAI_STAGE_MAP[cur][1]
-        completed = cur
-    else:
-        detail = "Finalizing..."
-        completed = len(_PACEAI_STAGE_MAP)
-
-    W = 48
-
-    def _row(text="", center=False):
-        body = text.center(W - 4) if center else text.ljust(W - 4)
-        return "│ " + body + " │"
-
-    lines = [
-        "┌" + "─" * (W - 2) + "┐",
-        _row("PACEAI ANALYSIS", center=True),
-        _row(),
-        _row("ANALYZING DELIVERY", center=True),
-        _row(),
-        _row(f"{pct}%", center=True),
-        _row(),
-        _row("Extracting bowling biomechanics", center=True),
-        _row(),
-    ]
-    for i, (name, _d) in enumerate(_PACEAI_STAGE_MAP):
-        icon = "✓" if i < completed else ("●" if i == completed else "○")
-        lines.append(_row(f"{icon} {name}"))
-    lines.extend([
-        _row(),
-        "│ " + "─" * (W - 4) + " │",
-        _row("Current operation"),
-        _row(detail),
-        "└" + "─" * (W - 2) + "┘",
-    ])
-    return "\n".join(lines)
-
-
 # ---------------- HELPERS ----------------
 def rerun():
     if hasattr(st, "rerun"):
         st.rerun()
     else:
         st.experimental_rerun()
+
+
+class _LiveAnalysisScreen:
+    """Streamlit wrapper around the premium live-analysis HTML view.
+
+    Re-renders the analysis screen into a single placeholder on every stage
+    tick so Streamlit updates live without a full app rerun. Presentation only
+    -- all state comes from `analysis_ui.AnalysisState`, which the pipeline's
+    progress callback and the returned AnalysisResult populate.
+    """
+
+    def __init__(self):
+        self._ph = st.empty()
+
+    def render(self, state: analysis_ui.AnalysisState, show_art: bool = True):
+        self._ph.markdown(analysis_ui.render_lab_html(state, show_art=show_art),
+                          unsafe_allow_html=True)
+
+    def clear(self):
+        self._ph.empty()
+
+
+def _live_state(phase="running", **kw) -> analysis_ui.AnalysisState:
+    return analysis_ui.AnalysisState(phase=phase, **kw)
+
+
+def _clear_video_run():
+    """Reset the processed-file token so a (re)analysis of the same upload runs again."""
+    st.session_state["video_processed_file_id"] = None
+
+
+def _run_video_analysis(uploaded, perf_bundle, injury_bundle, bowling_arm,
+                        target_fps, resize_choice, denoise, camera_view,
+                        slow_factor, zoom_end, debug_overlay, screen) -> dict:
+    """Run the full CV pipeline on an uploaded file ONCE.
+
+    Responsibility: write the upload to a temp file, run pipeline.analyze_video
+    (with the live-analysis screen driving progress), store all results in
+    session_state, and render the completion card. Returns the AnalysisState
+    used for the completion screen (or raises).
+
+    Guarded by the caller on ``uploaded.file_id`` so a Streamlit re-run does
+    NOT re-process the same file -- results already persist in session_state.
+    """
+    upload_t0 = time.perf_counter()
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+    try:
+        tmp.write(uploaded.read())
+        video_path = tmp.name
+    finally:
+        tmp.close()
+    upload_time = time.perf_counter() - upload_t0
+
+    try:
+        if not os.path.exists(config.POSE_MODEL_PATH):
+            st.warning("MediaPipe pose task model missing. Run pose downloader or manual entry.")
+            return None
+
+        screen.render(_live_state(
+            phase="running", fps=target_fps, resize=tuple(resize_choice),
+        ), show_art=True)
+
+        def _stage_cb(done, total, label):
+            screen.render(_live_state(
+                phase="running", done=done, total=total,
+                current_label=label, fps=target_fps,
+                resize=tuple(resize_choice),
+            ), show_art=True)
+
+        try:
+            result = pipeline.analyze_video(
+                video_path,
+                bowling_arm=bowling_arm.lower().split("-")[0],
+                performance_bundle=perf_bundle,
+                injury_bundle=injury_bundle,
+                target_fps=target_fps,
+                resize_dim=resize_choice,
+                denoise=denoise,
+                camera_view=camera_view,
+                slow_factor=slow_factor,
+                zoom_end=zoom_end,
+                run_ml=False,
+                progress_cb=_stage_cb,
+                debug_overlay=debug_overlay,
+            )
+        finally:
+            try:
+                os.remove(video_path)
+            except OSError:
+                pass
+
+        st.session_state["video_stage_times"] = dict(result.stage_times or {})
+        st.session_state["video_feature_vector"] = dict(result.feature_vector or {})
+        st.session_state["video_upload_time"] = upload_time
+        st.session_state["last_warnings"] = list(result.warnings or [])
+        st.session_state["video_output_path"] = getattr(result, "video_path", None)
+        st.session_state["pose_video_path"] = getattr(result, "pose_video_path", None)
+        st.session_state["reels_video_path"] = getattr(result, "reels_video_path", None)
+        st.session_state["analysis_replay_path"] = getattr(result, "analysis_replay_path", None)
+        st.session_state["analysis_key_moments"] = getattr(result, "key_moments", None) or getattr(result, "events", None) or []
+        st.session_state["ball_stats"] = getattr(result, "ball_stats", {})
+
+        balls = result.ball_stats or {}
+        screen.render(_live_state(
+            phase="complete",
+            done=len([1 for g in analysis_ui.GROUPS for _ in g.steps]),
+            total=len([1 for g in analysis_ui.GROUPS for _ in g.steps]),
+            current_label="Complete",
+            fps=target_fps,
+            resize=tuple(resize_choice),
+            total_frames=balls.get("total_frames"),
+            original_dims=tuple(result.original_frame_dims)
+            if result.original_frame_dims else None,
+            bowler_track_id=result.bowler_track_id,
+            bowler_confidence=result.bowler_confidence,
+            elapsed_s=(result.stage_times or {}).get("total"),
+        ), show_art=False)
+        st.button("VIEW ANALYSIS →",
+                  on_click=lambda: st.session_state.update(scroll_to_replay=True),
+                  type="primary")
+        return result
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        err = f"{type(e).__name__}: {e}"
+        screen.render(_live_state(
+            phase="error", error=err, fps=target_fps,
+            resize=tuple(resize_choice),
+            done=0,
+            total=len([1 for g in analysis_ui.GROUPS for _ in g.steps]),
+        ), show_art=True)
+        st.button("TRY AGAIN", on_click=_clear_video_run)
+        st.markdown("#### 🔧 TECHNICAL DETAILS")
+        st.caption("The analysis was interrupted. The technical reason "
+                   "(visible to judges / for debugging) is below.")
+        with st.expander("Error details", expanded=False):
+            st.code(err + "\n\n" + tb, language="python")
+        return None
 
 
 # ---------------- CACHED MODEL LOADING ----------------
@@ -1184,65 +1289,16 @@ else:
     uploaded = st.file_uploader("Upload bowling delivery video clip", type=["mp4", "mov", "avi"])
 
     if uploaded is not None:
-        upload_t0 = time.perf_counter()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
-            tmp.write(uploaded.read())
-            video_path = tmp.name
-        upload_time = time.perf_counter() - upload_t0
-        try:
-            if not os.path.exists(config.POSE_MODEL_PATH):
-                st.warning("MediaPipe pose task model missing. Run pose downloader or manual entry.")
-            else:
-                _prog_ph = st.empty()
-                _prog_ph.text(build_paceai_box(0, len(_PACEAI_LABEL_ORDER), "Video loaded"))
-
-                def _stage_cb(done, total, label):
-                    _prog_ph.text(build_paceai_box(done, total, label))
-
-                try:
-                    result = pipeline.analyze_video(
-                        video_path,
-                        bowling_arm=bowling_arm.lower().split("-")[0],
-                        performance_bundle=perf_bundle,
-                        injury_bundle=injury_bundle,
-                        target_fps=target_fps,
-                        resize_dim=resize_choice,
-                        denoise=denoise,
-                        camera_view=camera_view,
-                        slow_factor=slow_factor,
-                        zoom_end=zoom_end,
-                        run_ml=False,
-                        progress_cb=_stage_cb,
-                        debug_overlay=debug_overlay,
-                    )
-                    _prog_ph.empty()
-                    feature_vector = result.feature_vector
-                    st.session_state["video_stage_times"] = dict(result.stage_times or {})
-                    st.session_state["video_upload_time"] = upload_time
-                    st.session_state["last_warnings"] = list(result.warnings or [])
-                    st.session_state["video_output_path"] = getattr(result, "video_path", None)
-                    st.session_state["pose_video_path"] = getattr(result, "pose_video_path", None)
-                    st.session_state["reels_video_path"] = getattr(result, "reels_video_path", None)
-                    st.session_state["analysis_replay_path"] = getattr(result, "analysis_replay_path", None)
-                    st.session_state["analysis_key_moments"] = getattr(result, "key_moments", None) or getattr(result, "events", None) or []
-                    st.session_state["ball_stats"] = getattr(result, "ball_stats", {})
-                    st.success(f"Delivery processed ({target_fps} FPS)")
-                except Exception as e:
-                    import traceback
-                    _prog_ph.empty()
-                    tb = traceback.format_exc()
-                    st.error(
-                        "Video analysis failed. Please check that the file is a valid bowling "
-                        "delivery clip (MP4/MOV/AVI) and try again. If the problem persists, "
-                        f"try a shorter clip or different resolution. (Error type: {type(e).__name__}: {e})"
-                    )
-                    with st.expander("Full traceback", expanded=False):
-                        st.code(tb, language="python")
-        finally:
-            try:
-                os.remove(video_path)
-            except OSError:
-                pass
+        processed = st.session_state.get("video_processed_file_id")
+        if processed != uploaded.file_id:
+            screen = _LiveAnalysisScreen()
+            _run_video_analysis(
+                uploaded, perf_bundle, injury_bundle, bowling_arm,
+                target_fps, resize_choice, denoise, camera_view,
+                slow_factor, zoom_end, debug_overlay, screen,
+            )
+            st.session_state["video_processed_file_id"] = uploaded.file_id
+        feature_vector = st.session_state.get("video_feature_vector", {})
 
 
 # ---------------- VIDEO OUTPUT REFERENCES ----------------
@@ -1291,7 +1347,7 @@ def render_analysis_replay(hero_video, result, feature_vector, ball_stats):
         return
 
     st.markdown("""
-    <section class="analysis-replay-shell" aria-label="PaceAI analysis replay">
+    <section class="analysis-replay-shell" id="paceai-analysis-replay" aria-label="PaceAI analysis replay">
       <div class="analysis-replay-head">
         <div>
           <div class="eyebrow">PACEAI / DELIVERY ANALYSIS</div>
@@ -1465,6 +1521,12 @@ if feature_vector:
 
     if input_mode.startswith("📹"):
         render_analysis_replay(_analysis_replay, result, feature_vector, st.session_state.get("ball_stats") or {})
+        if st.session_state.pop("scroll_to_replay", False):
+            st.components.v1.html(
+                '<script>document.getElementById("paceai-analysis-replay")'
+                "?.scrollIntoView({behavior:'smooth'});</script>",
+                height=1,
+            )
 
     render_ood_warnings(feature_vector, perf_bundle)
     render_ood_warnings(feature_vector, injury_bundle)

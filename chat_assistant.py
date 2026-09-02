@@ -38,7 +38,7 @@ import streamlit as st
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_URL = f"{OLLAMA_BASE_URL.rstrip('/')}/api/chat"
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:1b")
-OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "30"))
+OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "120"))
 
 _MAX_RESPONSE_CHARS = 4000  # sanity cap on LLM output displayed in UI
 
@@ -204,10 +204,25 @@ def _call_ollama(messages: list) -> str:
             f"the model is ready."
         )
 
+    # --- warm up the model once so the first query doesn't eat the whole
+    # timeout on a slow cold-load, and keep it resident so later replies are fast.
+    if not st.session_state.get("_ollama_warmed_up"):
+        warm_url = f"{OLLAMA_BASE_URL.rstrip('/')}/api/generate"
+        try:
+            requests.post(
+                warm_url,
+                json={"model": OLLAMA_MODEL, "prompt": "", "keep_alive": "30m"},
+                timeout=min(OLLAMA_TIMEOUT, 120),
+            )
+        except Exception:
+            pass  # non-fatal: the real query below will still attempt the call
+        st.session_state["_ollama_warmed_up"] = True
+
     payload = {
         "model": OLLAMA_MODEL,
         "messages": messages,
         "stream": False,
+        "keep_alive": "30m",
     }
     try:
         resp = requests.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT)
