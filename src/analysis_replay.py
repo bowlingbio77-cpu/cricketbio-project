@@ -50,6 +50,54 @@ _HEADER_BG = (14, 18, 26)
 _HEADER_TEXT = (240, 246, 252)
 _DEBUG_TEXT = (255, 220, 120)         # warm amber for debug diagnostics
 
+# ---- Styling constants (lifted out of the draw functions) ----
+_BOWLER_THICKNESS = 3                  # bowler box outline weight
+_BOWLER_BAND_H = 20                    # label band height under the bowler
+_BOWLER_LABEL_SCALE = 0.6              # font scale for the "BOWLER #N" tag
+_BOWLER_FONT_BASELINE = 6              # baseline offset inside the label band
+_LABEL_PAD = 7                         # horizontal padding in label bands
+_BALL_BLEND_ALPHA = 0.45               # opacity of the real ball-box overlay
+_BALL_ROI_PAD = 4                      # padded region around the ball box for the blend
+
+# ---- Spatial de-focus (bowler focus treatment) constants ----
+# Presentation-only: applied to the raw frame BEFORE any analysis overlays.
+# Controls a shallow-depth-of-field effect that keeps the bowler sharp while
+# blurring and dimming the background (batter, fielders, crowd).
+#
+# The treatment is fully deterministic, does not affect any CV/ML calculation,
+# and is not exposed to the end user.  All parameters can be tuned here.
+#
+# _FOCUS_FEATHER_RADIUS : int
+#     Half-width (in pixels) of the soft transition zone around the bowler
+#     bounding box.  Larger values produce a wider, more gradual falloff.
+#     Recommended range: 15-60.
+_FOCUS_FEATHER_RADIUS = 30
+
+# _FOCUS_BLUR_KSIZE : int (must be odd, >= 3)
+#     Kernel size for the Gaussian blur applied to the background.
+#     Larger values produce a stronger defocus.  The kernel is clamped to
+#     be odd and >= 3 automatically.
+_FOCUS_BLUR_KSIZE = 51
+
+# _FOCUS_DIM_FACTOR : float  (0.0 = black, 1.0 = no change)
+#     Brightness multiplier applied to the blurred background region.
+#     Values < 1.0 darken the background, making the bowler pop.
+#     Recommended range: 0.30-0.60.
+_FOCUS_DIM_FACTOR = 0.38
+
+# _FOCUS_SAT_FACTOR : float  (0.0 = grayscale, 1.0 = no change)
+#     Saturation multiplier applied to the blurred background region.
+#     Values < 1.0 partially desaturate the background, further reducing
+#     visual competition with the bowler.
+#     Recommended range: 0.35-0.75.
+_FOCUS_SAT_FACTOR = 0.50
+
+# _FOCUS_MIN_BBOX_PX : int
+#     Minimum bowler bounding-box width or height (in pixels) below which
+#     the focus treatment is skipped entirely.  Prevents the effect from
+#     activating on tiny, unreliable detections.
+_FOCUS_MIN_BBOX_PX = 30
+
 
 def _clamp_pt(x, y, w, h):
     x = max(0, min(w - 1, int(round(x))))
@@ -123,7 +171,22 @@ def _draw_ball_box(img, pt, frame_h, frame_w, debug=False):
     src = getattr(pt, "source", "motion")
     real = pt.detected or src in ("wrist_proxy", "blended")
     if real:
-        cv2.rectangle(img, (x1, y1), (x2, y2), _BALL_DETECTED, 2, cv2.LINE_AA)
+        # De-emphasized, semi-transparent ball box: the ball is a *tracked
+        # object*, never the subject. The sharp/opaque bowler overlay is drawn
+        # AFTER this so the bowler always reads as the visual focus.
+        # Blend is scoped to a small padded ROI around the box (not the whole
+        # frame) -- same visual result, without a full-frame copy+blend on
+        # every frame that has a ball point.
+        pad = _BALL_ROI_PAD
+        rx1, ry1 = max(0, x1 - pad), max(0, y1 - pad)
+        rx2, ry2 = min(frame_w, x2 + pad), min(frame_h, y2 + pad)
+        if rx2 > rx1 and ry2 > ry1:
+            roi = img[ry1:ry2, rx1:rx2]
+            roi_overlay = roi.copy()
+            cv2.rectangle(roi_overlay, (x1 - rx1, y1 - ry1), (x2 - rx1, y2 - ry1),
+                          _BALL_DETECTED, 1, cv2.LINE_AA)
+            roi[:] = cv2.addWeighted(roi_overlay, _BALL_BLEND_ALPHA, roi,
+                                     1.0 - _BALL_BLEND_ALPHA, 0)
         if debug:
             conf = getattr(pt, "confidence", 0.0)
             label = f"ball {conf:.2f}" if conf > 0 else "ball"
@@ -136,7 +199,7 @@ def _draw_ball_box(img, pt, frame_h, frame_w, debug=False):
                        _BALL_DETECTED if real else _BALL_PRED)
 
 
-def _draw_bowler_box(img, bbox, frame_h, frame_w):
+def _draw_bowler_box(img, bbox, frame_h, frame_w, bowler_track_id=None):
     """Identity-locked bowler box: drawn only in frames where the bowler crop
     bbox genuinely exists (carried over at most a few tracker-gap frames).
     A frame with no bowler bbox draws NO bowler box -- there is no substitute
@@ -146,13 +209,21 @@ def _draw_bowler_box(img, bbox, frame_h, frame_w):
     x1, y1, x2, y2 = [int(round(v)) for v in bbox]
     x1, y1 = _clamp_pt(x1, y1, frame_w, frame_h)
     x2, y2 = _clamp_pt(x2, y2, frame_w, frame_h)
-    cv2.rectangle(img, (x1, y1), (x2, y2), _BOWLER_BOX, 2, cv2.LINE_AA)
+    # Thicker, brighter box so the bowler is unmistakable against any
+    # background activity (batter/runner/fielders in the full-frame footage).
+    cv2.rectangle(img, (x1, y1), (x2, y2), _BOWLER_BOX, _BOWLER_THICKNESS, cv2.LINE_AA)
+    bw = max(1, x2 - x1)
     font = cv2.FONT_HERSHEY_SIMPLEX
-    label = "BOWLER"
-    ty = max(18, y1 - 8)
-    (tw, th), _ = cv2.getTextSize(label, font, 0.5, 2)
-    cv2.rectangle(img, (x1, ty - th - 6), (x1 + tw + 8, ty + 4), _BOWLER_BOX, -1)
-    cv2.putText(img, label, (x1 + 4, ty - 2), font, 0.5, (14, 18, 26), 2, cv2.LINE_AA)
+    tag = f"BOWLER #{bowler_track_id}" if bowler_track_id is not None else "BOWLER"
+    (tw, th), _ = cv2.getTextSize(tag, font, _BOWLER_LABEL_SCALE, 2)
+    label_w = max(tw + 2 * _LABEL_PAD, bw + 2 * _LABEL_PAD)
+    y_bottom = min(frame_h - 1, y2)
+    # Full-width band under the bowler so the label is huge and legible even
+    # when the bowler is small in frame.
+    cv2.rectangle(img, (x1, y_bottom - _BOWLER_BAND_H), (x1 + label_w, y_bottom),
+                  _BOWLER_BOX, -1)
+    cv2.putText(img, tag, (x1 + _LABEL_PAD, y_bottom - _BOWLER_FONT_BASELINE), font,
+                _BOWLER_LABEL_SCALE, (14, 18, 26), 2, cv2.LINE_AA)
 
 
 def _draw_debug_panel(img, frame_w, frame_h, lines):
@@ -175,8 +246,11 @@ def _draw_debug_panel(img, frame_w, frame_h, lines):
         y -= line_h
 
 
-def _draw_header(img, frame_idx, release_frame, frame_w):
-    """Subtle top bar: product name + real current-frame info."""
+def _draw_header(img, frame_idx, release_frame, frame_w, bowler_track_id=None):
+    """Subtle top bar: product name + real current-frame info.
+
+    When the bowler identity is locked it is called out on the right so it is
+    always obvious the analysis is on the bowler (not the batter/background)."""
     hdr_h = 34
     overlay = img[0:hdr_h, 0:frame_w]
     cv2.rectangle(overlay, (0, 0), (frame_w, hdr_h), _HEADER_BG, -1)
@@ -186,13 +260,81 @@ def _draw_header(img, frame_idx, release_frame, frame_w):
     cv2.putText(img, "PACEAI  ·  ANALYSIS REPLAY", (12, 22), font, 0.55,
                 (_BONE[0], _BONE[1], _BONE[2]), 1, cv2.LINE_AA)
 
+    # Left-of-right text: bowler-lock callout, then frame/release info.
+    right_texts = []
+    if bowler_track_id is not None:
+        right_texts.append(f"BOWLER LOCKED #{bowler_track_id}")
     if release_frame is not None and frame_idx == release_frame:
-        text = f"frame {frame_idx}  ·  RELEASE"
-    else:
-        text = f"frame {frame_idx}"
-    tw, th = cv2.getTextSize(text, font, 0.5, 1)[0]
-    x = frame_w - tw - 14
-    cv2.putText(img, text, (x, 22), font, 0.5, _HEADER_TEXT, 1, cv2.LINE_AA)
+        right_texts.append("RELEASE")
+    right_texts.append(f"frame {frame_idx}")
+
+    x = frame_w - 14
+    for txt in reversed(right_texts):
+        tw, th = cv2.getTextSize(txt, font, 0.5, 1)[0]
+        x -= tw
+        color = (_RELEASE[0], _RELEASE[1], _RELEASE[2]) if txt == "RELEASE" \
+            else (_BOWLER_BOX[0], _BOWLER_BOX[1], _BOWLER_BOX[2]) if txt.startswith("BOWLER") \
+            else _HEADER_TEXT
+        cv2.putText(img, txt, (x, 22), font, 0.5, color, 1, cv2.LINE_AA)
+        x -= 14
+
+
+def _apply_focus_treatment(img, bowler_bbox, frame_h, frame_w):
+    """Apply a spatial de-focus (shallow depth-of-field) to a single frame.
+
+    The bowler region stays sharp and bright; the background is blurred,
+    darkened, and partially desaturated.  This is a PRESENTATION-ONLY effect
+    applied to the raw frame BEFORE any analysis overlays are drawn.
+
+    Parameters are read from the module-level _FOCUS_* constants.
+
+    If bowler_bbox is ``None`` or too small, the frame is returned unchanged.
+
+    Returns the modified frame (in-place mutation of *img*).
+    """
+    if bowler_bbox is None:
+        return img
+
+    bx1, by1, bx2, by2 = [int(round(v)) for v in bowler_bbox]
+    bw, bh = bx2 - bx1, by2 - by1
+    if bw < _FOCUS_MIN_BBOX_PX or bh < _FOCUS_MIN_BBOX_PX:
+        return img
+
+    # --- Step 1: build feathered binary mask from the bowler bbox ---
+    mask = np.zeros((frame_h, frame_w), dtype=np.float32)
+    _cx1 = max(0, bx1)
+    _cy1 = max(0, by1)
+    _cx2 = min(frame_w, bx2)
+    _cy2 = min(frame_h, by2)
+    if _cx2 <= _cx1 or _cy2 <= _cy1:
+        return img
+    mask[_cy1:_cy2, _cx1:_cx2] = 1.0
+    feather = max(3, _FOCUS_FEATHER_RADIUS)
+    ksize = _FOCUS_BLUR_KSIZE if _FOCUS_BLUR_KSIZE % 2 == 1 else _FOCUS_BLUR_KSIZE + 1
+    ksize = max(3, ksize)
+    mask = cv2.GaussianBlur(mask, (ksize, ksize), 0)
+
+    # --- Step 2: blurred + darkened + desaturated background ---
+    blur_ksize = max(3, ksize)
+    blurred = cv2.GaussianBlur(img, (blur_ksize, blur_ksize), 0)
+
+    # Dim the blurred background.
+    if _FOCUS_DIM_FACTOR < 1.0:
+        blurred = (blurred.astype(np.float32) * _FOCUS_DIM_FACTOR).astype(np.uint8)
+
+    # Partially desaturate the blurred background.
+    if _FOCUS_SAT_FACTOR < 1.0:
+        hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV).astype(np.float32)
+        hsv[:, :, 1] *= _FOCUS_SAT_FACTOR
+        blurred = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+
+    # --- Step 3: composite — sharp bowler (mask=1) + blurred background (mask=0) ---
+    mask3 = mask[:, :, np.newaxis]
+    composite = (img.astype(np.float32) * mask3
+                 + blurred.astype(np.float32) * (1.0 - mask3))
+    np.clip(composite, 0, 255, out=composite)
+    img[:] = composite.astype(np.uint8)
+    return img
 
 
 def render_analysis_replay(
@@ -262,15 +404,15 @@ def render_analysis_replay(
 
         pt = ball_by_idx.get(idx)
 
-        # --- Identity-locked bowler box (real bowler crop for this frame) ---
-        if bowler_bboxes:
-            _draw_bowler_box(img, bowler_bboxes.get(idx), h, w)
+        # --- 1. Spatial de-focus: blur + dim background, keep bowler sharp ---
+        # Applied to the raw frame BEFORE any overlays so all analysis
+        # annotations (trajectory, ball box, skeleton, bowler box) are drawn
+        # on top of the treated frame and remain crisp.  Overlay coordinates
+        # are unchanged — the treatment is purely visual.
+        bowler_bbox = bowler_bboxes.get(idx) if bowler_bboxes else None
+        _apply_focus_treatment(img, bowler_bbox, h, w)
 
-        # --- Ball box (real detection for this frame) ---
-        if pt is not None:
-            _draw_ball_box(img, pt, h, w, debug=debug)
-
-        # --- Trajectory path: real track points up to (and incl.) this frame ---
+        # --- 2. Trajectory path: real track points up to (and incl.) this frame ---
         if idx in ordered_idx_set:
             started = True
             p = ball_by_idx[idx]
@@ -281,7 +423,17 @@ def render_analysis_replay(
             for a, b in zip(path_pts, path_pts[1:]):
                 cv2.line(img, a, b, color_seg, 1, cv2.LINE_AA)
 
-        # --- Release-point marker (only if a real release frame is provided) ---
+        # --- 3. Ball box (real detection for this frame) ---
+        # Semi-transparent; drawn before the bowler so the bowler always
+        # reads as the topmost visual subject.
+        if pt is not None:
+            _draw_ball_box(img, pt, h, w, debug=debug)
+
+        # --- 4. Pose skeleton (mapped to full frame for THIS frame) ---
+        if idx in pose_px and pose_px[idx]:
+            _draw_pose(img, pose_px[idx])
+
+        # --- 5. Release-point marker (only if a real release frame is provided) ---
         if release_frame is not None and idx == release_frame:
             rp = ball_by_idx.get(release_frame)
             if rp is not None:
@@ -294,14 +446,18 @@ def render_analysis_replay(
             cv2.putText(img, "RELEASE", (rx + 12, ry - 8), font, 0.5,
                         _RELEASE, 2, cv2.LINE_AA)
 
-        # --- Pose skeleton (mapped to full frame for THIS frame) ---
-        if idx in pose_px and pose_px[idx]:
-            _draw_pose(img, pose_px[idx])
+        # --- 6. Identity-locked bowler box (real bowler crop for this frame) ---
+        # Drawn LAST among the scene overlays so the sharp, bright bowler
+        # box always wins z-order against the blurred background.
+        if bowler_bboxes:
+            _draw_bowler_box(img, bowler_bboxes.get(idx), h, w,
+                             bowler_track_id=bowler_track_id)
 
-        # --- Info header ---
-        _draw_header(img, idx, release_frame, w)
+        # --- 7. Info header ---
+        _draw_header(img, idx, release_frame, w,
+                     bowler_track_id=bowler_track_id)
 
-        # --- Debug diagnostics (off by default in the app) ---
+        # --- 8. Debug diagnostics (off by default in the app) ---
         if debug:
             bowler_line = "BOWLER: none  (no bowler-like motion in clip)"
             if bowler_track_id is not None:
