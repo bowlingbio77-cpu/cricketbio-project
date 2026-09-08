@@ -162,7 +162,11 @@ def check_human_pose(pose_sequence: List[PoseFrame],
     # person is plainly present, so arms must NOT be a hard requirement here.
     # We only fall back to requiring arms when the posture is too ambiguous
     # (neither clearly upright nor clearly prone) to call it a bowler on its own.
-    posture_good = posture_frac >= 0.5
+    #
+    # Cricket bowlers frequently lean forward during delivery, so the posture
+    # threshold is intentionally lenient (0.35 not 0.5) — a bowler at 40%
+    # "upright" is still clearly a bowler, not a bystander.
+    posture_good = posture_frac >= 0.35
     arms_good = arm_frac >= 0.2
     ok = (torso_ok >= min_frames and
           (posture_good or arms_good))
