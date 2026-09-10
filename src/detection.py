@@ -18,7 +18,7 @@ from . import config
 try:
     from ultralytics import YOLO
     _HAS_ULTRALYTICS = True
-except ImportError:
+except (ImportError, OSError):
     _HAS_ULTRALYTICS = False
 
 

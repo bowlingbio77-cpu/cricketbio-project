@@ -53,7 +53,7 @@ try:
     from ultralytics import YOLO
     from .detection import resolve_weights
     _HAS_ULTRALYTICS = True
-except ImportError:
+except (ImportError, OSError):
     _HAS_ULTRALYTICS = False
 
 BALL_CLASS_ID = 32          # COCO "sports ball"
