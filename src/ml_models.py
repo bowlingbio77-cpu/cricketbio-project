@@ -487,64 +487,62 @@ class _SequenceClassifierBase:
         return self.predict_proba(X).argmax(axis=1)
 
 
-class _CNNLSTMNet(nn.Module):
-    def __init__(self, n_features, hidden, n_classes, dropout):
-        super().__init__()
-        self.conv = nn.Sequential(
-            nn.Conv1d(n_features, 32, kernel_size=3, padding=1), nn.BatchNorm1d(32), nn.ReLU(),
-            nn.Conv1d(32, 64, kernel_size=3, padding=1), nn.BatchNorm1d(64), nn.ReLU(),
-        )
-        self.lstm = nn.LSTM(64, hidden, batch_first=True, bidirectional=True)
-        self.head = nn.Sequential(nn.Dropout(dropout), nn.Linear(hidden * 2, n_classes))
+if _HAS_TORCH:
+    class _CNNLSTMNet(nn.Module):
+        def __init__(self, n_features, hidden, n_classes, dropout):
+            super().__init__()
+            self.conv = nn.Sequential(
+                nn.Conv1d(n_features, 32, kernel_size=3, padding=1), nn.BatchNorm1d(32), nn.ReLU(),
+                nn.Conv1d(32, 64, kernel_size=3, padding=1), nn.BatchNorm1d(64), nn.ReLU(),
+            )
+            self.lstm = nn.LSTM(64, hidden, batch_first=True, bidirectional=True)
+            self.head = nn.Sequential(nn.Dropout(dropout), nn.Linear(hidden * 2, n_classes))
 
-    def forward(self, x):  # (B, W, F)
-        x = x.transpose(1, 2)      # (B, F, W)
-        x = self.conv(x)           # (B, 64, W)
-        x = x.transpose(1, 2)      # (B, W, 64)
-        out, _ = self.lstm(x)      # (B, W, 2*hidden)
-        return self.head(out.mean(dim=1))  # mean-pool over time
+        def forward(self, x):  # (B, W, F)
+            x = x.transpose(1, 2)      # (B, F, W)
+            x = self.conv(x)           # (B, 64, W)
+            x = x.transpose(1, 2)      # (B, W, 64)
+            out, _ = self.lstm(x)      # (B, W, 2*hidden)
+            return self.head(out.mean(dim=1))  # mean-pool over time
 
+    class _TransformerNet(nn.Module):
+        def __init__(self, n_features, window, d_model, nhead, n_layers, n_classes, dropout):
+            super().__init__()
+            self.proj = nn.Linear(n_features, d_model)
+            self.pos = nn.Parameter(torch.randn(1, window, d_model) * 0.02)
+            layer = nn.TransformerEncoderLayer(
+                d_model=d_model, nhead=nhead, dim_feedforward=2 * d_model, dropout=dropout,
+                activation="gelu", batch_first=True)
+            self.enc = nn.TransformerEncoder(layer, num_layers=n_layers,
+                                             enable_nested_tensor=False)
+            self.norm = nn.LayerNorm(d_model)
+            self.head = nn.Sequential(nn.Dropout(dropout), nn.Linear(d_model, n_classes))
 
-class _TransformerNet(nn.Module):
-    def __init__(self, n_features, window, d_model, nhead, n_layers, n_classes, dropout):
-        super().__init__()
-        self.proj = nn.Linear(n_features, d_model)
-        self.pos = nn.Parameter(torch.randn(1, window, d_model) * 0.02)
-        layer = nn.TransformerEncoderLayer(
-            d_model=d_model, nhead=nhead, dim_feedforward=2 * d_model, dropout=dropout,
-            activation="gelu", batch_first=True)
-        self.enc = nn.TransformerEncoder(layer, num_layers=n_layers,
-                                         enable_nested_tensor=False)
-        self.norm = nn.LayerNorm(d_model)
-        self.head = nn.Sequential(nn.Dropout(dropout), nn.Linear(d_model, n_classes))
+        def forward(self, x):  # (B, W, F)
+            x = self.proj(x) + self.pos[:, :x.size(1), :]
+            x = self.enc(x)
+            x = self.norm(x.mean(dim=1))
+            return self.head(x)
 
-    def forward(self, x):  # (B, W, F)
-        x = self.proj(x) + self.pos[:, :x.size(1), :]
-        x = self.enc(x)
-        x = self.norm(x.mean(dim=1))
-        return self.head(x)
+    class _CNNLSTMClassifier(_SequenceClassifierBase):
+        def __init__(self, n_features, n_classes, window, hidden=64, **kwargs):
+            self.hidden = hidden
+            super().__init__(n_features, n_classes, window, **kwargs)
 
+        def _build_net(self) -> nn.Module:
+            return _CNNLSTMNet(self.n_features, self.hidden, self.n_classes, self.dropout)
 
-class _CNNLSTMClassifier(_SequenceClassifierBase):
-    def __init__(self, n_features, n_classes, window, hidden=64, **kwargs):
-        self.hidden = hidden
-        super().__init__(n_features, n_classes, window, **kwargs)
+    class _TransformerClassifier(_SequenceClassifierBase):
+        def __init__(self, n_features, n_classes, window, d_model=64, nhead=4,
+                     n_layers=2, **kwargs):
+            self.d_model = d_model
+            self.nhead = nhead
+            self.n_layers = n_layers
+            super().__init__(n_features, n_classes, window, **kwargs)
 
-    def _build_net(self) -> nn.Module:
-        return _CNNLSTMNet(self.n_features, self.hidden, self.n_classes, self.dropout)
-
-
-class _TransformerClassifier(_SequenceClassifierBase):
-    def __init__(self, n_features, n_classes, window, d_model=64, nhead=4,
-                 n_layers=2, **kwargs):
-        self.d_model = d_model
-        self.nhead = nhead
-        self.n_layers = n_layers
-        super().__init__(n_features, n_classes, window, **kwargs)
-
-    def _build_net(self) -> nn.Module:
-        return _TransformerNet(self.n_features, self.window, self.d_model, self.nhead,
-                               self.n_layers, self.n_classes, self.dropout)
+        def _build_net(self) -> nn.Module:
+            return _TransformerNet(self.n_features, self.window, self.d_model, self.nhead,
+                                   self.n_layers, self.n_classes, self.dropout)
 
 
 def make_sequence_classifier(model_name: ModelName, n_features: int, n_classes: int,
