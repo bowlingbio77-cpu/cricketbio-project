@@ -11,7 +11,7 @@
 
 ## 1. PROJECT OVERVIEW
 
-PACEAI is an AI-powered cricket fast-bowling biomechanics analysis platform. A user uploads a bowling delivery video (or dials in 10 kinematic sliders manually); the system runs computer vision (YOLOv11 person + sports-ball detection, ByteTrack multi-object tracking, MediaPipe Pose Landmarker) to extract the bowler's movement, derives 10 biomechanical features, and then uses trained ML models to produce a **performance score (0–100)**, an **injury-risk classification (low/moderate/high)**, **SHAP explainability**, **rule-based coaching recommendations**, and an **ICC arm-legality check**. Intended users are cricket coaches, players, sports physiotherapists, and (for a hackathon/judge audience) technical evaluators of an AI sports-science pipeline. The main workflow is: upload/preview → staged analysis → biomechanics → ML prediction → explainability → coaching → history. It is differentiated by combining a full CV pipeline with biomechanical feature engineering, transparent SHAP explanations, injury-risk modeling, and coaching — all in one interactive dashboard. Maturity: a functional, well-engineered **prototype/demo** (models are trained on synthetic data for the core performance/injury pair), with partial real-data secondary models and 167 passing tests.
+PACEAI is an AI-powered cricket fast-bowling biomechanics analysis platform. A user uploads a bowling delivery video (or dials in 10 kinematic sliders manually); the system runs computer vision (YOLOv11 person + sports-ball detection, ByteTrack multi-object tracking, MediaPipe Pose Landmarker) to extract the bowler's movement, derives 10 biomechanical features, and then uses trained ML models to produce a **demonstration performance indicator (0–100, literature-informed demo score)** and a **biomechanical risk indicator (low/moderate/high, screening only)** with **SHAP explainability**, **rule-based coaching recommendations**, and an **ICC elbow-screening check** (screening indicator; an official legality ruling requires lab-grade 3D motion capture per ICC protocol). Intended users are cricket coaches, players, sports physiotherapists, and (for a hackathon/judge audience) technical evaluators of an AI sports-science pipeline. The main workflow is: upload/preview → staged analysis → biomechanics → ML prediction → explainability → coaching → history. It is differentiated by combining a full CV pipeline with biomechanical feature engineering, transparent SHAP explanations, risk-indicator modeling, and coaching — all in one interactive dashboard. Maturity: a functional, well-engineered **prototype/demo** (core performance/risk models are trained on synthetic data; synthetic targets are self-referential demo targets, not validated measurements), with partial real-data secondary models and 184 passing tests.
 
 ---
 
@@ -289,7 +289,7 @@ Features (from `config.FEATURE_NAMES` + `feature_engineering.py`) and grounding:
 | Feature | Source | Units | Used by ML? | Shown to user? | Validation |
 |---|---|---|---|---|---|
 | shoulder_rotation_deg | shoulder/hip landmarks | deg | yes | yes (labels/report) | FEATURE_LABELS range |
-| elbow_flexion_deg | shoulder/elbow/wrist | deg | yes | yes (ICC legality) | ICC 15° threshold |
+| elbow_flexion_deg | shoulder/elbow/wrist | deg | yes | yes (ICC screening) | ICC 15° threshold |
 | wrist_angle_deg | elbow/wrist/hand | deg | yes | in report | ranges |
 | hip_rotation_deg | hips | deg | yes | in report | ranges |
 | knee_flexion_deg | hip/knee/ankle | deg | yes | yes (metric card) | ranges |
@@ -603,9 +603,9 @@ history_db.save_analysis (SQLite)
 | Bowler tracking | ✅ | tracking.py | real | warn | — | ✅ |
 | Pose estimation | ✅ | pose_estimation | real | overlay | yes | ✅ heavy |
 | Biomech features (10) | ✅ | feature_engineering | real | yes | yes | ✅ |
-| Performance score | ✅ | ml_models | synthetic | yes | yes | ⚠️ synthetic model |
-| Injury risk | ✅ | ml_models | synthetic + real | yes | yes | ⚠️ long-term-exposure assumption |
-| ICC legality | ✅ | app (elbow) | real | yes | yes | ✅ |
+| Performance score | ✅ | ml_models | synthetic | yes | yes | ⚠️ self-referential demo target (not a validated measurement) |
+| Injury risk | ✅ | ml_models | synthetic + real | yes | yes | ⚠️ long-term-exposure assumption; screening indicator, not a prediction of actual injury |
+| ICC elbow screening | ✅ | app (elbow) | real | yes | yes | ⚠️ screening only; official legality ruling needs lab-grade 3D capture per ICC protocol |
 | SHAP explainability | ✅ | explainability | model | yes | — | ✅ |
 | Coaching | ✅ | coaching.py | real | yes | — | ✅ (rule-based) |
 | Clinical injury KB | ✅ | injury_knowledge_base | literary | deep-dive | yes | ✅ |

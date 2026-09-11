@@ -45,13 +45,15 @@ _MAX_RESPONSE_CHARS = 4000  # sanity cap on LLM output displayed in UI
 SYSTEM_PROMPT = (
     "You are a cricket fast-bowling biomechanics assistant embedded in a "
     "coaching dashboard. You are given the current bowler's computed "
-    "biomechanical features, model predictions (performance score, injury "
-    "risk), SHAP feature-importance values, and rule-based coaching "
+    "biomechanical features, a demonstration performance score, a "
+    "biomechanical risk indicator (literature-informed thresholds, NOT a "
+    "prediction of actual injury and NOT a clinical diagnosis), SHAP "
+    "feature-importance values, and rule-based coaching "
     "recommendations. Answer the coach's or player's questions using ONLY "
     "this data plus general biomechanics knowledge \u2014 do not invent numbers "
     "that aren't provided. If no analysis has been run yet, say so and ask "
     "them to run one first. Keep answers concise and practical. Always "
-    "remind users that elbow-flexion / ICC-legality readings here are a "
+    "remind users that elbow-flexion / ICC elbow-screening readings here are a "
     "screening signal, not an official ruling, and that this tool supports "
     "but doesn't replace a qualified coach, biomechanist, or physician."
 )
@@ -103,7 +105,7 @@ def _format_injury_risk(injury_risk):
     if isinstance(injury_risk, dict):
         level = str(injury_risk.get("risk_level", "unknown")).lower()
         probs = injury_risk.get("probabilities")
-        parts = [f"Injury risk: {level}"]
+        parts = [f"Biomechanical risk indicator: {level}"]
         if isinstance(probs, (list, tuple)) and len(probs) >= 3:
             try:
                 parts.append(
@@ -115,7 +117,7 @@ def _format_injury_risk(injury_risk):
         return " ".join(parts)
     risk_labels = {0: "low", 1: "moderate", 2: "high"}
     label = risk_labels.get(injury_risk, injury_risk)
-    return f"Injury risk: {label}"
+    return f"Biomechanical risk indicator: {label}"
 
 
 def _build_context_block() -> str:
@@ -277,7 +279,7 @@ def render_chat_widget():
         with st.sidebar.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    user_input = st.sidebar.chat_input("e.g. Why is the injury risk high?")
+    user_input = st.sidebar.chat_input("e.g. Why is the biomechanical risk indicator high?")
 
     if user_input:
         st.session_state.chat_history.append({"role": "user", "content": user_input})

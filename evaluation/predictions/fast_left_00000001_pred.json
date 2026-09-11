@@ -1,0 +1,21 @@
+{
+  "video_id": "fast_left_00000001",
+  "fps": 20.0,
+  "frame_space": "preprocessed_20fps_640x360",
+  "release_frame": 0,
+  "front_contact_frame": null,
+  "reliable": false,
+  "biomechanics": {
+    "shoulder_rotation_deg": 25.6925,
+    "elbow_flexion_deg": 25.1269,
+    "wrist_angle_deg": 147.4673,
+    "hip_rotation_deg": 11.7265,
+    "knee_flexion_deg": 44.2135,
+    "trunk_lean_deg": 165.9423,
+    "stride_length_norm": 0.1069,
+    "release_angle_deg": 33.8575,
+    "angular_velocity_deg_s": 1741.7514,
+    "ground_contact_time_s": 0.0
+  },
+  "note": "PaceAI pipeline prediction output -- NOT ground truth. Frames are indices in the preprocessed space (20 FPS)."
+}

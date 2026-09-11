@@ -1,19 +1,20 @@
 """
 Synthetic demo dataset generator.
 
-No public, labeled (features -> performance score, injury risk) dataset for
-cricket bowling biomechanics ships with this project. To make the dashboard
-usable immediately (and to let the ML/SHAP/coaching modules be exercised and
-tested end-to-end), this module generates a synthetic dataset whose feature
-ranges and label-generating rules are grounded in published fast-bowling
-biomechanics ranges (ICC elbow-extension law, typical elite trunk-lean/knee-
-flexion/stride-length bands referenced in coaching.py).
+No public, labeled (features -> demonstration performance score, biomechanical
+risk indicator) dataset for cricket bowling biomechanics ships with this
+project. To make the dashboard usable immediately (and to let the
+ML/SHAP/coaching modules be exercised and tested end-to-end), this module
+generates a synthetic dataset whose feature ranges and label-generating rules
+are grounded in published fast-bowling biomechanics ranges (ICC elbow-extension
+reference, typical elite trunk-lean/knee-flexion/stride-length bands referenced
+in coaching.py).
 
-Injury risk is modelled as a *3-class severity level* (0=low, 1=moderate,
-2=high) derived from clinical trigger thresholds in
-data/cricket_injury_recovery_benchmarks.json (see
-generate_clinical_synthetic_dataset). The trained model therefore predicts
-P(severity) per delivery.
+The biomechanical risk indicator is modelled as a *3-class severity level*
+(0=low, 1=moderate, 2=high) derived from literature-informed clinical trigger
+thresholds in data/cricket_injury_recovery_benchmarks.json (see
+generate_clinical_synthetic_dataset). The trained demo model therefore predicts
+P(severity) per delivery, NOT a diagnosis or a prediction of actual injury.
 
 Replace this with `pd.read_csv(<your real labeled dataset>)` as soon as you
 have one -- train_demo_model.py works with either.
@@ -66,14 +67,14 @@ def compute_performance_score(df: pd.DataFrame) -> pd.Series:
     Each component is a 0-1 "how close to elite" score; weights sum to 1.0.
     Grounding (fast-bowling literature / ICC law 21.5):
 
-      * angular velocity  -> raw arm speed (pace driver), higher is better
+      * angular velocity  -> shoulder-rotation rate (pace proxy), higher is better
       * knee flexion      -> front-knee BRACE at landing: ideal small (< ~15 deg);
                              41 deg knee is a lever-efficiency failure (w = 0)
-      * elbow flexion     -> ICC action legality: flexion should be small (<= 15 deg)
+      * elbow flexion     -> ICC screening reference: flexion should be small (<= 15 deg)
       * shoulder rotation -> counter-rotation: low is efficient + lumbar-safe
       * trunk lateral lean-> moderate (~22 deg) is optimal; extreme lean = lumbar risk
       * stride length     -> long but NOT over-striding (ideal ~1.05 x stature)
-      * hip rotation      -> pelvis/shoulder separation, moderate ~40 deg optimal
+      * hip rotation      -> pelvic-tilt proxy (from horizontal), moderate ~40 deg optimal
       * release angle     -> release high and over, ideal ~75 deg
       * ground contact    -> short, explosive front-foot contact, ideal ~0.09 s
       * wrist angle       -> wrist snap at release, higher is better

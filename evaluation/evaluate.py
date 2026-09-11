@@ -20,6 +20,13 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+try:
+    from evaluation.ground_truth_validation import run_ground_truth_validation
+    _GT_VALIDATION_AVAILABLE = True
+except ImportError:  # pragma: no cover - import-grace fallback
+    run_ground_truth_validation = None
+    _GT_VALIDATION_AVAILABLE = False
+
 EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 VIDEOS_DIR = os.path.join(EVAL_DIR, "videos")
 ANNOTATIONS_DIR = os.path.join(EVAL_DIR, "annotations")
@@ -705,6 +712,10 @@ def main():
     parser.add_argument("--predict", action="store_true",
                         help="Run the real CV pipeline on each annotated video and "
                              "cache predictions before evaluating (slow).")
+    parser.add_argument("--validate_ground_truth", action="store_true",
+                        help="Compare independently annotated ground truth "
+                             "(evaluation/ground_truth/ground_truth.csv) against "
+                             "PaceAI predictions and write evaluation/results/.")
     args = parser.parse_args()
 
     if args.predict:
@@ -729,38 +740,59 @@ def main():
     if results["status"] == "NO_DATA":
         print(f"\n{results['message']}")
         print("\nAll metrics: NOT MEASURED")
-        return
+    else:
+        print(f"\nVideos evaluated: {results['n_videos']}")
 
-    print(f"\nVideos evaluated: {results['n_videos']}")
+        for vid_id, v_result in results.get("videos", {}).items():
+            print(f"\n--- {vid_id} ---")
+            print(f"  Ground truth annotations: {v_result['ground_truth_count']}")
+            det = v_result["detection"]
+            print(f"  Detection: P={det.get('precision', 'N/A')}, "
+                  f"R={det.get('recall', 'N/A')}, mAP50={det.get('ap50', 'N/A')} "
+                  f"[{det['status']}]")
+            trk = v_result["tracking"]
+            print(f"  Tracking: coverage={trk.get('coverage_pct', 'N/A')}%, "
+                  f"ID switches={trk.get('id_switches', 'N/A')} [{trk['status']}]")
+            rel = v_result["release_frame"]
+            print(f"  Release frame: error={rel.get('absolute_error', 'N/A')} frames "
+                  f"[{rel['status']}]")
+            pose = v_result["pose"]
+            print(f"  Pose: mean_error={pose.get('mean_pixel_error', 'N/A')} px "
+                  f"[{pose['status']}]")
+            wp = v_result["wrist_proxy"]
+            print(f"  Wrist proxy: {wp.get('quality_level', 'N/A')} [{wp['status']}]")
+            reels = v_result["reels"]
+            print(f"  Reels: max_displacement={reels.get('max_center_displacement_px', 'N/A')} px "
+                  f"[{reels['status']}]")
 
-    for vid_id, v_result in results.get("videos", {}).items():
-        print(f"\n--- {vid_id} ---")
-        print(f"  Ground truth annotations: {v_result['ground_truth_count']}")
-        det = v_result["detection"]
-        print(f"  Detection: P={det.get('precision', 'N/A')}, "
-              f"R={det.get('recall', 'N/A')}, mAP50={det.get('ap50', 'N/A')} "
-              f"[{det['status']}]")
-        trk = v_result["tracking"]
-        print(f"  Tracking: coverage={trk.get('coverage_pct', 'N/A')}%, "
-              f"ID switches={trk.get('id_switches', 'N/A')} [{trk['status']}]")
-        rel = v_result["release_frame"]
-        print(f"  Release frame: error={rel.get('absolute_error', 'N/A')} frames "
-              f"[{rel['status']}]")
-        pose = v_result["pose"]
-        print(f"  Pose: mean_error={pose.get('mean_pixel_error', 'N/A')} px "
-              f"[{pose['status']}]")
-        wp = v_result["wrist_proxy"]
-        print(f"  Wrist proxy: {wp.get('quality_level', 'N/A')} [{wp['status']}]")
-        reels = v_result["reels"]
-        print(f"  Reels: max_displacement={reels.get('max_center_displacement_px', 'N/A')} px "
-              f"[{reels['status']}]")
-
-    if "aggregate" in results:
-        print("\n--- AGGREGATE ---")
-        for metric, vals in results["aggregate"].items():
-            print(f"  {metric}: {vals}")
+        if "aggregate" in results:
+            print("\n--- AGGREGATE ---")
+            for metric, vals in results["aggregate"].items():
+                print(f"  {metric}: {vals}")
 
     print("\n" + "=" * 60)
+
+    if args.validate_ground_truth:
+        print("\n" + "=" * 60)
+        print("GROUND-TRUTH VALIDATION (independent annotations vs PaceAI)")
+        print("=" * 60)
+        if run_ground_truth_validation is None:
+            print("Ground-truth validation module unavailable.")
+        else:
+            results = run_ground_truth_validation(write_reports=True)
+            print(f"Ground-truth rows     : {results['ground_truth_rows']}")
+            print(f"Annotated clips       : {results['annotated_video_ids'] or 'none'}")
+            print(f"Clips with predictions: {results['prediction_video_ids'] or 'none'}")
+            if results["ground_truth_rows"] == 0:
+                print("Paired samples        : NO REAL GROUND TRUTH -- INSUFFICIENT DATA")
+            else:
+                print("Paired samples        : %s" % (
+                    "yes" if results["paired_samples_available"]
+                    else "no -> insufficient data"))
+            print("Reports               : evaluation/results/validation_report.md")
+            if results["ground_truth_rows"] == 0:
+                print("NOTE: no accuracy statistics exist -- human annotation is "
+                      "required before any can be reported.")
 
 
 if __name__ == "__main__":

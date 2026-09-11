@@ -33,7 +33,7 @@ _TRIGGER_LABELS = {
     "lateral_trunk_flexion": "Lateral trunk flexion",
     "knee_angle_ffc": "Knee angle at front-foot contact",
     "stride_length_norm": "Stride length",
-    "angular_velocity_deg_s": "Peak angular velocity",
+    "angular_velocity_deg_s": "Shoulder-rotation speed",
     "shoulder_abduction_deg": "Shoulder abduction",
     "continuous_overs": "Continuous overs in spell",
     "seven_day_ball_load": "7-day bowling load",

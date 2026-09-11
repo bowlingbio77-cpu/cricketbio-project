@@ -1,4 +1,4 @@
-"""
+﻿"""
 Stage 10: AI assistant layer over a delivery analysis.
 
 Bridges the biomechanics pipeline to the self-hosted Odysseus AI workspace
@@ -44,15 +44,15 @@ DEFAULT_SESSION_NAME = "cricket-biomech-assistant"
 DEFAULT_QUESTION = (
     "Analyze this delivery as an expert cricket biomechanics coach. Summarize the "
     "delivery in 2-3 sentences, then highlight the strongest and weakest technical "
-    "aspects, flag any injury-risk concerns, and recommend 3-4 concrete, prioritized "
-    "technical/training adjustments."
+    "aspects, flag any biomechanical risk-indicator concerns, and recommend 3-4 "
+    "concrete, prioritized technical/training adjustments."
 )
 
 COHORT_QUESTION = (
     "Compare this cohort of deliveries as an expert cricket biomechanics coach. "
-    "Identify cross-delivery patterns in performance, injury risk, technique "
-    "consistency, and ball-tracking quality. Rank the deliveries most in need of "
-    "attention (and why), and list any repeat technical or risk flags."
+    "Identify cross-delivery patterns in performance, biomechanical risk indicator, "
+    "technique consistency, and ball-tracking quality. Rank the deliveries most in "
+    "need of attention (and why), and list any repeat technical or risk flags."
 )
 
 # Human-friendly units for the kinematics table (mirrors config.FEATURE_NAMES).
@@ -104,8 +104,9 @@ def _elbow_legality(feature_vector: dict) -> str:
     elbow = feature_vector.get("elbow_flexion_deg")
     if elbow is None:
         return "n/a"
-    status = "LEGAL" if elbow <= ICC_ELBOW_EXTENSION_LIMIT_DEG else "EXCEEDS ICC LIMIT"
-    return f"{status} (ICC limit: <= {ICC_ELBOW_EXTENSION_LIMIT_DEG} deg extension at release)"
+    status = "WITHIN LIMIT" if elbow <= ICC_ELBOW_EXTENSION_LIMIT_DEG else "ABOVE REFERENCE"
+    return (f"{status} (ICC screening reference: <= {ICC_ELBOW_EXTENSION_LIMIT_DEG} deg "
+            f"extension at release; screening only, not an official ICC measurement)")
 
 
 def _top_contributors(shap_values: dict, n: int = 5) -> str:
@@ -147,23 +148,23 @@ def assistant_report(result, include_timings: bool = True) -> str:
     parts.append("\n".join(rows))
     parts.append("")
 
-    parts.append(f"**ICC elbow legality**: {_elbow_legality(result.feature_vector)}")
+    parts.append(f"**ICC elbow screening**: {_elbow_legality(result.feature_vector)}")
     parts.append("")
 
     if result.performance_score is not None:
-        parts.append("## Performance model")
+        parts.append("## Performance indicator model (demo)")
         parts.append(f"- **Score**: {result.performance_score:.1f} / 100")
         parts.append("- **Top contributors (SHAP)**:")
         parts.append(_top_contributors(result.shap_contributions_performance))
         parts.append("")
     else:
-        parts.append("## Performance model")
+        parts.append("## Performance indicator model (demo)")
         parts.append("- **Score**: n/a (ML bundles not supplied)")
         parts.append("")
 
     if result.injury_risk:
         risk = result.injury_risk
-        parts.append("## Injury risk model")
+        parts.append("## Biomechanical risk-indicator model")
         parts.append(f"- **Level**: {risk.get('risk_level', 'n/a')}")
         parts.append(f"- **Risk index**: {_fmt(risk.get('risk_index'))}")
         probs = risk.get("probabilities")
@@ -173,7 +174,7 @@ def assistant_report(result, include_timings: bool = True) -> str:
         parts.append(_top_contributors(result.shap_contributions_injury))
         parts.append("")
     else:
-        parts.append("## Injury risk model")
+        parts.append("## Biomechanical risk-indicator model")
         parts.append("- **Level**: n/a (ML bundles not supplied)")
         parts.append("")
 
@@ -237,9 +238,9 @@ def cohort_report(labeled_results, include_timings: bool = False) -> str:
     """Render several labeled deliveries as one compact cohort report.
 
     `labeled_results` is an iterable of ``(label, AnalysisResult)`` pairs. Each
-    delivery gets a compact block (scores, legality, key features, ball outcome)
-    plus a deterministic machine summary (mean performance, injury-level counts,
-    ICC legality count, ball-outcome counts, recurring warnings). Intended for
+    delivery gets a compact block (scores, elbow screening, key features, ball outcome)
+    plus a deterministic machine summary (mean performance, risk-indicator counts,
+    ICC elbow screening count, ball-outcome counts, recurring warnings). Intended for
     comparative / trend questions to the assistant.
     """
     key_features = ("elbow_flexion_deg", "trunk_lean_deg", "knee_flexion_deg",
@@ -263,16 +264,16 @@ def cohort_report(labeled_results, include_timings: bool = False) -> str:
         if result.injury_risk:
             level = result.injury_risk.get("risk_level", "n/a")
             risk_counts[level] = risk_counts.get(level, 0) + 1
-            parts.append(f"- **Injury risk**: {level} "
+            parts.append(f"- **Biomechanical risk indicator**: {level} "
                          f"(index {_fmt(result.injury_risk.get('risk_index'))})")
         elbow = result.feature_vector.get("elbow_flexion_deg")
         if elbow is not None:
             elbow_seen += 1
             if elbow <= ICC_ELBOW_EXTENSION_LIMIT_DEG:
                 legal_count += 1
-            parts.append(f"- **ICC legality**: "
-                         f"{'LEGAL' if elbow <= ICC_ELBOW_EXTENSION_LIMIT_DEG else 'EXCEEDS LIMIT'} "
-                         f"(elbow {_fmt(elbow)} deg)")
+            parts.append(f"- **ICC elbow screening**: "
+                         f"{'WITHIN LIMIT' if elbow <= ICC_ELBOW_EXTENSION_LIMIT_DEG else 'ABOVE REFERENCE'} "
+                         f"(elbow {_fmt(elbow)} deg; screening only, not an official ICC measurement)")
         for feat in key_features:
             parts.append(f"- {feat}: {_fmt(result.feature_vector.get(feat))}")
         ball_stats = result.ball_stats or {}
@@ -292,10 +293,10 @@ def cohort_report(labeled_results, include_timings: bool = False) -> str:
                      f"(range {min(performance_scores):.1f}-{max(performance_scores):.1f}, "
                      f"n={len(performance_scores)})")
     if risk_counts:
-        parts.append("- **Injury risk distribution**: "
+        parts.append("- **Biomechanical risk-indicator distribution**: "
                      + ", ".join(f"{k}: {v}" for k, v in sorted(risk_counts.items())))
     if elbow_seen:
-        parts.append(f"- **ICC legal deliveries**: {legal_count} / {elbow_seen}")
+        parts.append(f"- **ICC elbow screening within reference**: {legal_count} / {elbow_seen}")
     if outcome_counts:
         parts.append("- **Ball-tracking outcomes**: "
                      + ", ".join(f"{k}: {v}" for k, v in sorted(outcome_counts.items())))

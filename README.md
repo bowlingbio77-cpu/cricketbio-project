@@ -5,8 +5,8 @@ Cricket Bowling Biomechanics AI — an end-to-end implementation of the pipeline
 ```
 Video → Preprocessing → Bowler Detection (YOLOv11) → Tracking (ByteTrack)
       → Pose Estimation (MediaPipe, 33 landmarks) → Biomechanical Feature
-      Engineering → ML (Performance / Injury Risk) → SHAP → Streamlit
-      Dashboard → Coaching Recommendations
+      Engineering → ML (Performance Indicator / Biomechanical Risk Indicator)
+      → SHAP → Streamlit Dashboard → Coaching Recommendations
 ```
 
 ## What's real vs. what's a fallback
@@ -20,7 +20,7 @@ This was built in a sandbox with **no internet access**, so it ships with:
 | Tracking | ByteTrack (via `ultralytics`) | code correct; falls back to a built-in greedy IoU tracker |
 | Pose estimation | MediaPipe Tasks `PoseLandmarker` | ✅ library installed & API verified; **needs one model file download** (see below) |
 | Feature engineering | NumPy | ✅ fully working, unit-tested with synthetic landmarks |
-| ML models | scikit-learn always; XGBoost/CatBoost/PyTorch if installed | ✅ trained and validated end-to-end (Random Forest) |
+| ML models | scikit-learn always; XGBoost/CatBoost/PyTorch if installed | ✅ trained end-to-end (Random Forest); CV metrics reported vs baselines — not real-world validated |
 | Explainability | SHAP if installed, else permutation/sensitivity fallback | ✅ fallback tested end-to-end |
 | Dashboard | Streamlit | code correct; **needs `pip install streamlit plotly`** |
 | Coaching engine | Rule-based, SHAP-aware | ✅ fully working, tested |
@@ -100,9 +100,9 @@ delivery into a local SQLite database (`data/bowling_history.db`).
 Two pages in the sidebar:
 - **Analyze** — run a new delivery (manual entry or video upload).
 - **History & Compare** — browse every saved session, track the performance trend
-  over time, compare sessions side-by-side (performance, injury risk, and a
-  feature-by-feature table/delta), inspect full details of any session, and
-  delete/clear history.
+  over time, compare sessions side-by-side (performance indicator, biomechanical
+  risk indicator, and a feature-by-feature table/delta), inspect full details of
+  any session, and delete/clear history.
 
 ## Project layout
 
@@ -149,9 +149,9 @@ cricket_biomech_ai/
 ## Using real data
 
 `synthetic_data.py` exists only so the app works before you have labeled data.
-Once you have real (features → performance_score, injury_risk) rows —
-ideally scored by a coach/biomechanist and a sports-medicine team —
-retrain with:
+Once you have real (features → demonstration performance_score, biomechanical
+risk indicator) rows — ideally scored by a coach/biomechanist and a
+sports-medicine team — retrain with:
 
 ```bash
 python scripts/train_demo_model.py --data your_labeled_dataset.csv --model xgboost
@@ -159,6 +159,9 @@ python scripts/train_demo_model.py --data your_labeled_dataset.csv --model xgboo
 
 CSV columns required: the 10 names in `src/config.FEATURE_NAMES`, plus
 `performance_score` (0–100) and `injury_risk` (0=low, 1=moderate, 2=high).
+These column names are kept for compatibility; the biomechanical model scoring
+is a literature-informed screening indicator, not a prediction of actual injury
+or a clinical diagnosis.
 
 ### ML validity safeguards
 
@@ -229,9 +232,16 @@ Key correctness choices (all deliberate, see `src/ml_models.py`):
 
 ## Important caveats
 
-- **Elbow flexion / ICC legality**: the feature is a good *screening* signal,
-  not a certified throwing test. Official illegal-action rulings require
-  lab-grade 3D motion capture per ICC protocol.
+- **No human per-delivery biomechanical ground truth exists for this project yet.**
+  The 8 run clips and the `corrected_all_data/bowling/*` corpus (2,559 bowls) are
+  unlabeled for biomechanics, so MAE/RMSE/ICC/Bland-Altman accuracy validation has
+  not been and cannot yet be performed. Until clips are annotated by a
+  coach/biomechanist + sports-medicine team and collected with documented consent,
+  everything is a *demonstration* or *screening indicator*, not a validated
+  measurement.
+- **ICC elbow screening**: a good *screening* signal, not a certified throwing
+  test. Official illegal-action rulings require lab-grade 3D motion capture per
+  ICC protocol.
 - **Coaching thresholds** in `coaching.py` are illustrative, drawn from
   published fast-bowling biomechanics ranges — calibrate them (and better,
   replace the rule engine's role with your trained model's SHAP output) against

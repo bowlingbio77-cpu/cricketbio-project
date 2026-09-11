@@ -1,6 +1,6 @@
 """
 PaceAI — Cricket Bowling Biomechanics AI
-Pro Coaching & Injury Analytics Dashboard (dark theme)
+Pro Coaching & Biomechanics Screening Dashboard (dark theme)
 
 Run with:
     streamlit run app.py
@@ -136,6 +136,8 @@ st.markdown("""
     .badge-high { background-color: rgba(198, 40, 40, 0.2); color: #ef5350; border: 1px solid #ef5350; }
     .badge-legal { background-color: rgba(0, 230, 118, 0.15); color: #00e676; border: 1px solid #00e676; }
     .badge-illegal { background-color: rgba(255, 23, 68, 0.15); color: #ff1744; border: 1px solid #ff1744; }
+    .badge-demo { background-color: rgba(255, 179, 71, 0.15); color: #ffb347; border: 1px solid #ffb347; }
+    .badge-video { background-color: rgba(41, 182, 246, 0.15); color: #29b6f6; border: 1px solid #29b6f6; }
 
     /* Custom Header Banner */
     .hero-banner {
@@ -546,16 +548,16 @@ FEATURE_LABELS = {
     "shoulder_rotation_deg": ("Shoulder Counter-Rotation", "deg", 0, 90, 18.0),
     "elbow_flexion_deg": ("Elbow Flexion", "deg", 0, 45, 8.0),
     "wrist_angle_deg": ("Wrist Angle", "deg", 90, 180, 165.0),
-    "hip_rotation_deg": ("Hip Rotation", "deg", 0, 80, 45.0),
+    "hip_rotation_deg": ("Pelvic Tilt (from horizontal)", "deg", 0, 80, 45.0),
     "knee_flexion_deg": ("Front-Knee Flexion", "deg", 0, 60, 10.0),
     "trunk_lean_deg": ("Trunk Lateral Lean", "deg", 0, 60, 25.0),
     "stride_length_norm": ("Stride Length (norm)", "x H", 0.3, 1.6, 1.05),
     "release_angle_deg": ("Release Angle", "deg", 30, 90, 78.0),
-    "angular_velocity_deg_s": ("Peak Angular Velocity", "deg/s", 100, 1500, 1100.0),
+    "angular_velocity_deg_s": ("Shoulder-Rotation Speed", "deg/s", 100, 1500, 1100.0),
     "ground_contact_time_s": ("Front Foot Contact Time", "s", 0.05, 0.35, 0.11),
 }
 
-# Elite Fast Bowler Benchmark for comparison (clinically grounded profile)
+# Elite Fast Bowler Benchmark for comparison (literature-informed profile)
 ELITE_BENCHMARK = {
     "shoulder_rotation_deg": 18.0,
     "elbow_flexion_deg": 8.0,
@@ -577,7 +579,7 @@ PRESETS = {
         "stride_length_norm": 1.05, "release_angle_deg": 78.0, "angular_velocity_deg_s": 1100.0,
         "ground_contact_time_s": 0.11
     },
-    "🚨 High Lumbar Injury Risk Action": {
+    "🚨 High Biomechanical Risk Indicator Action": {
         "shoulder_rotation_deg": 28.0, "elbow_flexion_deg": 22.0, "wrist_angle_deg": 135.0,
         "hip_rotation_deg": 58.0, "knee_flexion_deg": 38.0, "trunk_lean_deg": 45.0,
         "stride_length_norm": 0.72, "release_angle_deg": 60.0, "angular_velocity_deg_s": 460.0,
@@ -635,7 +637,7 @@ def render_modern_gauge(value, title, subtitle="", max_val=100, is_risk=False):
 
 def render_radar_comparison(current_feats: dict):
     categories = [
-        "Shoulder Rot.", "Arm Extension", "Wrist Cocking", "Hip Rotation",
+        "Shoulder Rot.", "Arm Extension", "Wrist Cocking", "Pelvic Tilt",
         "Knee Brace", "Upright Trunk", "Stride Prowess", "Release Velocity"
     ]
 
@@ -781,7 +783,7 @@ def render_model_quality_expander(perf_bundle, injury_bundle):
             cv = getattr(injury_bundle, "cv_metrics", None) or {}
             bl = getattr(injury_bundle, "baseline_metrics", None) or {}
             folds = cv.get("folds", 0)
-            st.markdown(f"**Injury-risk model** (`{injury_bundle.model_name}`)"
+            st.markdown(f"**Biomechanical risk-indicator model** (`{injury_bundle.model_name}`)"
                         + (f" — {folds}-fold cross-validation" if folds else ""))
             if cv:
                 st.markdown(f"- Accuracy: **{cv.get('accuracy_mean', 0):.3f}** ± "
@@ -821,18 +823,21 @@ def render_plain_language_summary(result, risk_level, is_icc_legal, elbow_flex):
         bullets.append(f"**Performance: {perf:.0f}/100** — {band}.")
 
     risk_desc = {
-        "low": "mechanics look safe to repeat",
-        "moderate": "a few technical flags worth addressing before heavy workload",
-        "high": "worth stopping and correcting technique before more bowling",
+        "low": "no literature-informed biomechanical trigger thresholds were exceeded for this delivery",
+        "moderate": "a few literature-informed trigger thresholds were flagged — review before heavy workload",
+        "high": "several literature-informed trigger thresholds were exceeded — review technique before more bowling",
     }.get(risk_level, "see detailed breakdown")
-    bullets.append(f"**Injury risk: {risk_level.upper()}** — {risk_desc}.")
+    bullets.append(f"**Biomechanical risk indicator: {risk_level.upper()}** — {risk_desc}.")
 
     if is_icc_legal:
-        bullets.append(f"**ICC action: LEGAL** — elbow extension {elbow_flex:.1f}° is within the "
-                       f"{config.ICC_ELBOW_EXTENSION_LIMIT_DEG}° limit, so the delivery won't be called a throw.")
+        bullets.append(f"**ICC screening: WITHIN LIMIT** — elbow extension {elbow_flex:.1f}° is within the "
+                       f"{config.ICC_ELBOW_EXTENSION_LIMIT_DEG}° reference value. This is a screening "
+                       f"indicator, not an official ICC on-field measurement.")
     else:
-        bullets.append(f"**ICC action: SUSPECT** — elbow extension {elbow_flex:.1f}° exceeds the "
-                       f"{config.ICC_ELBOW_EXTENSION_LIMIT_DEG}° limit; a straight-arm path through release is the priority.")
+        bullets.append(f"**ICC screening: ABOVE REFERENCE** — elbow extension {elbow_flex:.1f}° exceeds the "
+                       f"{config.ICC_ELBOW_EXTENSION_LIMIT_DEG}° reference value; a straighter arm path "
+                       f"through release is the priority. This is a screening indicator, not an official "
+                       f"ICC on-field measurement.")
 
     top_fix = next((n for n in (result.coaching_notes or [])
                     if not n.startswith("No significant")), None)
@@ -842,8 +847,8 @@ def render_plain_language_summary(result, risk_level, is_icc_legal, elbow_flex):
     if result.shap_contributions_injury:
         top_feat = max(result.shap_contributions_injury, key=lambda k: abs(result.shap_contributions_injury[k]))
         label = FEATURE_LABELS.get(top_feat, (top_feat.replace("_", " ").title(),))[0]
-        bullets.append(f"**Main injury driver:** {label} has the biggest effect on the injury-risk score "
-                       f"(see Explainable AI tab for the full picture).")
+        bullets.append(f"**Main risk-indicator driver:** {label} has the biggest effect on the "
+                       f"biomechanical risk-indicator score (see Explainable AI tab for the full picture).")
 
     bstats = st.session_state.get("ball_stats") or {}
     if bstats.get("n_frames"):
@@ -866,17 +871,17 @@ FEATURES_GUIDE = [
     ("VIDEO", "📹 Video Capture", "Upload a clip; the app finds the bowler, reads 33 body landmarks, and measures the delivery automatically."),
     ("BALL", "🎯 Ball Tracking", "The red box follows the cricket ball from release to impact; a dashed box means the app is guessing where it is between detections."),
     ("ARM", "🏏 Bowling Arm", "Which arm the bowler bowls with. The app mirrors the joints so left-handers aren't analyzed backwards."),
-    ("AI", "🧠 AI Backbone", "The math model that turns measurements into a 0–100 score and an injury-risk level. Random Forest is the safe default."),
+    ("AI", "🧠 AI Backbone", "The math model that turns measurements into a demonstration performance score and a biomechanical risk-indicator level. Random Forest is the safe default."),
     ("PRESET", "🎥 Processing", "Speed vs accuracy of the video analysis. Fast = rough but quick; Maximum accuracy = precise but slow."),
-    ("SCORE", "⭐ Performance", "One number (0–100) for how good this delivery's mechanics are. Higher = closer to elite pace bowlers."),
-    ("RISK", "🚨 Injury Risk", "How safe this action is to keep repeating. Low = fine, Moderate = fix a couple of things, High = stop and correct."),
-    ("LEGALITY", "⚖️ ICC Legality", "Whether the elbow stays straight enough (≤15°) at release to be a legal delivery, not a 'throw'."),
+    ("SCORE", "⭐ Performance", "A literature-informed demonstration performance indicator (0–100) for this delivery's mechanics. Higher = closer to published elite pace-bowler ranges."),
+    ("RISK", "🚨 Biomechanical Risk Indicator", "How many literature-informed biomechanical trigger thresholds this action crosses. Low = none exceeded, Moderate = a few, High = several."),
+    ("LEGALITY", "⚖️ ICC Screening", "Whether the elbow flexion at release stays within the ≤15° ICC reference value. Screening only — an official legality ruling requires lab-grade 3D motion capture per ICC protocol."),
     ("KNEE", "🦵 Knee Brace", "How straight the front knee is at landing. Low degrees = better braking and less knee stress."),
     ("GAUGES", "📊 Gauges & Stress", "Big dials for your score and risk, plus how much load lands on the back, knee and shoulder."),
     ("RADAR", "🕸️ Kinetic Radar", "Your shape compared with an elite bowler's. A wider, more balanced shape is better."),
     ("XAI", "🧠 Explainable AI", "Which single measurement moved your score or risk up or down the most."),
     ("DRILLS", "🏋️ Coaching Drills", "Exercises and technique fixes for whatever got flagged in this delivery."),
-    ("CLINICAL", "🏥 Clinical Risk", "Checks your delivery against published injury benchmarks and workload rules (ACWR, overs, rest days)."),
+    ("CLINICAL", "🏥 Literature Risk Thresholds", "Checks your delivery against published biomechanical screening benchmarks and workload rules (ACWR, overs, rest days). Screening only — not a prediction of injury."),
     ("REPORT", "📑 Report", "Downloads all of this run's results as a JSON file you can keep or share."),
     ("HISTORY", "📚 History & Compare", "Every saved delivery, listed and compared side by side over time."),
     ("SAVE", "💾 Save to History", "Stores this run so you can compare it against future sessions."),
@@ -1000,7 +1005,7 @@ def render_history_page():
         st.plotly_chart(fig, width='stretch')
     elif chrono:
         st.subheader("Performance over time")
-        st.caption("Save more results to see a performance trend chart.")
+        st.caption("Save more results to see a demo-performance trend chart.")
 
     # --- Comparison ---
     options = {r["id"]: _session_name(r) for r in records}
@@ -1030,7 +1035,7 @@ def render_history_page():
                 marker_color=["#ef5350" if _risk_of(r) == "high" else "#fbc02d"
                               if _risk_of(r) == "moderate" else "#00e676" for r in sel],
                 text=[_risk_of(r).title() for r in sel], textposition="outside"))
-            fig.update_layout(title="Injury risk", height=320,
+            fig.update_layout(title="Biomechanical risk indicator", height=320,
                               paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                               font=dict(color="#c9d1d9"), margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig, width='stretch')
@@ -1074,12 +1079,12 @@ def render_history_page():
             if isinstance(risk, dict) and risk.get("probabilities"):
                 probs = risk["probabilities"]
                 risk_num = {"low": 25, "moderate": 60, "high": 90}[risk.get("risk_level", "low")]
-                st.plotly_chart(render_modern_gauge(risk_num, f"Injury Risk: {risk['risk_level'].upper()}",
+                st.plotly_chart(render_modern_gauge(risk_num, f"Biomechanical Risk: {risk['risk_level'].upper()}",
                                                     is_risk=True), width='stretch')
                 if len(probs) >= 3:
                     st.caption(f"P(low)={probs[0]:.2f}  P(moderate)={probs[1]:.2f}  P(high)={probs[2]:.2f}")
             else:
-                st.info("No injury-risk prediction stored for this session.")
+                st.info("No biomechanical risk-indicator prediction stored for this session.")
         with st.expander("Features"):
             feat_df = pd.DataFrame([
                 {"Feature": FEATURE_LABELS.get(k, (k,))[0],
@@ -1095,7 +1100,7 @@ def render_history_page():
             if not notes:
                 st.caption("No coaching notes stored for this session.")
         with st.expander("Explainable AI — feature contributions"):
-            tab1, tab2 = st.tabs(["Performance drivers", "Injury-risk drivers"])
+            tab1, tab2 = st.tabs(["Performance drivers", "Biomechanical-risk drivers"])
             with tab1:
                 shap_perf = detail.get("shap_performance")
                 if shap_perf:
@@ -1108,10 +1113,10 @@ def render_history_page():
                 shap_injury = detail.get("shap_injury")
                 if shap_injury:
                     st.plotly_chart(render_shap_bar(shap_injury,
-                                                    "Feature contribution to injury-risk score"),
+                                                    "Feature contribution to biomechanical risk-indicator score"),
                                     width='stretch')
                 else:
-                    st.caption("No injury SHAP data stored for this session.")
+                    st.caption("No biomechanical-risk SHAP data stored for this session.")
         with st.expander("Run timing"):
             render_timings(detail.get("stage_times") or {})
 
@@ -1148,7 +1153,7 @@ def _confirm_clear_history():
 # ---------------- SIDEBAR CONTROLS ----------------
 with st.sidebar:
     st.markdown("### 🏏 PaceAI Biomechanics")
-    st.caption("AI Motion Capture, Kinetics & Injury Prevention")
+    st.caption("AI Motion Capture, Kinetics & Biomechanics Screening")
     st.markdown("---")
 
     page = st.radio("🧭 Navigation", ["⚡ Analyze", "📚 History & Compare"],
@@ -1246,7 +1251,7 @@ st.markdown("""
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
         <div>
             <h1 class="hero-title">⚡ Fast-Bowling Biomechanics AI</h1>
-            <p class="hero-subtitle">Kinematic Chain Profiling • ICC Arm Legality Check • Lumbar & Knee Injury Prevention</p>
+            <p class="hero-subtitle">Kinematic Chain Profiling • ICC Elbow Screening • Literature-Informed Biomechanical Risk</p>
         </div>
         <div>
             <span class="status-badge badge-legal" style="margin-right: 8px;">● AI Engine Ready</span>
@@ -1446,7 +1451,7 @@ if feature_vector:
     # Make the latest analysis available to the sidebar chat assistant.
     merged_shap = dict(result.shap_contributions_performance or {})
     for k, v in (result.shap_contributions_injury or {}).items():
-        merged_shap[f"{k} [injury]"] = v
+        merged_shap[f"{k} [biomech risk]"] = v
     st.session_state["features"] = dict(result.feature_vector)
     st.session_state["performance_score"] = result.performance_score
     st.session_state["injury_risk"] = result.injury_risk
@@ -1478,34 +1483,64 @@ if feature_vector:
     for warning in st.session_state.get("last_warnings", []):
         st.warning(warning)
 
+    # DEMO vs RESEARCH / input-mode badges (research transparency)
+    ds = getattr(perf_bundle, "data_source", "synthetic")
+    if ds == "synthetic":
+        model_badge = ('<span class="status-badge badge-demo">DEMO MODELS • SYNTHETIC-TRAINED</span>',
+                       "Scored by demo models trained on synthetic biomechanical data "
+                       "(labels derived from the features themselves). Illustrative only, "
+                       "not a validated research measurement.")
+    elif ds == "real":
+        model_badge = ('<span class="status-badge badge-legal">REAL-DATA-TRAINED MODELS</span>',
+                       "Scored by models trained on a real labeled dataset. Still not a "
+                       "clinically validated measurement -- benchmark against a fresh holdout "
+                       "population before research use.")
+    else:
+        model_badge = ('<span class="status-badge badge-demo">MODEL SOURCE UNKNOWN</span>',
+                       "Bundle saved by an older version without provenance -- treat as demo.")
+    if input_mode.startswith("📹"):
+        input_badge = ('<span class="status-badge badge-video">REAL VIDEO • FEATURES MEASURED</span>',
+                       f"Features measured from the uploaded clip via MediaPipe "
+                       f"({result.landmark_source_summary and result.landmark_source_summary.get('world_3d_frames', 0)} "
+                       f"world-3D / {result.landmark_source_summary and result.landmark_source_summary.get('normalized_2d_frames', 0)} "
+                       f"2D pose frames).")
+    else:
+        input_badge = ('<span class="status-badge badge-video">MANUAL SLIDER INPUT</span>',
+                       "Features entered by hand in the simulator -- not measured from video.")
+    st.markdown(
+        f'<div style="display:flex; gap:8px; flex-wrap:wrap; margin:6px 0;">'
+        f'{model_badge[0]}{input_badge[0]}</div>',
+        unsafe_allow_html=True)
+    st.caption(f"{model_badge[1]} {input_badge[1]}")
+
     # Key Summary Metric Header
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     with col_m1:
         st.markdown(f"""
-        <div class="metric-card" role="region" aria-label="Performance Rating">
-            <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">PERFORMANCE RATING</span>
+        <div class="metric-card" role="region" aria-label="Demonstration Performance Indicator">
+            <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">DEMONSTRATION PERFORMANCE INDICATOR</span>
             <h2 style="margin:4px 0; color:#00e676;">{result.performance_score:.1f}<span style="font-size:1rem;color:#8b949e"> / 100</span></h2>
-            <span style="color:#8b949e; font-size:0.78rem;">Pace Potential Index</span>
+            <span style="color:#8b949e; font-size:0.78rem;">Literature-informed demo score — not a validated measurement</span>
         </div>
         """, unsafe_allow_html=True)
     with col_m2:
         badge_cls = f"badge-{risk_level}"
         p_high = f"{risk_probs[2]:.2f}" if len(risk_probs) > 2 else "n/a"
         st.markdown(f"""
-        <div class="metric-card" role="region" aria-label="Injury Risk Level">
-            <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">INJURY RISK LEVEL</span>
+        <div class="metric-card" role="region" aria-label="Biomechanical Risk Indicator">
+            <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">BIOMECHANICAL RISK INDICATOR</span>
             <div style="margin:8px 0;"><span class="status-badge {badge_cls}">{_esc(risk_level.upper())} RISK</span></div>
-            <span style="color:#8b949e; font-size:0.78rem;">P(High Risk) = {_esc(p_high)}</span>
+            <span style="color:#8b949e; font-size:0.78rem;">P(High) = {_esc(p_high)} (demo model)</span>
         </div>
         """, unsafe_allow_html=True)
     with col_m3:
         icc_badge = "badge-legal" if is_icc_legal else "badge-illegal"
-        icc_text = "LEGAL (\u226415\u00b0)" if is_icc_legal else "SUSPECT (>15\u00b0)"
+        icc_text = "WITHIN LIMIT (\u226415\u00b0)" if is_icc_legal else "ABOVE REF (>15\u00b0)"
         st.markdown(f"""
-        <div class="metric-card" role="region" aria-label="ICC Action Legality">
-            <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">ICC ACTION LEGALITY</span>
+        <div class="metric-card" role="region" aria-label="ICC Screening Indicator">
+            <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">ICC SCREENING INDICATOR</span>
             <div style="margin:8px 0;"><span class="status-badge {icc_badge}">{_esc(icc_text)}</span></div>
-            <span style="color:#8b949e; font-size:0.78rem;">Flexion: <b>{elbow_flex:.1f}\u00b0</b></span>
+            <span style="color:#8b949e; font-size:0.78rem;">Flexion: <b>{elbow_flex:.1f}\u00b0</b> (screening, not an official ICC measurement)</span>
         </div>
         """, unsafe_allow_html=True)
     with col_m4:
@@ -1534,19 +1569,20 @@ if feature_vector:
     # Model confidence disclaimer
     data_source = getattr(perf_bundle, "data_source", "synthetic")
     if data_source == "synthetic":
-        st.info("**Note:** Performance and injury-risk predictions are trained on "
-                "synthetic biomechanical data. Scores are experimental and should "
-                "not be treated as clinical diagnoses. Use for technique feedback only.")
+        st.info("**Note:** Performance and biomechanical risk-indicator predictions are trained on "
+                "synthetic biomechanical data and labelled **demo models**. Scores are experimental and "
+                "should not be treated as clinical diagnoses or real-world validated measurements. "
+                "Use for technique feedback only.")
 
     # ---------------- DETAILED BREAKDOWN (deep dive, collapsed by default) ----------------
-    with st.expander("🔍 Deep-dive analysis — gauges, radar, SHAP, drills, clinical, report", expanded=False):
+    with st.expander("🔍 Deep-dive analysis — gauges, radar, SHAP, drills, risk thresholds, report", expanded=False):
         # ---------------- TABBED DETAILED BREAKDOWN ----------------
         tab_summary, tab_radar, tab_shap, tab_coaching, tab_clinical, tab_export = st.tabs([
             "📊 Gauges & Joint Stress",
             "🕸️ Kinetic Radar vs Pro Benchmark",
             "🧠 Explainable AI (SHAP)",
             "🏋️ Coaching & Rehab Drills",
-            "🏥 Clinical Risk",
+            "🏥 Literature Risk Thresholds",
             "📑 Biomechanical Report"
         ])
     
@@ -1554,7 +1590,7 @@ if feature_vector:
             col_g1, col_g2 = st.columns(2)
             with col_g1:
                 st.plotly_chart(
-                    render_modern_gauge(result.performance_score, "Performance & Pace Potential", "Kinematic Energy Transfer Score"),
+                    render_modern_gauge(result.performance_score, "Demonstration Performance Indicator", "Demo score — not a validated measurement"),
                     width='stretch'
                 )
                 interval = ml_models.prediction_interval_performance(perf_bundle, feature_vector)
@@ -1563,7 +1599,7 @@ if feature_vector:
                                f"(model uncertainty)")
             with col_g2:
                 st.plotly_chart(
-                    render_modern_gauge(risk_score, "Injury Hazard Index", f"Overall Risk: {risk_level.upper()}", is_risk=True),
+                    render_modern_gauge(risk_score, "Biomechanical Risk Index", f"Overall Risk: {risk_level.upper()}", is_risk=True),
                     width='stretch'
                 )
                 if len(risk_probs) >= 3:
@@ -1594,7 +1630,7 @@ if feature_vector:
     
         with tab_shap:
             st.markdown("#### 🧠 Model Explainability Breakdown")
-            st.caption("Identifies which exact kinematic variables pushed performance up or triggered injury alerts.")
+            st.caption("Identifies which exact kinematic variables pushed performance up or signalled biomechanical risk.")
             shap_c1, shap_c2 = st.columns(2)
             with shap_c1:
                 if result.shap_contributions_performance:
@@ -1605,7 +1641,7 @@ if feature_vector:
             with shap_c2:
                 if result.shap_contributions_injury:
                     st.plotly_chart(
-                        render_shap_bar(result.shap_contributions_injury, "Injury Hazard Risk Drivers (Red = Elevates Risk)"),
+                        render_shap_bar(result.shap_contributions_injury, "Biomechanical Risk Drivers (Red = Elevates Risk)"),
                         width='stretch'
                     )
     
@@ -1641,15 +1677,16 @@ if feature_vector:
                 """)
     
         with tab_clinical:
-            st.markdown("### 🏥 Clinical Injury-Risk Benchmarks")
+            st.markdown("### 🏥 Literature-Informed Biomechanical Risk Thresholds")
             st.caption("Literature-derived trigger thresholds (data/cricket_injury_recovery_benchmarks.json) "
-                       "evaluated against this delivery. Screening reference only -- not a medical diagnosis.")
+                       "evaluated against this delivery. Screening reference only — not a medical diagnosis, "
+                       "not a prediction of actual injury.")
     
             clinical_feats = injury_kb.map_from_pipeline_features(feature_vector)
             risks = injury_kb.assess_biomechanical_risks(clinical_feats)
     
             if risks:
-                st.markdown('<div role="list" aria-label="Clinical injury risk assessments">', unsafe_allow_html=True)
+                st.markdown('<div role="list" aria-label="Literature-informed biomechanical risk assessments">', unsafe_allow_html=True)
                 for r in risks:
                     badge_cls = "badge-high" if r["severity"] == "High" else "badge-moderate"
                     trig_text = "".join(f"<li>{_esc(t)}</li>" for t in r["trigger_detected"])
@@ -1694,7 +1731,7 @@ if feature_vector:
                 bench_df = pd.DataFrame(injury_kb.all_benchmarks())
                 bench_df = bench_df.rename(columns={
                     "injury": "Injury", "anatomical_site": "Anatomical Site",
-                    "clinical_incidence": "Clinical Incidence",
+                    "clinical_incidence": "Reported Incidence",
                     "primary_triggers": "Primary Triggers",
                     "avg_days_to_return": "Avg Days to Return",
                     "median_days_to_match": "Median Days to Match",
@@ -1719,7 +1756,11 @@ if feature_vector:
                 "injury_risk": result.injury_risk,
                 "icc_legal": is_icc_legal,
                 "kinematics": feature_vector,
-                "coaching_feedback": result.coaching_notes
+                "coaching_feedback": result.coaching_notes,
+                "feature_provenance": result.feature_provenance or {},
+                "landmark_source_summary": result.landmark_source_summary or {},
+                "model_note": "Demo models trained on synthetic/literature-derived data - "
+                              "screening indicators, not clinical diagnoses or validated measurements."
             }, indent=2)
     
             st.download_button(

@@ -1,0 +1,121 @@
+{
+  "schema_version": "2.0",
+  "generated": "2026-09-10",
+  "purpose": "Data provenance manifest for PaceAI research evaluation. Documents for every data artifact used in the project: what it is, where it came from, whether it is real or synthetic, whether individual consent for AI-processing exists, and whether it is usable as research-grade ground truth.",
+  "consent_policy": "Any real human-recording dataset (video, physiological, or player-season) that lacks documented individual consent for AI/biomechanics analysis is recorded as consent_status: unknown. Unknown consent blocks use in published research or commercial deployment until consent can be established.",
+  "datasets": [
+    {
+      "id": "corrected_all_data_bowling",
+      "kind": "real_video",
+      "path": "corrected_all_data/bowling/",
+      "file_count": 2559,
+      "subsets": {
+        "fast_left": 481,
+        "fast_right": 525,
+        "leg_left": 350,
+        "leg_right": 324,
+        "off_left": 443,
+        "off_right": 436
+      },
+      "formats": ["mp4", "avi"],
+      "origin": "Provided externally to the project; original source, capture protocol, camera specs and player identities not documented in-repo.",
+      "consent_status": "unknown",
+      "research_grade_gt": false,
+      "notes": "8 clips were run through the pipeline during PARI-F1 (May 2025 FFC qualifying sweep). No per-delivery biomechanical ground-truth labels exist for any clip; do not use for MAE/RMSE/ICC/Bland-Altman validation until labeled."
+    },
+    {
+      "id": "multimodal_sports_injury_dataset",
+      "kind": "real_tabular",
+      "path": "data/multimodal_sports_injury_dataset.csv",
+      "rows": 15420,
+      "groups": 156,
+      "target": "injury_occurred (0/1/2)",
+      "origin": "Kaggle: anjalibhegam/multimodal-sports-injury-dataset (downloaded artifact).",
+      "consent_status": "unknown",
+      "license": "unknown",
+      "research_grade_gt": true,
+      "notes": "Used to train sports_injury_* bundles with StratifiedGroupKFold on athlete_id (no athlete leakage). Original citation/URL to be recorded on verification."
+    },
+    {
+      "id": "cricket_injury_dataset",
+      "kind": "real_tabular",
+      "path": "data/cricket_injury_dataset.csv",
+      "rows": 1272,
+      "target": "injury_status (binary), injury_severity (ordinal from match_days_lost)",
+      "origin": "Referenced in src/cricket_injury_data.py as 'Cricket Injury Dataset' (player-season level). Original source repository not documented in-repo.",
+      "consent_status": "unknown",
+      "license": "unknown",
+      "research_grade_gt": true,
+      "notes": "Used to train cricket_injury_* and cricket_severity_* bundles. ROC-AUC ~0.5 (player-season metadata only, genuinely hard task)."
+    },
+    {
+      "id": "cricket_ball_dataset",
+      "kind": "real_image",
+      "path": "data/cricket_ball_dataset/",
+      "origin": "Cricket-ball detection/classification image dataset used for ball tracking evaluation.",
+      "consent_status": "not_applicable",
+      "research_grade_gt": true,
+      "notes": "BallAnnotation/PoseAnnotation evaluation harness exists (evaluation/evaluate.py) but annotation records are currently empty (NO_DATA)."
+    },
+    {
+      "id": "synthetic_bowling_dataset",
+      "kind": "synthetic",
+      "path": "data/synthetic_bowling_dataset.csv",
+      "rows": 4001,
+      "features": 10,
+      "targets": ["performance_score", "injury_severity"],
+      "origin": "Generated in-repo by src/synthetic_data.py (rules grounded in literature-informed ranges; see CITATION.md).",
+      "consent_status": "not_applicable",
+      "research_grade_gt": false,
+      "notes": "Labels derived from features (self-referential). Metrics on this set measure fit to the generator only -- never presented as accuracy."
+    },
+    {
+      "id": "gt_clips",
+      "kind": "synthetic_video",
+      "path": "data/gt_clips/",
+      "origin": "Generated in-repo by scripts/gen_gt_clips.py (synthetic ball-tracking clips with synthetic ball GT JSON).",
+      "consent_status": "not_applicable",
+      "research_grade_gt": false,
+      "notes": "Synthetic ball-tracking ground truth only -- NOT human biomechanics ground truth."
+    },
+    {
+      "id": "cricket_injury_recovery_benchmarks",
+      "kind": "literature_derived",
+      "path": "data/cricket_injury_recovery_benchmarks.json",
+      "origin": "Compiled in-repo from fast-bowling epidemiology/biomechanics literature reviews (screening reference).",
+      "consent_status": "not_applicable",
+      "research_grade_gt": false,
+      "notes": "Individual figures marked [Source verification required] in CITATION.md."
+    },
+    {
+      "id": "cricket_injury_recovery_benchmarks_csv",
+      "kind": "literature_derived",
+      "path": "data/cricket_injury_recovery_benchmarks.csv",
+      "origin": "Derived table from cricket_injury_recovery_benchmarks.json.",
+      "consent_status": "not_applicable",
+      "research_grade_gt": false
+    },
+    {
+      "id": "bowling_history_db",
+      "kind": "local_artifact",
+      "path": "data/bowling_history.db",
+      "origin": "SQLite history produced by app.py sessions.",
+      "consent_status": "not_applicable",
+      "research_grade_gt": false,
+      "notes": "Local app state; not a research dataset."
+    }
+  ],
+  "model_bundles": {
+    "kind": "first_party_artifacts",
+    "path": "models/",
+    "origin": "Produced in-repo by scripts/train_demo_model.py and scripts/train_sports_injury_model.py.",
+    "tagging": "Each bundle carries data_source (synthetic/real), CV metrics, baseline comparison, training config, seed.",
+    "note": "performance_random_forest/performance_xgboost/performance_catboost/performance_cnn_lstm/performance_transformer are DEMO models trained on synthetic_bowling_dataset (self-referential target). injury_* are DEMO biomechanical risk-indicator models (same synthetic set). sports_injury_* and cricket_injury_*/cricket_severity_* are trained on real labeled datasets with grouped cross-validation."
+  },
+  "known_gaps": [
+    "No human per-delivery biomechanical ground truth exists (P1 blocker for accuracy validation).",
+    "Consent status unknown for corrected_all_data and both tabular real datasets.",
+    "Original source citations/URLs for the two tabular real datasets not recorded in-repo.",
+    "torch/ultralytics blocked by AppLocker in this environment (WinError 4551) -- YOLO/ByteTrack live validation not runnable here."
+  ]
+}

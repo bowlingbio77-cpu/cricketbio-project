@@ -1,0 +1,118 @@
+{
+  "status": "PILOT_VALIDATION",
+  "ground_truth_rows": 0,
+  "annotated_video_ids": [],
+  "prediction_video_ids": [
+    "fast_left_00000001",
+    "fast_left_0000001",
+    "fast_right_00000001",
+    "fast_right_00000002",
+    "leg_right_00000001",
+    "leg_right_00000029",
+    "off_left_00000001",
+    "off_right_00000042"
+  ],
+  "paired_samples_available": false,
+  "parse_errors": [],
+  "validation_issues": [],
+  "feature_metrics": {
+    "front_knee_angle_deg": {
+      "feature": "front_knee_angle_deg",
+      "n": 0,
+      "status": "no_paired_samples",
+      "bias": null,
+      "mae": null,
+      "rmse": null,
+      "sd_error": null,
+      "pearson_r": null,
+      "r2": null,
+      "loa_lower": null,
+      "loa_upper": null,
+      "icc21": null,
+      "statistics_status": "insufficient data"
+    },
+    "elbow_flexion_deg": {
+      "feature": "elbow_flexion_deg",
+      "n": 0,
+      "status": "no_paired_samples",
+      "bias": null,
+      "mae": null,
+      "rmse": null,
+      "sd_error": null,
+      "pearson_r": null,
+      "r2": null,
+      "loa_lower": null,
+      "loa_upper": null,
+      "icc21": null,
+      "statistics_status": "insufficient data"
+    },
+    "trunk_lean_deg": {
+      "feature": "trunk_lean_deg",
+      "n": 0,
+      "status": "no_paired_samples",
+      "bias": null,
+      "mae": null,
+      "rmse": null,
+      "sd_error": null,
+      "pearson_r": null,
+      "r2": null,
+      "loa_lower": null,
+      "loa_upper": null,
+      "icc21": null,
+      "statistics_status": "insufficient data"
+    },
+    "release_angle_deg": {
+      "feature": "release_angle_deg",
+      "n": 0,
+      "status": "no_paired_samples",
+      "bias": null,
+      "mae": null,
+      "rmse": null,
+      "sd_error": null,
+      "pearson_r": null,
+      "r2": null,
+      "loa_lower": null,
+      "loa_upper": null,
+      "icc21": null,
+      "statistics_status": "insufficient data"
+    }
+  },
+  "frame_metrics": {
+    "release_frame": {
+      "feature": "release_frame",
+      "n": 0,
+      "fps": 20.0,
+      "status": "no_paired_samples",
+      "absolute_errors": null,
+      "errors_ms": null,
+      "mean_abs_frame_error": null,
+      "median_abs_frame_error": null,
+      "mean_signed_frame_error": null,
+      "median_signed_frame_error": null,
+      "mean_abs_error_ms": null,
+      "median_abs_error_ms": null
+    },
+    "front_contact_frame": {
+      "feature": "front_contact_frame",
+      "n": 0,
+      "fps": 20.0,
+      "status": "no_paired_samples",
+      "absolute_errors": null,
+      "errors_ms": null,
+      "mean_abs_frame_error": null,
+      "median_abs_frame_error": null,
+      "mean_signed_frame_error": null,
+      "median_signed_frame_error": null,
+      "mean_abs_error_ms": null,
+      "median_abs_error_ms": null
+    }
+  },
+  "excluded_features": {
+    "stride_length_px": {
+      "reason": "unit mismatch: ground truth is planar pixels, PaceAI estimates a normalized value. Comparable only after a shared normalized unit is agreed in the protocol."
+    },
+    "release_speed_mps": {
+      "reason": "not measurable from uncalibrated camera footage (needs pixel-per-metre calibration) and not produced by the PaceAI prediction cache."
+    }
+  }
+}

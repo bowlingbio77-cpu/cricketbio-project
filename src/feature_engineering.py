@@ -8,10 +8,16 @@ Converts a sequence of 33-landmark PoseFrames (from pose_estimation.py) into the
 
 View-independence (fixes perspective bias):
     MediaPipe returns *normalized* landmarks (pixel-space, x,y in [0,1]) AND
-    *world* landmarks (metric, meters, y-up). All joint angles and length ratios
-    here are computed from the world landmarks when available, so they are not
+    *world* landmarks (metric, meters). All joint angles and length ratios here
+    are computed from the world landmarks when available, so they are not
     perspective-distorted by the camera angle. The 2D normalized landmarks are
     only used as a fallback when a caller supplies plain arrays.
+
+    Coordinate convention (verified empirically on real clips):
+    MediaPipe's world landmarks use a metric y-axis that points DOWNWARD
+    (positive y = closer to the ground: feet are at positive y, the head at
+    negative y, origin at the hip centre), matching the image y-axis direction.
+    All vertical references below therefore treat -y as "up".
 
 Front/back-foot logic (fixes handedness/camera-view bugs):
     The front (planted) leg is detected from motion -- the ankle that goes
@@ -68,6 +74,66 @@ def _is_3d(landmarks: np.ndarray) -> bool:
     return landmarks is not None and landmarks.shape[1] >= 3
 
 
+def _resolve_source(frame) -> str:
+    """Classify the coordinate space a feature was computed from.
+
+    Returns one of:
+      - "mediapipe_world_3d"  PoseFrame with metric world landmarks (33, 3)
+      - "2d_normalized"       PoseFrame with only (33, 4) normalized landmarks
+      - "3d_array" / "2d_array"  raw ndarray inputs (unit-test / synthetic feeds)
+      - "missing"             no landmark data on the frame(s) used
+    """
+    if frame is None:
+        return "missing"
+    if isinstance(frame, np.ndarray):
+        arr = np.asarray(frame, dtype=float)
+        if arr.ndim < 2 or arr.shape[0] < 33:
+            return "missing"
+        return "3d_array" if arr.shape[1] >= 3 else "2d_array"
+    world = getattr(frame, "world_landmarks", None)
+    if world is not None and len(world) == 33:
+        return "mediapipe_world_3d"
+    lm = getattr(frame, "landmarks", None)
+    if lm is not None:
+        return "2d_normalized"
+    return "missing"
+
+
+def _mean_landmark_visibility(frame, names) -> Optional[float]:
+    """Mean MediaPipe visibility (0-1, from landmarks column 3) over named joints.
+
+    Returns None when no visibility data exists (e.g. raw ndarray feeds). This is
+    a real computed quantity but an UNSET calibrated measurement error -- consumers
+    must not treat it as a validated confidence interval.
+    """
+    if frame is None:
+        return None
+    if isinstance(frame, np.ndarray):
+        return None
+    lm = getattr(frame, "landmarks", None)
+    if lm is None or lm.shape[1] < 4:
+        return None
+    vis = [float(lm[L[name], 3]) for name in names if L[name] < lm.shape[0]]
+    if not vis:
+        return None
+    return float(np.mean(vis))
+
+
+def _confidence_label(mean_visibility: Optional[float]) -> str:
+    """Coarse per-feature confidence from mean landmark visibility.
+
+    Honest caveat: this is an UNCALIBRATED proxy (visibility is not measurement
+    error); it only distinguishes 'joints clearly seen' vs 'joints poorly seen'.
+    """
+    if mean_visibility is None:
+        return "unknown"
+    if mean_visibility >= 0.6:
+        return "high"
+    if mean_visibility >= 0.4:
+        return "medium"
+    return "low"
+
+
 def _pt(landmarks: np.ndarray, name: str, horizontal: bool = False) -> np.ndarray:
     """3D point (x,y,z) in world space, or the 2D (x,y) fallback.
 
@@ -111,14 +177,15 @@ def _angle_3pt(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
 def _angle_to_horizontal(v: np.ndarray) -> float:
     """Angle of a vector from the horizontal plane, in degrees.
 
-    3D (world): elevation from the ground plane (0 = horizontal, 90 = up).
+    3D (world): elevation from the ground plane (0 = horizontal, 90 = up;
+    world y points down, so upward vectors have negative y -> we negate).
     2D (normalized): angle from the image x-axis (matches the legacy fallback).
     """
     if v.ndim == 1 and v.shape[0] >= 3:
         norm = np.linalg.norm(v)
         if norm < 1e-8:
             return 0.0
-        return float(np.degrees(np.arcsin(np.clip(v[1] / norm, -1.0, 1.0))))
+        return float(np.degrees(np.arcsin(np.clip(-v[1] / norm, -1.0, 1.0))))
     return float(np.degrees(np.arctan2(v[1], v[0])))
 
 
@@ -207,7 +274,10 @@ def compute_frame_features(frame, frame_idx: int = 0,
         shoulder_rotation = min(shoulder_rotation, 180 - shoulder_rotation)
         # Pelvic tilt from the horizontal plane (view-independent proxy for hip drive).
         hip_rotation = abs(_angle_to_horizontal(hip_line))
-        trunk_lean = _angle_between(trunk, np.array([0.0, 1.0, 0.0]))
+        # Trunk lean vs straight-up. World y points DOWN (MediaPipe convention),
+        # so the "up" reference vector is -y, not +y. Using +y here made every
+        # upright body measure ~180 deg of lean instead of the true lean angle.
+        trunk_lean = _angle_between(trunk, np.array([0.0, -1.0, 0.0]))
     else:
         shoulder_rotation = abs(_angle_to_horizontal(shoulder_line) -
                                 _angle_to_horizontal(hip_line))
@@ -249,8 +319,10 @@ def compute_sequence_features(pose_sequence: Sequence, bowling_arm: str = "right
 def _wrist_elevation(pf, bowling_arm: str) -> float:
     """Bowling wrist height relative to the bowling shoulder (>0 => arm raised).
 
-    World coords (y-up): wrist_y - shoulder_y (meters).
-    Normalized coords (y grows down): shoulder_y - wrist_y.
+    World and normalized coords both use a y-axis pointing DOWN (MediaPipe world
+    landmarks keep the same direction as the image), so a wrist raised above the
+    shoulder has a smaller y than the shoulder in both cases:
+    shoulder_y - wrist_y (meters in world space, frame fractions in 2D).
     """
     arr = _array_for(pf)
     if arr is None:
@@ -258,7 +330,7 @@ def _wrist_elevation(pf, bowling_arm: str) -> float:
     wrist = arr[L[f"{bowling_arm}_wrist"]]
     shoulder = arr[L[f"{bowling_arm}_shoulder"]]
     if _is_3d(arr):
-        return float(wrist[1] - shoulder[1])
+        return float(shoulder[1] - wrist[1])
     return float(shoulder[1] - wrist[1])
 
 
@@ -536,6 +608,11 @@ def analyze_delivery(pose_sequence: Sequence, bowling_arm: str = "right",
     (feature_vector, diagnostics). The vector matches config.FEATURE_NAMES and is
     ready for the ML module; diagnostics describe the delivery-phase detection so
     the caller can warn when the clip was not a clean single delivery.
+
+    diagnostics["feature_provenance"] records, per feature, which coordinate
+    space it was computed from (mediapipe_world_3d / 2d_normalized / *_array /
+    missing) plus an UNCALIBRATED visibility-based confidence proxy -- so a
+    downstream report can state exactly what each number is (or is not) based on.
     """
     phases = analyze_delivery_phases(pose_sequence, bowling_arm)
     release_idx = phases["release_frame_idx"]
@@ -559,6 +636,52 @@ def analyze_delivery(pose_sequence: Sequence, bowling_arm: str = "right",
         "ground_contact_time_s": compute_ground_contact_time(pose_sequence, release_idx, bowling_arm, front_leg),
     }
 
+    other = "left" if bowling_arm == "right" else "right"
+    front = front_leg or other
+    back = "left" if front == "right" else "right"
+    contact_idx = front_foot_contact_frame(pose_sequence, front, release_idx)
+    stride_idx = contact_idx if contact_idx is not None else max(0, release_idx - 2)
+    stride_frame = pose_sequence[stride_idx]
+    release_pf = pose_sequence[release_idx]
+
+    def _prov(frame, joint_names):
+        source = _resolve_source(frame)
+        vis = _mean_landmark_visibility(frame, joint_names)
+        return {
+            "source": source,
+            "confidence": _confidence_label(vis),
+            "mean_landmark_visibility": vis,
+            "confidence_note": ("visibility-based proxy; not calibrated measurement error"
+                                if vis is not None else
+                                "not computed (no visibility data on this feed)"),
+        }
+
+    feature_provenance = {
+        "shoulder_rotation_deg": _prov(release_pf, ["left_shoulder", "right_shoulder", "left_hip", "right_hip"]),
+        "elbow_flexion_deg": _prov(release_pf, [f"{bowling_arm}_shoulder", f"{bowling_arm}_elbow", f"{bowling_arm}_wrist"]),
+        "wrist_angle_deg": _prov(release_pf, [f"{bowling_arm}_elbow", f"{bowling_arm}_wrist", f"{bowling_arm}_index"]),
+        "hip_rotation_deg": _prov(release_pf, ["left_hip", "right_hip"]),
+        "knee_flexion_deg": _prov(release_pf, [f"{front}_hip", f"{front}_knee", f"{front}_ankle"]),
+        "trunk_lean_deg": _prov(release_pf, ["left_shoulder", "right_shoulder", "left_hip", "right_hip"]),
+        "stride_length_norm": _prov(stride_frame, [f"{front}_ankle", f"{back}_ankle"]),
+        "release_angle_deg": _prov(release_pf, [f"{bowling_arm}_shoulder", f"{bowling_arm}_wrist"]),
+        "angular_velocity_deg_s": _prov(release_pf, ["left_shoulder", "right_shoulder", "left_hip", "right_hip"]),
+        "ground_contact_time_s": _prov(release_pf, [f"{front}_ankle", f"{back}_ankle"]),
+    }
+    feature_provenance["angular_velocity_deg_s"]["confidence_note"] = (
+        "derived by finite differences of shoulder_rotation_deg over a +/-3 "
+        f"frame window around release (n={max(1, len(frame_feats))})")
+
+    _visibility_summary = {
+        "world_3d_frames": sum(1 for pf in pose_sequence if _resolve_source(pf) == "mediapipe_world_3d"),
+        "normalized_2d_frames": sum(1 for pf in pose_sequence if _resolve_source(pf) == "2d_normalized"),
+        "raw_array_frames": sum(1 for pf in pose_sequence if _resolve_source(pf) in ("3d_array", "2d_array")),
+        "missing_frames": sum(1 for pf in pose_sequence if _resolve_source(pf) == "missing"),
+        "total_frames": len(pose_sequence),
+    }
+
     phases["feature_vector"] = vector
+    phases["feature_provenance"] = feature_provenance
+    phases["landmark_source_summary"] = _visibility_summary
     phases["camera_view"] = camera_view
     return vector, phases

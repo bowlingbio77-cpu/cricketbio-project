@@ -2,12 +2,17 @@
 Stage 9: Coaching Recommendation
 
 Turns (feature_vector, performance_score, injury_risk, SHAP contributions)
-into plain-English coaching notes. Rule thresholds are illustrative starting
-points based on published fast-bowling biomechanics literature (ICC elbow law,
-typical elite ranges for trunk lean / knee flexion / stride length) -- a real
-deployment should calibrate these against a labeled dataset from the target
+into plain-English coaching notes. Rule thresholds are illustrative, literature-informed
+starting points based on published fast-bowling biomechanics literature (ICC elbow
+reference value, typical elite ranges for trunk lean / knee flexion / stride length) --
+a real deployment should calibrate these against a labeled dataset from the target
 population (age group, format, injury history) via the ML module's targets
 rather than hard-coding numbers indefinitely.
+
+Terminology note: risk output is a "biomechanical risk indicator" derived from
+literature-informed biomechanical thresholds -- it is NOT a clinical diagnosis,
+and the ICC elbow check is a screening indicator (requires lab-grade 3D motion
+capture per ICC protocol for an official legality ruling).
 """
 from typing import List, Dict
 from . import config
@@ -16,8 +21,9 @@ from . import config
 _RULES = [
     ("elbow_flexion_deg", 0, config.ICC_ELBOW_EXTENSION_LIMIT_DEG,
      None,
-     "Elbow extension at release exceeds the ICC {limit}° legal-delivery threshold -- "
-     "risk of a called throw. Work on a straighter arm path through release."),
+     "Elbow extension at release exceeds the {limit}° ICC screening reference -- "
+     "screening indicator only (not an official ICC measurement). Work on a "
+     "straighter arm path through release."),
     ("trunk_lean_deg", 15, 40,
      "Very upright trunk at release -- more lateral flexion toward the target can add "
      "pace and downward trajectory on the ball.",
@@ -68,22 +74,23 @@ def generate_recommendations(feature_vector: Dict[str, float],
         if shap_contributions:
             top_feat = max(shap_contributions, key=lambda k: shap_contributions[k])
             notes.insert(0,
-                f"Model flags {injury_risk['risk_level'].upper()} injury risk, most driven by "
-                f"'{top_feat.replace('_', ' ')}' -- prioritize addressing this before increasing bowling workload.")
+                f"The biomechanical risk indicator is {injury_risk['risk_level'].upper()}, most driven by "
+                f"'{top_feat.replace('_', ' ')}' -- prioritize reviewing this before increasing bowling workload.")
         else:
-            notes.insert(0, f"Model flags {injury_risk['risk_level'].upper()} injury risk -- "
+            notes.insert(0, f"The biomechanical risk indicator is {injury_risk['risk_level'].upper()} -- "
                              f"consider a workload review with the medical/S&C staff.")
 
     if performance_score is not None:
         if performance_score >= 80:
-            notes.append(f"Overall action quality score: {performance_score:.0f}/100 -- strong, "
-                          f"technically sound action. Focus on consistency and repeatability.")
+            notes.append(f"Demonstration performance score: {performance_score:.0f}/100 -- strong, "
+                          f"technically sound action vs the literature-informed benchmark. "
+                          f"Focus on consistency and repeatability.")
         elif performance_score >= 60:
-            notes.append(f"Overall action quality score: {performance_score:.0f}/100 -- solid "
+            notes.append(f"Demonstration performance score: {performance_score:.0f}/100 -- solid "
                           f"foundation with room to refine the flagged areas above.")
         else:
-            notes.append(f"Overall action quality score: {performance_score:.0f}/100 -- several "
-                          f"technical elements below expected range; recommend focused net sessions "
+            notes.append(f"Demonstration performance score: {performance_score:.0f}/100 -- several "
+                          f"technical elements below the benchmark range; recommend focused net sessions "
                           f"on the items above under coach supervision.")
 
     if not notes:

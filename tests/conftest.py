@@ -16,30 +16,33 @@ def make_world_pose(wrist_elev=0.0, elbow_deg=170.0, l_ankle_y=-0.9, r_ankle_y=-
                     l_ankle_x=-0.08, r_ankle_x=0.08, sway=0.0, hip_y=0.0,
                     trunk_lean_deg=0.0):
     """
-    A roughly standing right-arm bowler in world coordinates (meters, y-up).
-    `wrist_elev`: bowling wrist height relative to the bowling shoulder (m).
+    A roughly standing right-arm bowler in world coordinates (meters, y-down,
+    matching MediaPipe's `world_landmarks`: positive y is towards the ground,
+    origin at the hip centre -- head at negative y, feet at positive y).
+    `wrist_elev`: bowling wrist height relative to the bowling shoulder (m),
+    positive = raised above the shoulder.
     `elbow_deg`:  angle at the bowling elbow (180 = straight).
     """
     lm = np.zeros((33, 3))
     lean = np.radians(trunk_lean_deg)
-    sh_y = hip_y + 0.62
+    sh_y = hip_y - 0.62
     sh_x_off = -0.22 if not trunk_lean_deg else -0.22 * np.cos(lean)
-    sh_top = hip_y + 0.62
+    sh_top = hip_y - 0.62
     lm[L["left_hip"]] = [-0.18 + sway, hip_y, 0]
     lm[L["right_hip"]] = [0.18 + sway, hip_y, 0]
     lm[L["left_shoulder"]] = [-0.22 + sway, sh_top, 0]
     lm[L["right_shoulder"]] = [0.22 + sway, sh_top, 0]
-    lm[L["left_knee"]] = [-0.1 + sway, -0.5, 0]
-    lm[L["right_knee"]] = [0.1 + sway, -0.5, 0]
-    lm[L["left_ankle"]] = [l_ankle_x + sway, l_ankle_y, 0]
-    lm[L["right_ankle"]] = [r_ankle_x + sway, r_ankle_y, 0]
-    lm[L["left_foot_index"]] = [l_ankle_x + sway, l_ankle_y - 0.02, 0]
-    lm[L["right_foot_index"]] = [r_ankle_x + sway, r_ankle_y - 0.02, 0]
-    lm[L["nose"]] = [0.0 + sway, 0.80, 0.05]
+    lm[L["left_knee"]] = [-0.1 + sway, 0.5, 0]
+    lm[L["right_knee"]] = [0.1 + sway, 0.5, 0]
+    lm[L["left_ankle"]] = [l_ankle_x + sway, -l_ankle_y, 0]
+    lm[L["right_ankle"]] = [r_ankle_x + sway, -r_ankle_y, 0]
+    lm[L["left_foot_index"]] = [l_ankle_x + sway, -l_ankle_y + 0.02, 0]
+    lm[L["right_foot_index"]] = [r_ankle_x + sway, -r_ankle_y + 0.02, 0]
+    lm[L["nose"]] = [0.0 + sway, hip_y - 0.80, 0.05]
 
     # bowling (right) arm: shoulder -> wrist, elbow placed for the given angle.
     s = lm[L["right_shoulder"]].copy()
-    w = s + np.array([0.0, wrist_elev, 0.3])
+    w = s + np.array([0.0, -wrist_elev, 0.3])
     d = w - s
     ln = np.linalg.norm(d)
     if ln < 1e-9:
@@ -59,14 +62,19 @@ def make_world_pose(wrist_elev=0.0, elbow_deg=170.0, l_ankle_y=-0.9, r_ankle_y=-
 
 
 def to_normalized(world_pose, scale=1.0):
-    """Project a world-space pose into a normalized-2D image (x,y in [0,1], y down)."""
+    """Project a world-space pose into a normalized-2D image (x,y in [0,1], y down).
+
+    World and image y share the same (down-positive) direction, so the mapping is
+    a direct translation + scale (points outside [0,1] are fine - only angles and
+    height-ratios are used downstream, and both are translation/scale invariant).
+    """
     lm = np.zeros((33, 4))
     # crude orthographic projection: x right, y down
     y_off = 0.5
     for name in config.POSE_LANDMARK_NAMES:
         i = L[name]
         p = world_pose[i]
-        lm[i] = [0.5 + p[0] * scale, y_off - p[1] * scale, 0.0, 1.0]
+        lm[i] = [0.5 + p[0] * scale, y_off + p[1] * scale, 0.0, 1.0]
     return lm
 
 

@@ -22,7 +22,7 @@ def explain_prediction(bundle, feature_vector: dict, background_X: np.ndarray = 
     """
     Returns {feature_name: contribution} for a single prediction.
     Positive contribution = pushes prediction up (higher performance score /
-    higher injury-risk class).
+    higher biomechanical risk-indicator class).
     """
     feature_names = bundle.feature_names
     x = np.array([[feature_vector[f] for f in feature_names]])

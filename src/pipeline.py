@@ -44,6 +44,8 @@ class AnalysisResult:
     original_frame_dims: Optional[tuple] = None  # (height, width) of pre-crop frames
     bowler_track_id: Optional[int] = None  # locked bowler track id (identity lock)
     bowler_confidence: Optional[float] = None  # cricket-evidence confidence 0..1
+    feature_provenance: Optional[dict] = None  # per-feature source + visibility proxy
+    landmark_source_summary: Optional[dict] = None  # world3d/2d/missing frame counts
 
     def to_dict(self):
         return asdict(self)
@@ -687,6 +689,8 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         bowler_track_id=bowler_track_id,
         bowler_confidence=bowler_confidence,
         pose_video_path=pose_video_path,
+        feature_provenance=diagnostics.get("feature_provenance"),
+        landmark_source_summary=diagnostics.get("landmark_source_summary"),
     )
 
 
@@ -727,6 +731,17 @@ def analyze_feature_vector(feature_vector: dict,
 
     timings["total"] = time.perf_counter() - t_start
 
+    # Manual slider mode: every feature is user-entered, NOT measured from video.
+    manual_provenance = {
+        name: {
+            "source": "manual_entry",
+            "confidence": "unknown",
+            "mean_landmark_visibility": None,
+            "confidence_note": "user-entered slider value; not measured from video",
+        }
+        for name in feature_vector
+    }
+
     return AnalysisResult(
         feature_vector=feature_vector,
         performance_score=performance_score,
@@ -736,4 +751,8 @@ def analyze_feature_vector(feature_vector: dict,
         coaching_notes=notes,
         stage_times=timings,
         camera_view=camera_view,
+        feature_provenance=manual_provenance,
+        landmark_source_summary={"total_frames": 0, "world_3d_frames": 0,
+                                 "normalized_2d_frames": 0, "raw_array_frames": 0,
+                                 "missing_frames": 0},
     )

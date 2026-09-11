@@ -63,8 +63,8 @@ def test_report_contains_all_sections():
     report = assistant.assistant_report(make_result())
     assert "# Delivery Biomechanics Analysis Report" in report
     assert "## Kinematics" in report
-    assert "## Performance model" in report
-    assert "## Injury risk model" in report
+    assert "## Performance indicator model (demo)" in report
+    assert "## Biomechanical risk-indicator model" in report
     assert "## Ball tracking" in report
     assert "## Coaching notes" in report
     assert "## Warnings" in report
@@ -74,7 +74,7 @@ def test_report_contains_all_sections():
     assert "moderate" in report
     assert "release frame" in report.lower()
     assert "78.6%" in report
-    assert "LEGAL" in report
+    assert "WITHIN LIMIT" in report
 
 
 def test_report_handles_missing_ml():
@@ -82,7 +82,7 @@ def test_report_handles_missing_ml():
                                                     shap_contributions_performance=None,
                                                     shap_contributions_injury=None))
     assert "n/a (ML bundles not supplied)" in report
-    assert "LEGAL" in report
+    assert "WITHIN LIMIT" in report
 
 
 def test_report_handles_probabilities_as_list():
@@ -95,7 +95,8 @@ def test_report_handles_probabilities_as_list():
 def test_report_elbow_legality_exceeded():
     report = assistant.assistant_report(make_result(feature_vector={
         **make_result().feature_vector, "elbow_flexion_deg": 21.0}))
-    assert "EXCEEDS ICC LIMIT" in report
+    assert "ABOVE REFERENCE" in report
+    assert "screening only, not an official ICC measurement" in report
 
 
 def test_report_top_contributors_ordered():
@@ -143,7 +144,7 @@ def test_cohort_report_summary():
     assert "## delivery-A" in report and "## delivery-B" in report
     assert "Mean performance" in report and "70.0" in report
     assert "low: 1" in report and "high: 1" in report
-    assert "**ICC legal deliveries**: 1 / 2" in report
+    assert "**ICC elbow screening within reference**: 1 / 2" in report
 
 
 # --------------------------------------------------------------------------- #

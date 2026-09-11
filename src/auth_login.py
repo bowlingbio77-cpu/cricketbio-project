@@ -478,8 +478,8 @@ def _render_hero() -> None:
             </div>
             <h1>Bowling biomechanics,<br/>quantified.</h1>
             <p>
-                Kinematic chain profiling, ICC arm-legality checks, and
-                injury-risk analytics for coaches, biomechanists, and
+                Kinematic chain profiling, ICC elbow-screening checks, and
+                biomechanical risk analytics for coaches, biomechanists, and
                 sports physiotherapists.
             </p>
         </div>
