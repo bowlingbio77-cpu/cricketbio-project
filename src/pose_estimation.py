@@ -26,6 +26,7 @@ class PoseFrame:
     timestamp_sec: float
     landmarks: np.ndarray  # shape (33, 4) -> x, y, z, visibility (x,y normalized 0-1)
     world_landmarks: Optional[np.ndarray] = None  # shape (33, 3) -> metric x,y,z (meters)
+    n_people: int = 1  # how many simultaneous people the pose model saw in this frame
 
 
 def _primary_person(pose_landmarks) -> int:
@@ -59,6 +60,7 @@ class PoseEstimator:
         options = mp_vision.PoseLandmarkerOptions(
             base_options=base_options,
             running_mode=mp_vision.RunningMode.VIDEO,
+            num_poses=config.POSE_MAX_PEOPLE,
             min_pose_detection_confidence=min_detection_confidence,
             min_tracking_confidence=min_tracking_confidence,
             output_segmentation_masks=False,
@@ -75,6 +77,7 @@ class PoseEstimator:
         if not result.pose_landmarks:
             return None
 
+        n_people = len(result.pose_landmarks)
         idx = _primary_person(result.pose_landmarks)
         lm = result.pose_landmarks[idx]
         landmarks = np.array([[p.x, p.y, p.z, p.visibility] for p in lm])
@@ -84,7 +87,7 @@ class PoseEstimator:
             wlm = result.pose_world_landmarks[idx]
             world = np.array([[p.x, p.y, p.z] for p in wlm])
 
-        return PoseFrame(frame_idx, timestamp_sec, landmarks, world)
+        return PoseFrame(frame_idx, timestamp_sec, landmarks, world, n_people)
 
     def process_video_frames(self, frames_iter) -> List[PoseFrame]:
         """frames_iter yields (frame_idx, timestamp_sec, frame_bgr), e.g. from preprocessing.py"""

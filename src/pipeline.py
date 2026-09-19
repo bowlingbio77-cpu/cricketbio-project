@@ -46,6 +46,10 @@ class AnalysisResult:
     bowler_confidence: Optional[float] = None  # cricket-evidence confidence 0..1
     feature_provenance: Optional[dict] = None  # per-feature source + visibility proxy
     landmark_source_summary: Optional[dict] = None  # world3d/2d/missing frame counts
+    subject_verified: Optional[bool] = None  # False -> ML/coaching refused (wrong-subject risk)
+    scoring_blocked_reason: Optional[str] = None  # human-readable why scoring was withheld
+    stage_backends: dict = field(default_factory=dict)  # detection/tracking backend actually used
+    delivery_reliable: Optional[bool] = None  # from pose-quality diagnostics (G6)
 
     def to_dict(self):
         return asdict(self)
@@ -420,16 +424,37 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     frames_full = None
     bowler_track_id = None
     bowler_confidence = None
+    stage_backends = {}
     try:
         # Snapshot full-frame dimensions before any cropping
         if frames:
             original_frame_dims = (frames[0][2].shape[0], frames[0][2].shape[1])
             frames_full = list(frames)
         tracker = tracking.BowlerTracker()
+        stage_backends = {
+            "tracking": tracker.backend,
+            "detection": getattr(getattr(tracker, "detector", None), "backend",
+                                 "bytetrack"),
+        }
+        if getattr(tracker, "fallback_reason", None):
+            warnings.append(f"Detection/tracking degraded: {tracker.fallback_reason}")
         tracks = tracker.track_frames([(idx, fr) for idx, ts, fr in frames])
         h, w = frames[0][2].shape[:2]
+        # Appearance-grade the identity stitch (G3): the tracker hands the
+        # selector a way to read real pre-crop pixels so a continuation that
+        # merely happens to be spatially continuous is rejected if its colour
+        # profile does not match the locked bowler.
+        frames_by_idx = {idx: fr for idx, ts, fr in (frames_full or [])}
+
+        def _frame_provider(frame_idx, bbox):
+            fr = frames_by_idx.get(frame_idx)
+            if fr is None:
+                return None
+            return fr
+
         bowler, bowler_meta = tracking.select_bowler_track_with_meta(
-            tracks, frame_dims=(h, w), total_frames=len(frames))
+            tracks, frame_dims=(h, w), total_frames=len(frames),
+            frame_provider=_frame_provider)
         if bowler is not None and len(bowler) >= 3:
             bowler_bboxes = _padded_bowler_bboxes(
                 bowler, len(frames), h, w,
@@ -455,6 +480,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         warnings.append(f"Detection/tracking skipped ({exc}); pose ran on full frames.")
         bowler_track_id = None
         bowler_confidence = None
+        stage_backends = {"error": f"{type(exc).__name__}: {exc}"}
     timings["detection_tracking"] = time.perf_counter() - t0
 
     # 4-5: pose estimation -> 33 landmarks/frame.
@@ -507,6 +533,37 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
             f"fell back to {pose_source.replace('_', ' ')}. If the skeleton "
             "looks loose, enable the debug overlay to inspect the bowler lock."
         )
+    # Subject-verification gate (G1): only the identity-locked bowler-crop path
+    # guarantees the skeleton belongs to the bowler. The FULL-FRAME fallback has
+    # no bowler box at all, so we check whether the pose model saw more than one
+    # person in any frame -- if it did, the measured features may be from a
+    # batsman/keeper/fielder and ML/coaching must NOT run (the "all_frames" path
+    # is still bowler-bound because those frames are already bowler crops).
+    subject_verified = True
+    scoring_blocked_reason = None
+    if pose_source == "full_frames":
+        pose_frames = sum(1 for pf in pose_sequence if pf.n_people > 1)
+        if pose_frames > 0:
+            subject_verified = False
+            scoring_blocked_reason = (
+                "pose detected multiple people in the frame (no bowler lock); the "
+                "measured skeleton may not be the bowler."
+            )
+        else:
+            warnings.append(
+                "Subject check: full-frame fallback saw a single person throughout, "
+                "so the skeleton is treated as the bowler."
+            )
+    elif pose_source != "bowler_crops":
+        warnings.append(
+            "Subject check: pose ran on bowler-cropped frames (media extracted "
+            "before the missing identity-check step)."
+        )
+    if scoring_blocked_reason is not None:
+        warnings.append(
+            "Scoring withheld — subject not verified: "
+            f"{scoring_blocked_reason}"
+        )
     _progress("Bowler detection")
     _progress("Pose extraction")
 
@@ -519,6 +576,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
 
     if diagnostics.get("reliable") is not True:
         warnings.append(f"Delivery quality: {diagnostics.get('reliability_reason')}")
+    delivery_reliable = diagnostics.get("reliable") is True
     if crop_stats is not None and diagnostics.get("n_frames", 0) < 10:
         warnings.append("Few pose frames after cropping -- consider tighter framing.")
 
@@ -585,13 +643,32 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         warnings.append("Ball not detected reliably; showing pose-skeleton overlay video.")
     _progress("Ball tracking")
 
-    # 7: ML predictions
+    # 7: ML predictions. Refused when the pose subject could not be verified as
+    # the bowler (wrong-subject risk), the delivery window was unreliable
+    # (G6), or the caller disabled the ML pass.
     performance_score = None
     injury_risk = None
     shap_perf = None
     shap_injury = None
+    runs_ml = (
+        run_ml
+        and (config.SUBJECT_VERIFICATION_REQUIRED is False or subject_verified is True)
+        and (config.REFUSE_ML_ON_UNRELIABLE_DELIVERY is False or delivery_reliable is True)
+    )
+    if not runs_ml and run_ml and subject_verified is False:
+        warnings.append(
+            "ML analysis skipped: scoring a skeleton that may not be the bowler "
+            "would produce misleading numbers. Features are still shown, clearly "
+            "marked as from an unverified subject."
+        )
+    if not runs_ml and run_ml and delivery_reliable is False:
+        warnings.append(
+            "ML analysis skipped: the delivery window was unreliable (no clear "
+            "release detected) so the interpolated features would produce "
+            "misleading predictions."
+        )
 
-    if run_ml and performance_bundle is not None:
+    if runs_ml and performance_bundle is not None:
         t0 = time.perf_counter()
         performance_score = ml_models.predict(performance_bundle, feature_vector)
         timings["ml_predictions"] = time.perf_counter() - t0
@@ -599,7 +676,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         shap_perf = explainability.explain_prediction(performance_bundle, feature_vector)
         timings["shap_explanation"] = time.perf_counter() - t0
 
-    if run_ml and injury_bundle is not None:
+    if runs_ml and injury_bundle is not None:
         t0 = time.perf_counter()
         injury_risk = ml_models.predict(injury_bundle, feature_vector)
         timings["ml_predictions"] = timings.get("ml_predictions", 0.0) + (time.perf_counter() - t0)
@@ -610,10 +687,18 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
 
     # 9: coaching recommendations
     t0 = time.perf_counter()
-    notes = coaching.generate_recommendations(
-        feature_vector, performance_score, injury_risk,
-        shap_contributions=shap_injury or shap_perf,
-    )
+    if subject_verified is True and (delivery_reliable is not False or config.REFUSE_ML_ON_UNRELIABLE_DELIVERY is False):
+        notes = coaching.generate_recommendations(
+            feature_vector, performance_score, injury_risk,
+            shap_contributions=shap_injury or shap_perf,
+        )
+    else:
+        reason = (
+            "pose subject could not be verified as the bowler"
+            if subject_verified is False else
+            "the delivery window was unreliable (no clear release detected)"
+        )
+        notes = [f"Coaching withheld — {reason}."]
     if run_ml:
         timings["coaching"] = time.perf_counter() - t0
 
@@ -691,15 +776,35 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         pose_video_path=pose_video_path,
         feature_provenance=diagnostics.get("feature_provenance"),
         landmark_source_summary=diagnostics.get("landmark_source_summary"),
+        subject_verified=subject_verified,
+        scoring_blocked_reason=scoring_blocked_reason,
+        stage_backends=stage_backends,
+        delivery_reliable=delivery_reliable,
     )
 
 
 def analyze_feature_vector(feature_vector: dict,
                             performance_bundle: ml_models.TrainedBundle = None,
                             injury_bundle: ml_models.TrainedBundle = None,
-                            camera_view: str = "behind") -> AnalysisResult:
+                            camera_view: str = "behind",
+                            subject_verified: Optional[bool] = None,
+                            reliable: Optional[bool] = None) -> AnalysisResult:
     """    Same as analyze_video but skips CV/pose stages -- useful for the Streamlit
-    manual-entry mode and for testing without a video file."""
+    manual-entry mode and for testing without a video file.
+
+    Parameters
+    ----------
+    subject_verified : bool or None
+        Passed through from the video pipeline. When ``False``, ML predictions,
+        SHAP explanations and coaching notes are **refused** to prevent scoring
+        a skeleton that may not be the bowler (the subject-verification gate).
+        ``None`` or ``True`` means scoring proceeds (manual-entry mode has no
+        video to verify, so it always scores).
+    reliable : bool or None
+        Passed through from the video pipeline. When ``False`` AND
+        ``config.REFUSE_ML_ON_UNRELIABLE_DELIVERY`` is on, ML/SHAP/coaching are
+        refused because the delivery window was noisy/short (G6).
+    """
     timings = {}
     t_start = time.perf_counter()
 
@@ -707,8 +812,22 @@ def analyze_feature_vector(feature_vector: dict,
     injury_risk = None
     shap_perf = None
     shap_injury = None
+    scoring_blocked_reason = None
+    runs_ml = config.SUBJECT_VERIFICATION_REQUIRED is False or subject_verified is not False
+    if config.REFUSE_ML_ON_UNRELIABLE_DELIVERY and reliable is False:
+        runs_ml = False
+    if not runs_ml and subject_verified is False:
+        scoring_blocked_reason = (
+            "pose detected multiple people in the frame (no bowler lock); the "
+            "measured skeleton may not be the bowler."
+        )
+    elif not runs_ml and reliable is False:
+        scoring_blocked_reason = (
+            "the delivery window was unreliable (no clear release detected); "
+            "the interpolated features would produce misleading predictions."
+        )
 
-    if performance_bundle is not None:
+    if runs_ml and performance_bundle is not None:
         t0 = time.perf_counter()
         performance_score = ml_models.predict(performance_bundle, feature_vector)
         timings["ml_predictions"] = time.perf_counter() - t0
@@ -716,7 +835,7 @@ def analyze_feature_vector(feature_vector: dict,
         shap_perf = explainability.explain_prediction(performance_bundle, feature_vector)
         timings["shap_explanation"] = time.perf_counter() - t0
 
-    if injury_bundle is not None:
+    if runs_ml and injury_bundle is not None:
         t0 = time.perf_counter()
         injury_risk = ml_models.predict(injury_bundle, feature_vector)
         timings["ml_predictions"] = timings.get("ml_predictions", 0.0) + (time.perf_counter() - t0)
@@ -724,10 +843,13 @@ def analyze_feature_vector(feature_vector: dict,
         shap_injury = explainability.explain_prediction(injury_bundle, feature_vector)
         timings["shap_explanation"] = timings.get("shap_explanation", 0.0) + (time.perf_counter() - t0)
 
-    notes = coaching.generate_recommendations(
-        feature_vector, performance_score, injury_risk,
-        shap_contributions=shap_injury or shap_perf,
-    )
+    if not runs_ml and scoring_blocked_reason is not None:
+        notes = [f"Coaching withheld — {scoring_blocked_reason}"]
+    else:
+        notes = coaching.generate_recommendations(
+            feature_vector, performance_score, injury_risk,
+            shap_contributions=shap_injury or shap_perf,
+        )
 
     timings["total"] = time.perf_counter() - t_start
 
@@ -755,4 +877,7 @@ def analyze_feature_vector(feature_vector: dict,
         landmark_source_summary={"total_frames": 0, "world_3d_frames": 0,
                                  "normalized_2d_frames": 0, "raw_array_frames": 0,
                                  "missing_frames": 0},
+        subject_verified=subject_verified,
+        scoring_blocked_reason=scoring_blocked_reason,
+        delivery_reliable=reliable,
     )

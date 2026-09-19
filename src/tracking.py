@@ -20,7 +20,7 @@ Falls back to a lightweight IoU-based tracker (greedy nearest-bbox matching)
 when ultralytics isn't installed, so the pipeline still runs end-to-end offline.
 """
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 import numpy as np
 from . import config
 from .detection import Detection, _bbox_area
@@ -47,15 +47,33 @@ class BowlerTracker:
                  conf_threshold: float = config.DETECTION_CONF_THRESHOLD,
                  detector: "BowlerDetector" = None):
         self.conf_threshold = conf_threshold
+        self.fallback_reason: Optional[str] = None
         self.backend = "bytetrack" if _HAS_ULTRALYTICS else "iou_fallback"
         if self.backend == "bytetrack":
-            from .detection import resolve_weights
-            self.model = YOLO(resolve_weights(weights))
-        else:
+            # G2: a weights file that can't load (missing + no network, corrupt,
+            # version mismatch) must NOT throw out of the constructor -- that
+            # would silently disable ALL bowler detection. Degrade to the IoU
+            # fallback tracker (with its own HOG detector if YOLO also fails)
+            # and record why so the pipeline flags the reduced confidence.
+            try:
+                from .detection import resolve_weights
+                self.model = YOLO(resolve_weights(weights))
+            except Exception as exc:
+                self.fallback_reason = (
+                    f"ByteTrack could not be initialised ({type(exc).__name__}: {exc}); "
+                    "degraded to the IoU fallback tracker (lower confidence)."
+                )
+                self.backend = "iou_fallback"
+        if self.backend == "iou_fallback":
             from .detection import BowlerDetector
             detector = detector or BowlerDetector(weights=weights,
                                                   conf_threshold=conf_threshold)
             self.detector = detector
+            if getattr(detector, "fallback_reason", None):
+                self.fallback_reason = (
+                    f"{self.fallback_reason or 'IoU fallback tracker'}; "
+                    f"{detector.fallback_reason}"
+                )
         self._iou_tracks: Dict[int, Track] = {}
         self._next_id = 0
 
@@ -201,6 +219,7 @@ BOWLER_STITCH_MAX_GAP = 8
 BOWLER_STITCH_MIN_IOU = 0.12
 BOWLER_STITCH_CENTER_MULT = 0.5      # x own-last-box max-diagonal fraction
 BOWLER_STITCH_VEL_MULT = 1.5         # x bowler speed x gap (projected window)
+BOWLER_STITCH_APPEARANCE_MIN = 0.30  # minimum HSV-histogram correlation for a re-stitch
 
 _FRAME_DIMS_DEFAULT = (360, 640)      # used only when caller omits frame_dims
 
@@ -383,12 +402,65 @@ def _same_person(winner_tr: Track, cand_box, cand_frame: int,
     return dist <= tol
 
 
+def _crop_frame_region(frame, bbox, fx1=0.20, fy1=0.10, fx2=0.80, fy2=0.75):
+    """Grab the upper-body (torso) region of a bbox from a full frame.
+
+    The torso band is used for the appearance check because the full bbox is
+    dominated by background (pitch, sky, stumps) that correlates across
+    completely different people."""
+    h, w = frame.shape[:2]
+    x1, y1, x2, y2 = bbox
+    bw, bh = max(1.0, x2 - x1), max(1.0, y2 - y1)
+    cx1, cy1 = int(x1 + fx1 * bw), int(y1 + fy1 * bh)
+    cx2, cy2 = int(x1 + fx2 * bw), int(y1 + fy2 * bh)
+    if cx2 <= cx1 or cy2 <= cy1:
+        return None
+    return frame[max(0, cy1):min(h, cy2), max(0, cx1):min(w, cx2)]
+
+
+def _hsv_hist_corr(img_a, img_b) -> float:
+    """Correlation (0..1, 1 = identical colour layout) of 3-channel HSV
+    histograms of two crops. Robust enough to reject a visually distinct person
+    even when the backgrounds are similar."""
+    if img_a is None or img_b is None or img_a.size == 0 or img_b.size == 0:
+        return 0.0
+    try:
+        ha = cv2.calcHist([cv2.cvtColor(img_a, cv2.COLOR_BGR2HSV)], [0, 1], None,
+                          [16, 16], [0, 180, 0, 256])
+        hb = cv2.calcHist([cv2.cvtColor(img_b, cv2.COLOR_BGR2HSV)], [0, 1], None,
+                          [16, 16], [0, 180, 0, 256])
+        cv2.normalize(ha, ha)
+        cv2.normalize(hb, hb)
+        return float(cv2.compareHist(ha, hb, cv2.HISTCMP_CORREL))
+    except cv2.error:
+        return 0.0
+
+
+def _appearance_match(winner: Track, cand_frame: int, cand_box, frame_provider) -> bool:
+    """HSV-histogram consistency between the bowler's last seen crop and the
+    candidate continuation's first crop. Requires `frame_provider(frame_idx,
+    bbox) -> np.ndarray` (the caller supplies the graded frames)."""
+    last_box = winner.bboxes[-1]
+    last_frame = winner.frames[-1]
+    img_a = frame_provider(last_frame, last_box)
+    img_b = frame_provider(cand_frame, cand_box)
+    if img_a is None or img_b is None:
+        return True  # no visual evidence -> keep the spatial test's verdict
+    corr = _hsv_hist_corr(_crop_frame_region(img_a, last_box),
+                          _crop_frame_region(img_b, cand_box))
+    return corr >= BOWLER_STITCH_APPEARANCE_MIN
+
+
 def _stitch_continuations(winner: Track, tracks: Dict[int, Track],
-                          frame_diag: float) -> Track:
+                          frame_diag: float,
+                          frame_provider: Optional[Callable] = None) -> Track:
     """Identity lock keeps one bowler; a *continuation of the same person*
     (born after a brief occlusion or a tracker ID reset) is re-stitched to it.
     A different person -- fielder, keeper, umpire, batsman -- is never adopted,
-    even briefly; if the bowler is lost we prefer a gap over a wrong box."""
+    even briefly; if the bowler is lost we prefer a gap over a wrong box.
+    When `frame_provider` is supplied the spatial test is tightened with an
+    appearance (HSV-histogram) check so a visually distinct person that merely
+    happens to be spatially continuous is NOT stitched in."""
     if winner is None or not tracks:
         return winner
     w_index = winner.track_id
@@ -406,6 +478,9 @@ def _stitch_continuations(winner: Track, tracks: Dict[int, Track],
             if not (-1 <= gap <= BOWLER_STITCH_MAX_GAP):
                 continue
             if not _same_person(winner, tr.bboxes[0], tr.frames[0], frame_diag):
+                continue
+            if frame_provider is not None and not _appearance_match(
+                    winner, tr.frames[0], tr.bboxes[0], frame_provider):
                 continue
             extra = [(f, b) for f, b in zip(tr.frames, tr.bboxes) if f not in w_frames and f > w_last]
             if extra:
@@ -446,7 +521,8 @@ def score_bowler_tracks(tracks: Dict[int, Track], frame_dims=None,
 
 
 def select_bowler_track_with_meta(tracks: Dict[int, Track], frame_dims=None,
-                                  total_frames: Optional[int] = None
+                                  total_frames: Optional[int] = None,
+                                  frame_provider: Optional[Callable] = None
                                   ) -> "tuple[Optional[Track], Optional[dict]]":
     """Choose the bowler. Returns (best_track, meta).
 
@@ -455,6 +531,10 @@ def select_bowler_track_with_meta(tracks: Dict[int, Track], frame_dims=None,
     and nobody else is ever adopted. If nobody in the clip moves like a bowler
     (all-static scene), returns (None, None) so the caller does NOT fall back
     to boxing a random (batsman/keeper) person.
+
+    `frame_provider(frame_idx, bbox) -> np.ndarray` optionally grades the
+    stitched candidate with an appearance check (G3); without it the stitch
+    stays spatial-only for backwards compatibility.
     """
     if not tracks:
         return None, None
@@ -478,7 +558,8 @@ def select_bowler_track_with_meta(tracks: Dict[int, Track], frame_dims=None,
         _log.info("No bowler: best motion=%.3f active=%.3f below thresholds",
                   best["motion"], best["active"])
         return None, None
-    winner = _stitch_continuations(tracks[best["track_id"]], tracks, frame_diag)
+    winner = _stitch_continuations(tracks[best["track_id"]], tracks, frame_diag,
+                                   frame_provider=frame_provider)
     best["track_id"] = winner.track_id
     best["n_frames"] = len(winner)
     best["start_frame"] = winner.frames[0] if winner.frames else None
@@ -489,9 +570,11 @@ def select_bowler_track_with_meta(tracks: Dict[int, Track], frame_dims=None,
 
 
 def select_bowler_track(tracks: Dict[int, Track], frame_dims=None,
-                        total_frames: Optional[int] = None) -> Optional[Track]:
+                        total_frames: Optional[int] = None,
+                        frame_provider: Optional[Callable] = None) -> Optional[Track]:
     """Backwards-compatible wrapper: the selected bowler Track or None."""
-    winner, _meta = select_bowler_track_with_meta(tracks, frame_dims, total_frames)
+    winner, _meta = select_bowler_track_with_meta(
+        tracks, frame_dims, total_frames, frame_provider=frame_provider)
     return winner
 
 

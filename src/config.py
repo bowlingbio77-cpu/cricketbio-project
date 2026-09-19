@@ -31,6 +31,17 @@ BYTETRACK_CONFIG = "bytetrack.yaml"  # shipped with ultralytics
 POSE_MODEL_PATH = os.path.join(MODEL_DIR, "pose_landmarker_heavy.task")
 POSE_MIN_DETECTION_CONFIDENCE = 0.5
 POSE_MIN_TRACKING_CONFIDENCE = 0.5
+POSE_MAX_PEOPLE = 2  # how many simultaneous poses MediaPipe will look for
+                      # (needed to detect wrong-subject risk in full-frame fallback)
+
+# Gating: refuse ML/coaching when the pose subject could not be verified as the
+# bowler (e.g. full-frame fallback with multiple people detected in frame).
+SUBJECT_VERIFICATION_REQUIRED = True
+
+# When True, refuse ML/SHAP/coaching for a delivery the pose-quality diagnostic
+# flagged as unreliable (short, noisy, or no clear release window). The features
+# themselves are still returned; only the predictions are withheld.
+REFUSE_ML_ON_UNRELIABLE_DELIVERY = False
 
 # The 33 MediaPipe Pose landmarks, in official index order.
 POSE_LANDMARK_NAMES = [

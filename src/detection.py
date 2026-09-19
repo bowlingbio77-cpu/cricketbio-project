@@ -44,10 +44,22 @@ class BowlerDetector:
     def __init__(self, weights: str = config.YOLO_WEIGHTS,
                  conf_threshold: float = config.DETECTION_CONF_THRESHOLD):
         self.conf_threshold = conf_threshold
+        self.fallback_reason: Optional[str] = None
         self.backend = "yolov11" if _HAS_ULTRALYTICS else "hog_fallback"
         if self.backend == "yolov11":
-            self.model = YOLO(resolve_weights(weights))
-        else:
+            # G2: a missing/mis-downloaded weights file must NEVER kill the whole
+            # detection stage. If YOLO can't be built (no network to fetch the
+            # .pt, corrupt file, version mismatch), degrade to the HOG detector
+            # and record WHY so the pipeline can surface the lower confidence.
+            try:
+                self.model = YOLO(resolve_weights(weights))
+            except Exception as exc:
+                self.fallback_reason = (
+                    f"YOLO could not be initialised ({type(exc).__name__}: {exc}); "
+                    "degraded to the HOG person detector (lower confidence)."
+                )
+                self.backend = "hog_fallback"
+        if self.backend == "hog_fallback":
             self.model = cv2.HOGDescriptor()
             self.model.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
 
