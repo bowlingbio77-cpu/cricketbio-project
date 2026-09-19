@@ -50,6 +50,7 @@ class AnalysisResult:
     scoring_blocked_reason: Optional[str] = None  # human-readable why scoring was withheld
     stage_backends: dict = field(default_factory=dict)  # detection/tracking backend actually used
     delivery_reliable: Optional[bool] = None  # from pose-quality diagnostics (G6)
+    player_roles: Optional[dict] = None  # track_id -> {role, confidence, scores} for non-bowler players
 
     def to_dict(self):
         return asdict(self)
@@ -425,6 +426,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     bowler_track_id = None
     bowler_confidence = None
     stage_backends = {}
+    player_roles = None
     try:
         # Snapshot full-frame dimensions before any cropping
         if frames:
@@ -468,6 +470,14 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
                 f"Detection/tracking: locked to bowler track #{bowler_track_id} "
                 f"({len(bowler)} frames, confidence {conf_txt}) before pose estimation."
             )
+            # Classify remaining tracks into cricket roles (batsman, keeper, umpire)
+            player_roles = tracking.classify_player_roles(
+                tracks, bowler.track_id, frame_dims=(h, w), total_frames=len(frames))
+            if player_roles:
+                role_summary = ", ".join(
+                    f"#{tid}: {r['role']}({r['confidence']:.2f})"
+                    for tid, r in player_roles.items())
+                warnings.append(f"Player roles: {role_summary}")
         else:
             bowler_track_id = None
             bowler_confidence = None
@@ -745,11 +755,33 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
                 bowler_track_id=bowler_track_id,
                 bowler_confidence=bowler_confidence,
                 pose_in_full_frame=pose_source == "full_frames",
+                player_roles=player_roles,
+                all_tracks=tracks,
             )
             warnings.append(f"Analysis Replay generated: {analysis_replay_path}")
+        else:
+            warnings.append(
+                "Analysis Replay skipped: no full frames available "
+                "(detection/tracking may have failed before frames were captured)."
+            )
     except Exception as exc:
-        analysis_replay_path = None
-        warnings.append(f"Analysis Replay rendering skipped ({exc}).")
+        warnings.append(f"Analysis Replay rendering failed ({type(exc).__name__}: {exc}).")
+        # Fallback: try a minimal replay without overlays so the user still
+        # gets a playable video of the original footage.
+        try:
+            if frames_full:
+                analysis_replay_path = analysis_replay.render_analysis_replay(
+                    frames_full, [], [], {}, None,
+                    ball_tracking.make_output_path("analysis_replay_fallback"),
+                    fps=float(target_fps) / slow_factor,
+                    frame_dims=original_frame_dims,
+                )
+                warnings.append(
+                    f"Analysis Replay fallback (no overlays) generated: "
+                    f"{analysis_replay_path}"
+                )
+        except Exception:
+            warnings.append("Analysis Replay fallback also failed; no video will be shown.")
 
     timings["total"] = time.perf_counter() - t_start
     _progress("Complete")
@@ -780,6 +812,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         scoring_blocked_reason=scoring_blocked_reason,
         stage_backends=stage_backends,
         delivery_reliable=delivery_reliable,
+        player_roles=player_roles,
     )
 
 

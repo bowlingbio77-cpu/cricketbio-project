@@ -578,6 +578,163 @@ def select_bowler_track(tracks: Dict[int, Track], frame_dims=None,
     return winner
 
 
+# --------------------------------------------------------------------------- #
+# Cricket role classification for non-bowler persons
+#
+# After the bowler is locked, remaining tracks are scored for three roles:
+#   batsman       -- stationary/stable person at the far end (striker's end)
+#   wicketkeeper  -- crouching person behind the stumps (bowler's end)
+#   umpire        -- upright person standing behind the stumps
+#
+# Scoring uses four signals computed from the track:
+#   motion      -- low motion = batsman; high = not batsman
+#   aspect      -- height/width ratio: crouching (< 1.6) = keeper candidate
+#   position    -- vertical center relative to frame: far = low Y, near = high Y
+#   size        -- relative bbox area: batsman is typically largest non-bowler
+# --------------------------------------------------------------------------- #
+
+ROLE_BATSMAN = "batsman"
+ROLE_WICKETKEEPER = "wicketkeeper"
+ROLE_UMPIRE = "umpire"
+ROLE_FIELDER = "fielder"
+ROLE_UNKNOWN = "unknown"
+
+# Aspect ratio thresholds (height / width)
+_KEEPER_MAX_ASPECT = 1.6    # crouching: short & wide
+_UMPIRE_MIN_ASPECT = 2.0    # standing upright: tall & narrow
+_BATSMAN_MIN_ASPECT = 1.4   # batting stance: slightly wider than tall
+
+# Motion thresholds (same scale as bowler scoring: tanh of path/diagonal)
+_BATSMAN_MAX_MOTION = 0.15  # batsman stays mostly in place
+_KEEPER_MAX_MOTION = 0.20   # keeper shuffles slightly
+
+# Position: vertical center of bbox as fraction of frame height (0=top, 1=bottom)
+# In behind-the-bowler view: top=far (batsman end), bottom=near (bowler end)
+_KEEPER_MIN_Y_FRAC = 0.45   # keeper is in the lower half (near camera)
+_BATSMAN_MAX_Y_FRAC = 0.55  # batsman is in the upper half (far from camera)
+
+
+def _track_aspect_ratio(track: Track) -> float:
+    """Mean height/width ratio across the track's bounding boxes."""
+    if not track.bboxes:
+        return 0.0
+    ratios = []
+    for x1, y1, x2, y2 in track.bboxes:
+        w = max(1.0, x2 - x1)
+        h = max(1.0, y2 - y1)
+        ratios.append(h / w)
+    return float(np.mean(ratios))
+
+
+def _track_motion_fraction(track: Track, frame_diag: float) -> float:
+    """Total displacement / frame diagonal, same metric as bowler scoring."""
+    steps = _consecutive_steps(track)
+    path = float(np.sum(steps))
+    return float(np.tanh(path / max(frame_diag, 1e-6)))
+
+
+def _track_center_y_fraction(track: Track, frame_h: float) -> float:
+    """Mean vertical center of bbox as fraction of frame height (0=top, 1=bottom)."""
+    if not track.bboxes or frame_h <= 0:
+        return 0.5
+    centers = _track_centers(track)
+    return float(np.mean(centers[:, 1])) / frame_h
+
+
+def _track_median_area(track: Track) -> float:
+    """Median bounding box area across the track."""
+    if not track.bboxes:
+        return 0.0
+    areas = [_bbox_area(b) for b in track.bboxes]
+    return float(np.median(areas))
+
+
+def _score_role(track: Track, frame_diag: float, frame_h: float,
+                frame_w: float, bowler_track_id: int) -> dict:
+    """Score a non-bowler track for each cricket role. Returns dict with
+    role scores and the best role assignment."""
+    motion = _track_motion_fraction(track, frame_diag)
+    aspect = _track_aspect_ratio(track)
+    y_frac = _track_center_y_fraction(track, frame_h)
+    area = _track_median_area(track)
+    frame_area = max(1.0, frame_w * frame_h)
+    size_frac = area / frame_area
+
+    # --- Batsman score ---
+    # Low motion, at far end (low Y), reasonably sized, upright stance
+    batsman_motion_score = max(0.0, 1.0 - motion / _BATSMAN_MAX_MOTION)
+    batsman_position_score = max(0.0, 1.0 - y_frac / _BATSMAN_MAX_Y_FRAC)
+    batsman_aspect_score = 1.0 if aspect >= _BATSMAN_MIN_ASPECT else aspect / _BATSMAN_MIN_ASPECT
+    batsman_size_score = min(1.0, size_frac / 0.05)  # penalize very small detections
+    batsman = (0.35 * batsman_motion_score +
+               0.25 * batsman_position_score +
+               0.20 * batsman_aspect_score +
+               0.20 * batsman_size_score)
+
+    # --- Wicketkeeper score ---
+    # Crouching (low aspect), near camera (high Y), low motion
+    keeper_aspect_score = max(0.0, 1.0 - abs(aspect - 1.2) / 0.8)  # peak at ~1.2
+    keeper_position_score = max(0.0, (y_frac - _KEEPER_MIN_Y_FRAC) / (1.0 - _KEEPER_MIN_Y_FRAC))
+    keeper_motion_score = max(0.0, 1.0 - motion / _KEEPER_MAX_MOTION)
+    keeper_size_score = min(1.0, size_frac / 0.04)
+    keeper = (0.30 * keeper_aspect_score +
+              0.30 * keeper_position_score +
+              0.20 * keeper_motion_score +
+              0.20 * keeper_size_score)
+
+    # --- Umpire score ---
+    # Standing upright (high aspect), mid-position, low motion
+    umpire_aspect_score = max(0.0, min(1.0, (aspect - 1.5) / 1.0))  # grows above 1.5
+    umpire_position_score = max(0.0, 1.0 - abs(y_frac - 0.55) / 0.35)  # peak around mid-to-lower
+    umpire_motion_score = max(0.0, 1.0 - motion / 0.10)  # very still
+    umpire_size_score = min(1.0, size_frac / 0.03)
+    umpire = (0.30 * umpire_aspect_score +
+              0.25 * umpire_position_score +
+              0.25 * umpire_motion_score +
+              0.20 * umpire_size_score)
+
+    scores = {
+        ROLE_BATSMAN: float(np.clip(batsman, 0.0, 1.0)),
+        ROLE_WICKETKEEPER: float(np.clip(keeper, 0.0, 1.0)),
+        ROLE_UMPIRE: float(np.clip(umpire, 0.0, 1.0)),
+    }
+    best_role = max(scores, key=scores.get)
+    best_score = scores[best_role]
+    if best_score < 0.20:
+        best_role = ROLE_FIELDER
+    return {
+        "role": best_role,
+        "confidence": float(np.clip(best_score, 0.0, 1.0)),
+        "scores": scores,
+    }
+
+
+def classify_player_roles(tracks: Dict[int, Track], bowler_track_id: int,
+                           frame_dims=None,
+                           total_frames: Optional[int] = None) -> dict:
+    """Classify all non-bowler tracks into cricket roles.
+
+    Returns a dict mapping track_id to a role dict:
+        {track_id: {"role": "batsman"|"wicketkeeper"|"umpire"|"fielder"|"unknown",
+                     "confidence": float, "scores": {role: score}}}
+
+    The bowler track is excluded. Only tracks with >= 2 frames are classified
+    (single-frame detections are too unreliable for role assignment).
+    """
+    if not tracks:
+        return {}
+    frame_h, frame_w = frame_dims if frame_dims is not None else _FRAME_DIMS_DEFAULT
+    frame_diag = float(np.hypot(frame_w, frame_h))
+    result = {}
+    for tid, tr in tracks.items():
+        if tid == bowler_track_id:
+            continue
+        if len(tr) < 1:
+            continue
+        result[tid] = _score_role(tr, frame_diag, frame_h, frame_w, bowler_track_id)
+    return result
+
+
 def _iou(box_a, box_b):
     ax1, ay1, ax2, ay2 = box_a
     bx1, by1, bx2, by2 = box_b

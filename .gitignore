@@ -41,3 +41,6 @@ runs/
 
 # Local test asset (binary)
 test_synthetic.mp4
+
+# Evaluation dataset (large, downloaded separately)
+evaluation/single_video_benchmark/dataset/

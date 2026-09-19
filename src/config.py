@@ -19,7 +19,7 @@ DENOISE = False
 
 # --- Detection / Tracking ---
 YOLO_WEIGHTS = os.path.join(MODEL_DIR, "yolo11n.pt")   # auto-downloaded by ultralytics on first run
-DETECTION_CONF_THRESHOLD = 0.4
+DETECTION_CONF_THRESHOLD = 0.25
 BOWLER_CLASS_ID = 0              # "person" class in COCO-pretrained YOLO
 BYTETRACK_CONFIG = "bytetrack.yaml"  # shipped with ultralytics
 

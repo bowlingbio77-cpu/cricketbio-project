@@ -1,5 +1,5 @@
-﻿"""
-PaceAI â€” Cricket Bowling Biomechanics AI
+"""
+PaceAI - Cricket Bowling Biomechanics AI
 Pro Coaching & Biomechanics Screening Dashboard (dark theme)
 
 Run with:
@@ -74,7 +74,7 @@ def _esc(text) -> str:
 # ---------------- PAGE CONFIGURATION ----------------
 st.set_page_config(
     page_title="PaceAI | Cricket Bowling Biomechanics",
-    page_icon="âš¡",
+    page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -216,7 +216,7 @@ st.markdown("""
     .status-badge::before {
         content: none; /* text is already inside the badge element */
     }
-    /* Improved contrast for secondary text (WCAG AA: â‰¥4.5:1 on #0d1117) */
+    /* Improved contrast for secondary text (WCAG AA: >=4.5:1 on #0d1117) */
     .hero-subtitle, .metric-card span[style*="8b949e"] {
         color: #9ca3af !important;
     }
@@ -493,7 +493,7 @@ def _run_video_analysis(uploaded, perf_bundle, injury_bundle, bowling_arm,
             bowler_confidence=result.bowler_confidence,
             elapsed_s=(result.stage_times or {}).get("total"),
         ), show_art=False)
-        st.button("VIEW ANALYSIS â†’",
+        st.button("VIEW ANALYSIS →",
                   on_click=lambda: st.session_state.update(scroll_to_replay=True),
                   type="primary")
         return result
@@ -508,7 +508,7 @@ def _run_video_analysis(uploaded, perf_bundle, injury_bundle, bowling_arm,
             total=len([1 for g in analysis_ui.GROUPS for _ in g.steps]),
         ), show_art=True)
         st.button("TRY AGAIN", on_click=_clear_video_run)
-        st.markdown("#### ðŸ”§ TECHNICAL DETAILS")
+        st.markdown("#### 🔧 TECHNICAL DETAILS")
         st.caption("The analysis was interrupted. The technical reason "
                    "(visible to judges / for debugging) is below.")
         with st.expander("Error details", expanded=False):
@@ -577,25 +577,25 @@ ELITE_BENCHMARK = {
 
 PRESETS = {
     "Custom / Manual": None,
-    "âš¡ Elite Fast Bowler (Pro)": {
+    "⚡ Elite Fast Bowler (Pro)": {
         "shoulder_rotation_deg": 18.0, "elbow_flexion_deg": 8.0, "wrist_angle_deg": 165.0,
         "hip_rotation_deg": 45.0, "knee_flexion_deg": 10.0, "trunk_lean_deg": 25.0,
         "stride_length_norm": 1.05, "release_angle_deg": 78.0, "angular_velocity_deg_s": 1100.0,
         "ground_contact_time_s": 0.11
     },
-    "ðŸš¨ High Biomechanical Risk Indicator Action": {
+    "🚨 High Biomechanical Risk Indicator Action": {
         "shoulder_rotation_deg": 28.0, "elbow_flexion_deg": 22.0, "wrist_angle_deg": 135.0,
         "hip_rotation_deg": 58.0, "knee_flexion_deg": 38.0, "trunk_lean_deg": 45.0,
         "stride_length_norm": 0.72, "release_angle_deg": 60.0, "angular_velocity_deg_s": 460.0,
         "ground_contact_time_s": 0.28
     },
-    "ðŸŽ¯ Seam & Swing Specialist": {
+    "🎯 Seam & Swing Specialist": {
         "shoulder_rotation_deg": 25.0, "elbow_flexion_deg": 10.0, "wrist_angle_deg": 170.0,
         "hip_rotation_deg": 38.0, "knee_flexion_deg": 14.0, "trunk_lean_deg": 24.0,
         "stride_length_norm": 0.98, "release_angle_deg": 75.0, "angular_velocity_deg_s": 800.0,
         "ground_contact_time_s": 0.14
     },
-    "ðŸŒ€ Mystery Spin Action": {
+    "🌀 Mystery Spin Action": {
         "shoulder_rotation_deg": 65.0, "elbow_flexion_deg": 14.0, "wrist_angle_deg": 120.0,
         "hip_rotation_deg": 25.0, "knee_flexion_deg": 25.0, "trunk_lean_deg": 15.0,
         "stride_length_norm": 0.65, "release_angle_deg": 68.0, "angular_velocity_deg_s": 520.0,
@@ -773,13 +773,13 @@ def render_model_quality_expander(perf_bundle, injury_bundle):
             bl = getattr(perf_bundle, "baseline_metrics", None) or {}
             folds = cv.get("folds", 0)
             st.markdown(f"**Performance model** (`{perf_bundle.model_name}`)"
-                        + (f" â€” {folds}-fold cross-validation" if folds else ""))
+                        + (f" — {folds}-fold cross-validation" if folds else ""))
             if cv:
-                st.markdown(f"- MAE: **{cv.get('mae_mean', 0):.2f}** Â± {cv.get('mae_std', 0):.2f} "
+                st.markdown(f"- MAE: **{cv.get('mae_mean', 0):.2f}** ± {cv.get('mae_std', 0):.2f} "
                             f"points / 100")
                 st.markdown(f"- RMSE: **{cv.get('rmse_mean', 0):.2f}**")
-                st.markdown(f"- RÂ²: **{cv.get('r2_mean', 0):.3f}** Â± {cv.get('r2_std', 0):.3f} "
-                            f"â€” baseline (always predict mean): **{bl.get('r2', 0):.3f}**")
+                st.markdown(f"- R²: **{cv.get('r2_mean', 0):.3f}** ± {cv.get('r2_std', 0):.3f} "
+                            f"— baseline (always predict mean): **{bl.get('r2', 0):.3f}**")
             else:
                 st.caption("No cross-validation data stored in this bundle.")
 
@@ -788,12 +788,12 @@ def render_model_quality_expander(perf_bundle, injury_bundle):
             bl = getattr(injury_bundle, "baseline_metrics", None) or {}
             folds = cv.get("folds", 0)
             st.markdown(f"**Biomechanical risk-indicator model** (`{injury_bundle.model_name}`)"
-                        + (f" â€” {folds}-fold cross-validation" if folds else ""))
+                        + (f" — {folds}-fold cross-validation" if folds else ""))
             if cv:
-                st.markdown(f"- Accuracy: **{cv.get('accuracy_mean', 0):.3f}** Â± "
-                            f"{cv.get('accuracy_std', 0):.3f} â€” baseline (always majority class): "
+                st.markdown(f"- Accuracy: **{cv.get('accuracy_mean', 0):.3f}** ± "
+                            f"{cv.get('accuracy_std', 0):.3f} — baseline (always majority class): "
                             f"**{bl.get('accuracy', 0):.3f}**")
-                st.markdown(f"- F1 (macro): **{cv.get('f1_mean', 0):.3f}** Â± {cv.get('f1_std', 0):.3f}")
+                st.markdown(f"- F1 (macro): **{cv.get('f1_mean', 0):.3f}** ± {cv.get('f1_std', 0):.3f}")
             else:
                 st.caption("No cross-validation data stored in this bundle.")
 
@@ -806,7 +806,7 @@ def render_ood_warnings(feature_vector, bundle):
     ood = ml_models.out_of_distribution_warnings(feature_vector, bundle)
     if ood:
         lines = [f"- **{FEATURE_LABELS.get(f, (f,))[0]}** = {v:.2f} "
-                 f"(training range {lo:.2f}â€“{hi:.2f})" for f, v, lo, hi in ood]
+                 f"(training range {lo:.2f}–{hi:.2f})" for f, v, lo, hi in ood]
         st.warning("Some input features fall outside the model's training range -- predictions "
                    "extrapolate beyond what the model has seen and may be unreliable:\n"
                    + "\n".join(lines))
@@ -819,27 +819,27 @@ def render_plain_language_summary(result, risk_level, is_icc_legal, elbow_flex):
 
     if perf is not None:
         if perf >= 80:
-            band = "a strong, technically sound action â€” focus on consistency and repeatability"
+            band = "a strong, technically sound action — focus on consistency and repeatability"
         elif perf >= 60:
             band = "a solid foundation with a few refinements to make"
         else:
-            band = "below benchmark â€” several technical elements need focused work"
-        bullets.append(f"**Performance: {perf:.0f}/100** â€” {band}.")
+            band = "below benchmark — several technical elements need focused work"
+        bullets.append(f"**Performance: {perf:.0f}/100** — {band}.")
 
     risk_desc = {
         "low": "no literature-informed biomechanical trigger thresholds were exceeded for this delivery",
-        "moderate": "a few literature-informed trigger thresholds were flagged â€” review before heavy workload",
-        "high": "several literature-informed trigger thresholds were exceeded â€” review technique before more bowling",
+        "moderate": "a few literature-informed trigger thresholds were flagged — review before heavy workload",
+        "high": "several literature-informed trigger thresholds were exceeded — review technique before more bowling",
     }.get(risk_level, "see detailed breakdown")
-    bullets.append(f"**Biomechanical risk indicator: {risk_level.upper()}** â€” {risk_desc}.")
+    bullets.append(f"**Biomechanical risk indicator: {risk_level.upper()}** — {risk_desc}.")
 
     if is_icc_legal:
-        bullets.append(f"**ICC screening: WITHIN LIMIT** â€” elbow extension {elbow_flex:.1f}Â° is within the "
-                       f"{config.ICC_ELBOW_EXTENSION_LIMIT_DEG}Â° reference value. This is a screening "
+        bullets.append(f"**ICC screening: WITHIN LIMIT** -- elbow extension {elbow_flex:.1f}\u00b0 is within the "
+                       f"{config.ICC_ELBOW_EXTENSION_LIMIT_DEG}° reference value. This is a screening "
                        f"indicator, not an official ICC on-field measurement.")
     else:
-        bullets.append(f"**ICC screening: ABOVE REFERENCE** â€” elbow extension {elbow_flex:.1f}Â° exceeds the "
-                       f"{config.ICC_ELBOW_EXTENSION_LIMIT_DEG}Â° reference value; a straighter arm path "
+        bullets.append(f"**ICC screening: ABOVE REFERENCE** -- elbow extension {elbow_flex:.1f}\u00b0 exceeds the "
+                       f"{config.ICC_ELBOW_EXTENSION_LIMIT_DEG}° reference value; a straighter arm path "
                        f"through release is the priority. This is a screening indicator, not an official "
                        f"ICC on-field measurement.")
 
@@ -858,7 +858,7 @@ def render_plain_language_summary(result, risk_level, is_icc_legal, elbow_flex):
     if bstats.get("n_frames"):
         n_tracked = bstats["n_detected"] + bstats["n_interpolated"]
         bullets.append(f"**Ball tracking:** the ball was followed for {n_tracked} frames "
-                       f"({bstats.get('coverage_pct', 0):.0f}% of the clip) â€” watch the video above.")
+                       f"({bstats.get('coverage_pct', 0):.0f}% of the clip) — watch the video above.")
 
     summary_text = "### What this means for you\n" + "\n".join(f"- {b}" for b in bullets)
     if risk_level == "high":
@@ -871,25 +871,25 @@ def render_plain_language_summary(result, risk_level, is_icc_legal, elbow_flex):
 
 # Every feature in the app, explained in plain English (tag, title, description).
 FEATURES_GUIDE = [
-    ("SIMULATOR", "ðŸŽ›ï¸ Bio-Simulator", "Try different bowling actions with sliders â€” no video needed."),
-    ("VIDEO", "ðŸ“¹ Video Capture", "Upload a clip; the app finds the bowler, reads 33 body landmarks, and measures the delivery automatically."),
-    ("BALL", "ðŸŽ¯ Ball Tracking", "The red box follows the cricket ball from release to impact; a dashed box means the app is guessing where it is between detections."),
-    ("ARM", "ðŸ Bowling Arm", "Which arm the bowler bowls with. The app mirrors the joints so left-handers aren't analyzed backwards."),
-    ("AI", "ðŸ§  AI Backbone", "The math model that turns measurements into a demonstration performance score and a biomechanical risk-indicator level. Random Forest is the safe default."),
-    ("PRESET", "ðŸŽ¥ Processing", "Speed vs accuracy of the video analysis. Fast = rough but quick; Maximum accuracy = precise but slow."),
-    ("SCORE", "â­ Performance", "A literature-informed demonstration performance indicator (0â€“100) for this delivery's mechanics. Higher = closer to published elite pace-bowler ranges."),
-    ("RISK", "ðŸš¨ Biomechanical Risk Indicator", "How many literature-informed biomechanical trigger thresholds this action crosses. Low = none exceeded, Moderate = a few, High = several."),
-    ("LEGALITY", "âš–ï¸ ICC Screening", "Whether the elbow flexion at release stays within the â‰¤15Â° ICC reference value. Screening only â€” an official legality ruling requires lab-grade 3D motion capture per ICC protocol."),
-    ("KNEE", "ðŸ¦µ Knee Brace", "How straight the front knee is at landing. Low degrees = better braking and less knee stress."),
-    ("GAUGES", "ðŸ“Š Gauges & Stress", "Big dials for your score and risk, plus how much load lands on the back, knee and shoulder."),
-    ("RADAR", "ðŸ•¸ï¸ Kinetic Radar", "Your shape compared with an elite bowler's. A wider, more balanced shape is better."),
-    ("XAI", "ðŸ§  Explainable AI", "Which single measurement moved your score or risk up or down the most."),
-    ("DRILLS", "ðŸ‹ï¸ Coaching Drills", "Exercises and technique fixes for whatever got flagged in this delivery."),
-    ("CLINICAL", "ðŸ¥ Literature Risk Thresholds", "Checks your delivery against published biomechanical screening benchmarks and workload rules (ACWR, overs, rest days). Screening only â€” not a prediction of injury."),
-    ("REPORT", "ðŸ“‘ Report", "Downloads all of this run's results as a JSON file you can keep or share."),
-    ("HISTORY", "ðŸ“š History & Compare", "Every saved delivery, listed and compared side by side over time."),
-    ("SAVE", "ðŸ’¾ Save to History", "Stores this run so you can compare it against future sessions."),
-    ("TIMING", "â±ï¸ Run Timing", "How many seconds each analysis step took â€” only useful when tuning for speed."),
+    ("SIMULATOR", "Bio-Simulator", "Try different bowling actions with sliders -- no video needed."),
+    ("VIDEO", "📹 Video Capture", "Upload a clip; the app finds the bowler, reads 33 body landmarks, and measures the delivery automatically."),
+    ("BALL", "🎯 Ball Tracking", "The red box follows the cricket ball from release to impact; a dashed box means the app is guessing where it is between detections."),
+    ("ARM", "Bowling Arm", "Which arm the bowler bowls with. The app mirrors the joints so left-handers aren't analyzed backwards."),
+    ("AI", "🧠 AI Backbone", "The math model that turns measurements into a demonstration performance score and a biomechanical risk-indicator level. Random Forest is the safe default."),
+    ("PRESET", "🎥 Processing", "Speed vs accuracy of the video analysis. Fast = rough but quick; Maximum accuracy = precise but slow."),
+    ("SCORE", "Performance", "A literature-informed demonstration performance indicator (0--100) for this delivery's mechanics. Higher = closer to published elite pace-bowler ranges."),
+    ("RISK", "🚨 Biomechanical Risk Indicator", "How many literature-informed biomechanical trigger thresholds this action crosses. Low = none exceeded, Moderate = a few, High = several."),
+    ("LEGALITY", "ICC Screening", "Whether the elbow flexion at release stays within the <=15\u00b0 ICC reference value. Screening only -- an official legality ruling requires lab-grade 3D motion capture per ICC protocol."),
+    ("KNEE", "🦵 Knee Brace", "How straight the front knee is at landing. Low degrees = better braking and less knee stress."),
+    ("GAUGES", "📊 Gauges & Stress", "Big dials for your score and risk, plus how much load lands on the back, knee and shoulder."),
+    ("RADAR", "Kinetic Radar", "Your shape compared with an elite bowler's. A wider, more balanced shape is better."),
+    ("XAI", "🧠 Explainable AI", "Which single measurement moved your score or risk up or down the most."),
+    ("DRILLS", "Coaching Drills", "Exercises and technique fixes for whatever got flagged in this delivery."),
+    ("CLINICAL", "Literature Risk Thresholds", "Checks your delivery against published biomechanical screening benchmarks and workload rules (ACWR, overs, rest days). Screening only -- not a prediction of injury."),
+    ("REPORT", "📑 Report", "Downloads all of this run's results as a JSON file you can keep or share."),
+    ("HISTORY", "📚 History & Compare", "Every saved delivery, listed and compared side by side over time."),
+    ("SAVE", "💾 Save to History", "Stores this run so you can compare it against future sessions."),
+    ("TIMING", "Run Timing", "How many seconds each analysis step took -- only useful when tuning for speed."),
 ]
 
 
@@ -909,7 +909,7 @@ def _session_name(row):
     if row.get("athlete"):
         parts.append(f"({row['athlete']})")
     if row.get("label"):
-        parts.append(f"â€” {row['label']}")
+        parts.append(f"— {row['label']}")
     return " ".join(parts)
 
 
@@ -920,8 +920,8 @@ def _athlete_of(row):
 def _risk_of(row):
     risk = row.get("injury_risk")
     if isinstance(risk, dict):
-        return risk.get("risk_level", "â€”")
-    return row.get("risk_level") or "â€”"
+        return risk.get("risk_level", "—")
+    return row.get("risk_level") or "—"
 
 
 def render_history_page():
@@ -936,13 +936,13 @@ def render_history_page():
         return
 
     athletes = sorted({_athlete_of(r) for r in all_records})
-    athlete_choice = st.selectbox("ðŸ‘¤ Filter by bowler", ["All bowlers"] + athletes,
+    athlete_choice = st.selectbox("👤 Filter by bowler", ["All bowlers"] + athletes,
                                   key="history_athlete")
     records = [r for r in all_records
                if athlete_choice == "All bowlers" or _athlete_of(r) == athlete_choice]
 
     st.download_button(
-        label="ðŸ“¤ Export all history (JSON)",
+        label="📤 Export all history (JSON)",
         data=json.dumps(all_records, indent=2, default=str),
         file_name="bowling_history_export.json",
         mime="application/json",
@@ -954,8 +954,8 @@ def render_history_page():
     risks = [_risk_of(r) for r in records]
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Total sessions", len(records))
-    c2.metric("Avg performance", f"{np.mean(perfs):.1f}" if perfs else "â€”")
-    c3.metric("Best performance", f"{max(perfs):.1f}" if perfs else "â€”")
+    c2.metric("Avg performance", f"{np.mean(perfs):.1f}" if perfs else "—")
+    c3.metric("Best performance", f"{max(perfs):.1f}" if perfs else "—")
     c4.metric("High-risk sessions", risks.count("high"))
 
     # --- Full table ---
@@ -1026,7 +1026,7 @@ def render_history_page():
         with c1:
             fig = go.Figure(go.Bar(
                 x=sel_names, y=[r.get("performance_score") for r in sel],
-                marker_color="#00e676", text=[f"{r.get('performance_score'):.0f}" if r.get('performance_score') is not None else "â€”" for r in sel],
+                marker_color="#00e676", text=[f"{r.get('performance_score'):.0f}" if r.get('performance_score') is not None else "—" for r in sel],
                 textposition="outside"))
             fig.update_layout(title="Performance score", height=320,
                               paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
@@ -1052,7 +1052,7 @@ def render_history_page():
             for name, v in zip(sel_names, vals):
                 row[name] = round(v, 2) if v is not None else None
             if len(vals) > 1 and all(v is not None for v in vals):
-                row["Î” last vs first"] = round(vals[-1] - vals[0], 2)
+                row["Δ last vs first"] = round(vals[-1] - vals[0], 2)
             feat_rows.append(row)
         st.dataframe(pd.DataFrame(feat_rows), width='stretch', hide_index=True)
 
@@ -1103,7 +1103,7 @@ def render_history_page():
                 st.markdown(f"- {note}")
             if not notes:
                 st.caption("No coaching notes stored for this session.")
-        with st.expander("Explainable AI â€” feature contributions"):
+        with st.expander("Explainable AI — feature contributions"):
             tab1, tab2 = st.tabs(["Performance drivers", "Biomechanical-risk drivers"])
             with tab1:
                 shap_perf = detail.get("shap_performance")
@@ -1156,21 +1156,21 @@ def _confirm_clear_history():
 
 # ---------------- SIDEBAR CONTROLS ----------------
 with st.sidebar:
-    st.markdown("### ðŸ PaceAI Biomechanics")
+    st.markdown("### 🏏 PaceAI Biomechanics")
     st.caption("AI Motion Capture, Kinetics & Biomechanics Screening")
     st.markdown("---")
 
-    page = st.radio("ðŸ§­ Navigation", ["âš¡ Analyze", "ðŸ“š History & Compare"],
+    page = st.radio("🧭 Navigation", ["⚡ Analyze", "📚 History & Compare"],
                     help="Analyze: run a new delivery. History: browse saved results and compare.")
 
-    if page == "âš¡ Analyze":
-        input_mode = st.radio("ðŸ“¥ Analysis Mode", ["ðŸŽ›ï¸ Interactive Bio-Simulator", "ðŸ“¹ Video Motion Capture"], index=0,
-                              help="Simulator: adjust the biomechanics with sliders â€” no video needed. "
+    if page == "⚡ Analyze":
+        input_mode = st.radio("Analysis Mode", ["Interactive Bio-Simulator", "Video Motion Capture"], index=0,
+                              help="Simulator: adjust the biomechanics with sliders — no video needed. "
                                    "Video: upload a clip and the app measures the delivery automatically.")
     else:
-        input_mode = "ðŸŽ›ï¸ Interactive Bio-Simulator"
+        input_mode = "Interactive Bio-Simulator"
 
-    st.markdown("#### âš™ï¸ Model & Bowling Setup")
+    st.markdown("#### Model & Bowling Setup")
     bowling_arm = st.selectbox("Bowling Arm", ["Right-Arm", "Left-Arm"],
                                help="Which arm the bowler bowls with. Joints are mirrored automatically "
                                     "so left-handers aren't analyzed backwards.")
@@ -1185,16 +1185,16 @@ with st.sidebar:
     camera_view = "behind"
     target_fps, resize_choice, denoise = 20, (640, 360), False
     slow_factor, zoom_end = 2.5, 1.8
-    with st.expander("ðŸŽ¥ Video Processing (CV speed/accuracy)"):
+    with st.expander("Video Processing (CV speed/accuracy)"):
         camera_view = st.selectbox(
             "Camera view", ["behind", "side"],
             help="Recording orientation. 'Behind' (rear of the bowler) is assumed by the "
                  "2D fallback features; 'side' is supported for world-landmark metrics.")
         processing_preset = st.selectbox(
             "Preset", ["Balanced", "Fast", "Maximum accuracy"],
-            help="Balanced (default): denoise off, 640Ã—360 @ 20 fps -- most speed with little "
+            help="Balanced (default): denoise off, 640×360 @ 20 fps -- most speed with little "
                  "accuracy loss. Fast: same resolution @ 15 fps. Maximum accuracy: denoise on, "
-                 "960Ã—540 @ 30 fps (slowest).")
+                 "960×540 @ 30 fps (slowest).")
         if processing_preset == "Fast":
             target_fps, resize_choice, denoise = 15, (640, 360), False
         elif processing_preset == "Maximum accuracy":
@@ -1206,20 +1206,20 @@ with st.sidebar:
         resize_choice = st.selectbox(
             "Frame resolution",
             [(640, 360), (960, 540), (1280, 720)],
-            format_func=lambda d: f"{d[0]}Ã—{d[1]}",
+            format_func=lambda d: f"{d[0]}×{d[1]}",
             index=[(640, 360), (960, 540), (1280, 720)].index(resize_choice),
             help="Pixel size of the frames that get analyzed. Higher = more detail but slower.")
         denoise = st.checkbox("Denoise frames", value=denoise,
                               help="On = more accurate on noisy footage but much slower.")
 
-    with st.expander("ðŸ”§ Diagnostics"):
+    with st.expander("Diagnostics"):
         debug_overlay = st.checkbox(
             "Draw debug overlay on Analysis Replay",
             value=False,
             help="Adds a diagnostic panel (locked bowler track id + cricket-evidence "
                  "confidence + ball state) to the Analysis Replay video. Off by default.")
 
-    with st.expander("ðŸŽ¬ Reels Settings"):
+    with st.expander("🎬 Reels Settings"):
         slow_factor = st.slider(
             "Slow-motion factor", 1.5, 4.0, 2.5, step=0.1,
             help="How much to slow down the replay. 2.5x = 40% playback speed.")
@@ -1228,22 +1228,22 @@ with st.sidebar:
             help="How much to zoom in at the end of the clip. 1.8x = crop to 56% of frame.")
 
     # st.markdown("---")
-    # if st.button("ðŸšª Log Out"):
+    # if st.button("🚪 Log Out"):
     #     st.session_state["authenticated"] = False
     #     st.rerun()
 
 render_chat_widget()
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("#### ðŸ” System Status")
-st.sidebar.caption(f"âš¡ XGBoost: **{'Active' if ml_models.BACKEND_INFO['xgboost_available'] else 'Scikit Fallback'}**")
-st.sidebar.caption(f"ðŸ± CatBoost: **{'Active' if ml_models.BACKEND_INFO['catboost_available'] else 'Scikit Fallback'}**")
-st.sidebar.caption(f"ðŸ§  PyTorch: **{'Active' if ml_models.BACKEND_INFO['torch_available'] else 'Disabled'}**")
-st.sidebar.caption(f"ðŸ”¬ SHAP Engine: **{'Active' if explainability.SHAP_AVAILABLE else 'Finite Diff'}**")
-st.sidebar.caption(f"ðŸ“š History entries: **{history_db.count()}**")
+st.sidebar.markdown("#### System Status")
+st.sidebar.caption(f"⚡ XGBoost: **{'Active' if ml_models.BACKEND_INFO['xgboost_available'] else 'Scikit Fallback'}**")
+st.sidebar.caption(f"CatBoost: **{'Active' if ml_models.BACKEND_INFO['catboost_available'] else 'Scikit Fallback'}**")
+st.sidebar.caption(f"🧠 PyTorch: **{'Active' if ml_models.BACKEND_INFO['torch_available'] else 'Disabled'}**")
+st.sidebar.caption(f"🔬 SHAP Engine: **{'Active' if explainability.SHAP_AVAILABLE else 'Finite Diff'}**")
+st.sidebar.caption(f"📚 History entries: **{history_db.count()}**")
 
 # ---------------- PAGE DISPATCH ----------------
-if page == "ðŸ“š History & Compare":
+if page == "📚 History & Compare":
     render_history_page()
     st.stop()
 
@@ -1254,12 +1254,12 @@ st.markdown("""
 <div class="hero-banner" role="banner" id="main-content">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
         <div>
-            <h1 class="hero-title">âš¡ Fast-Bowling Biomechanics AI</h1>
-            <p class="hero-subtitle">Kinematic Chain Profiling â€¢ ICC Elbow Screening â€¢ Literature-Informed Biomechanical Risk</p>
+            <h1 class="hero-title">Fast-Bowling Biomechanics AI</h1>
+            <p class="hero-subtitle">Kinematic Chain Profiling - ICC Elbow Screening - Literature-Informed Biomechanical Risk</p>
         </div>
         <div>
-            <span class="status-badge badge-legal" style="margin-right: 8px;">â— AI Engine Ready</span>
-            <span class="status-badge badge-low">â— YOLOv11 + MediaPipe</span>
+            <span class="status-badge badge-legal" style="margin-right: 8px;">AI Engine Ready</span>
+            <span class="status-badge badge-low">YOLOv11 + MediaPipe</span>
         </div>
     </div>
 </div>
@@ -1274,14 +1274,14 @@ with st.expander("â“ New here? Every feature explained in plain English", e
     render_features_guide()
 
 # ---------------- INPUT SECTION ----------------
-if input_mode == "ðŸŽ›ï¸ Interactive Bio-Simulator":
+if input_mode == "Interactive Bio-Simulator":
     st.markdown("### 1. Delivery Kinematic Parameters")
     
     # Preset Selector
-    selected_preset = st.selectbox("âš¡ Quick Load Action Preset:", list(PRESETS.keys()))
+    selected_preset = st.selectbox("⚡ Quick Load Action Preset:", list(PRESETS.keys()))
     preset_data = PRESETS[selected_preset]
 
-    with st.expander("ðŸ› ï¸ Fine-Tune Biomechanical Sliders (Release & Impact Points)", expanded=True):
+    with st.expander("Fine-Tune Biomechanical Sliders (Release & Impact Points)", expanded=True):
         cols = st.columns(2)
         for i, (feat, (label, unit, lo, hi, default_val)) in enumerate(FEATURE_LABELS.items()):
             active_val = preset_data[feat] if preset_data else default_val
@@ -1294,7 +1294,7 @@ if input_mode == "ðŸŽ›ï¸ Interactive Bio-Simulator":
 
 else:
     st.markdown("### 1. Upload Bowling Video")
-    st.info("Runs Computer Vision pipeline: Detection (YOLOv11) âž” Multi-object tracking (ByteTrack) âž” 3D Pose (MediaPipe) âž” Biomechanical extraction.")
+    st.info("Runs Computer Vision pipeline: Detection (YOLOv11) ➔ Multi-object tracking (ByteTrack) ➔ 3D Pose (MediaPipe) ➔ Biomechanical extraction.")
     uploaded = st.file_uploader("Upload bowling delivery video clip", type=["mp4", "mov", "avi"])
 
     if uploaded is not None:
@@ -1322,6 +1322,15 @@ _reels_vid = st.session_state.get("reels_video_path") \
 _analysis_replay = st.session_state.get("analysis_replay_path") \
     if os.path.exists(st.session_state.get("analysis_replay_path") or "") else None
 
+# Fallback: if the primary analysis replay is missing, try other video outputs
+# so the user still sees *something* even when the full overlay pipeline failed.
+if _analysis_replay is None:
+    for _fallback_key in ("video_output_path", "pose_video_path", "reels_video_path"):
+        _fallback = st.session_state.get(_fallback_key)
+        if _fallback and os.path.exists(_fallback):
+            _analysis_replay = _fallback
+            break
+
 
 def _video_key_moments(raw_events):
     """Normalize optional pipeline event metadata without inventing events."""
@@ -1346,6 +1355,9 @@ def _video_key_moments(raw_events):
 def render_analysis_replay(hero_video, result, feature_vector, ball_stats):
     """Premium single-video analysis experience built entirely from real outputs."""
     if not hero_video:
+        # Surface pipeline warnings so the user knows *why* the replay is missing
+        _warns = st.session_state.get("last_warnings") or []
+        _replay_warns = [w for w in _warns if "Replay" in w or "replay" in w]
         st.markdown("""
         <div class="analysis-empty" role="status">
           <div class="analysis-empty-kicker">ANALYSIS REPLAY</div>
@@ -1353,6 +1365,9 @@ def render_analysis_replay(hero_video, result, feature_vector, ball_stats):
           <div class="analysis-empty-copy">The analysis completed, but a playable unified replay was not generated.</div>
         </div>
         """, unsafe_allow_html=True)
+        if _replay_warns:
+            for _w in _replay_warns:
+                st.warning(_w)
         return
 
     st.markdown("""
@@ -1377,14 +1392,14 @@ def render_analysis_replay(hero_video, result, feature_vector, ball_stats):
         if selected != "Start":
             selected_time = next(m["time_s"] for m in moments if m["label"] == selected)
             st.video(hero_video, start_time=int(selected_time))
-            st.caption(f"Key moment: **{selected}** Â· {selected_time:.2f}s")
+            st.caption(f"Key moment: **{selected}** · {selected_time:.2f}s")
     else:
         st.caption("Use the native player controls for slow motion and frame-by-frame review. Key-event navigation will appear automatically when the pipeline provides event timestamps.")
 
     bowler_id = getattr(result, "bowler_track_id", None)
     bowler_conf = getattr(result, "bowler_confidence", None)
     if bowler_id is not None:
-        conf_s = f" Â· confidence {bowler_conf:.2f}" if bowler_conf is not None else ""
+        conf_s = f" · confidence {bowler_conf:.2f}" if bowler_conf is not None else ""
         st.caption(f"Bowler identity: locked to track **#{bowler_id}**{conf_s} "
                    f"(cricket-evidence selection + identity lock; never swapped to batsman/keeper).")
     else:
@@ -1407,9 +1422,9 @@ def render_analysis_replay(hero_video, result, feature_vector, ball_stats):
     st.markdown("#### Key evidence")
     m1, m2, m3, m4 = st.columns(4)
     with m1:
-        st.metric("Release angle", f"{feature_vector.get('release_angle_deg', 0):.1f}Â°")
+        st.metric("Release angle", f"{feature_vector.get('release_angle_deg', 0):.1f}°")
     with m2:
-        st.metric("Front-knee flexion", f"{feature_vector.get('knee_flexion_deg', 0):.1f}Â°")
+        st.metric("Front-knee flexion", f"{feature_vector.get('knee_flexion_deg', 0):.1f}°")
     with m3:
         st.metric("Tracking quality", quality)
     with m4:
@@ -1474,7 +1489,7 @@ if feature_vector:
     # Merge video pipeline timings (if this run came from a video). The ML-only
     # `total` from the second call is ADDED to the CV pipeline's total, not
     # dropped over it -- otherwise "Total pipeline time" shows only ML time.
-    if input_mode.startswith("ðŸ“¹") and st.session_state.get("video_stage_times"):
+    if input_mode.startswith("📹") and st.session_state.get("video_stage_times"):
         stage_times = dict(st.session_state["video_stage_times"])
         ml_times = dict(result.stage_times or {})
         for k, v in ml_times.items():
@@ -1499,19 +1514,19 @@ if feature_vector:
     subject_blocked = result.subject_verified is False
     if subject_blocked:
         st.error(
-            "**Scoring withheld â€” subject not verified.** "
+            "**Scoring withheld — subject not verified.** "
             "The pose skeleton could not be confirmed as the bowler (multiple "
             "people detected with no bowler identity lock), so the measured "
             "features below may belong to another player. Performance / risk "
             "predictions, coaching notes and SHAP explanations are refused for "
-            "this run â€” the features and replay are still shown for manual "
+            "this run — the features and replay are still shown for manual "
             "review, clearly marked as from an unverified subject."
         )
 
     # DEMO vs RESEARCH / input-mode badges (research transparency)
     ds = getattr(perf_bundle, "data_source", "synthetic")
     if ds == "synthetic":
-        model_badge = ('<span class="status-badge badge-demo">DEMO MODELS â€¢ SYNTHETIC-TRAINED</span>',
+        model_badge = ('<span class="status-badge badge-demo">DEMO MODELS • SYNTHETIC-TRAINED</span>',
                        "Scored by demo models trained on synthetic biomechanical data "
                        "(labels derived from the features themselves). Illustrative only, "
                        "not a validated research measurement.")
@@ -1523,8 +1538,8 @@ if feature_vector:
     else:
         model_badge = ('<span class="status-badge badge-demo">MODEL SOURCE UNKNOWN</span>',
                        "Bundle saved by an older version without provenance -- treat as demo.")
-    if input_mode.startswith("ðŸ“¹"):
-        input_badge = ('<span class="status-badge badge-video">REAL VIDEO â€¢ FEATURES MEASURED</span>',
+    if input_mode.startswith("📹"):
+        input_badge = ('<span class="status-badge badge-video">REAL VIDEO • FEATURES MEASURED</span>',
                        f"Features measured from the uploaded clip via MediaPipe "
                        f"({result.landmark_source_summary and result.landmark_source_summary.get('world_3d_frames', 0)} "
                        f"world-3D / {result.landmark_source_summary and result.landmark_source_summary.get('normalized_2d_frames', 0)} "
@@ -1546,7 +1561,7 @@ if feature_vector:
             <div class="metric-card" role="region" aria-label="Demonstration Performance Indicator">
                 <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">DEMONSTRATION PERFORMANCE INDICATOR</span>
                 <h2 style="margin:4px 0; color:#00e676;">{result.performance_score:.1f}<span style="font-size:1rem;color:#8b949e"> / 100</span></h2>
-                <span style="color:#8b949e; font-size:0.78rem;">Literature-informed demo score â€” not a validated measurement</span>
+                <span style="color:#8b949e; font-size:0.78rem;">Literature-informed demo score — not a validated measurement</span>
             </div>
             """, unsafe_allow_html=True)
         else:
@@ -1554,7 +1569,7 @@ if feature_vector:
             <div class="metric-card" role="region" aria-label="Demonstration Performance Indicator">
                 <span style="color:#ef5350; font-size:0.85rem; font-weight:600;">DEMONSTRATION PERFORMANCE INDICATOR</span>
                 <h2 style="margin:4px 0; color:#ef5350;">WITHHELD</h2>
-                <span style="color:#8b949e; font-size:0.78rem;">Not scored â€” pose subject could not be verified as the bowler.</span>
+                <span style="color:#8b949e; font-size:0.78rem;">Not scored — pose subject could not be verified as the bowler.</span>
             </div>
             """, unsafe_allow_html=True)
     with col_m2:
@@ -1593,7 +1608,7 @@ if feature_vector:
         st.info("**No scoring summary available** — predictions were withheld because "
                 "the pose subject could not be verified as the bowler.")
 
-    if input_mode.startswith("ðŸ“¹"):
+    if input_mode.startswith("📹"):
         render_analysis_replay(_analysis_replay, result, feature_vector, st.session_state.get("ball_stats") or {})
         if st.session_state.pop("scroll_to_replay", False):
             st.components.v1.html(
@@ -1614,15 +1629,15 @@ if feature_vector:
                 "Use for technique feedback only.")
 
     # ---------------- DETAILED BREAKDOWN (deep dive, collapsed by default) ----------------
-    with st.expander("ðŸ” Deep-dive analysis â€” gauges, radar, SHAP, drills, risk thresholds, report", expanded=False):
+    with st.expander("Deep-dive analysis -- gauges, radar, SHAP, drills, risk thresholds, report", expanded=False):
         # ---------------- TABBED DETAILED BREAKDOWN ----------------
         tab_summary, tab_radar, tab_shap, tab_coaching, tab_clinical, tab_export = st.tabs([
-            "ðŸ“Š Gauges & Joint Stress",
-            "ðŸ•¸ï¸ Kinetic Radar vs Pro Benchmark",
-            "ðŸ§  Explainable AI (SHAP)",
-            "ðŸ‹ï¸ Coaching & Rehab Drills",
-            "ðŸ¥ Literature Risk Thresholds",
-            "ðŸ“‘ Biomechanical Report"
+            "📊 Gauges & Joint Stress",
+            "Kinetic Radar vs Pro Benchmark",
+            "🧠 Explainable AI (SHAP)",
+            "Coaching & Rehab Drills",
+            "Literature Risk Thresholds",
+            "📑 Biomechanical Report"
         ])
     
         with tab_summary:
@@ -1630,12 +1645,12 @@ if feature_vector:
                 col_g1, col_g2 = st.columns(2)
                 with col_g1:
                     st.plotly_chart(
-                        render_modern_gauge(result.performance_score, "Demonstration Performance Indicator", "Demo score â€” not a validated measurement"),
+                        render_modern_gauge(result.performance_score, "Demonstration Performance Indicator", "Demo score — not a validated measurement"),
                         width='stretch'
                     )
                     interval = ml_models.prediction_interval_performance(perf_bundle, feature_vector)
                     if interval:
-                        st.caption(f"68% prediction interval: **{interval[0]:.0f}â€“{interval[1]:.0f}** "
+                        st.caption(f"68% prediction interval: **{interval[0]:.0f}–{interval[1]:.0f}** "
                                    f"(model uncertainty)")
                 with col_g2:
                     st.plotly_chart(
@@ -1652,7 +1667,7 @@ if feature_vector:
                     "biomechanical measurements below are still shown for manual review."
                 )
     
-            st.markdown("#### ðŸ¦´ Joint & Segment Kinetic Stress Levels")
+            st.markdown("#### 🦴 Joint & Segment Kinetic Stress Levels")
             # Estimate stress indexes based on biomechanics
             trunk_stress = min(100, int((feature_vector['trunk_lean_deg'] / 50.0) * 100))
             knee_stress = min(100, int((feature_vector['knee_flexion_deg'] / 40.0) * 100))
@@ -1670,12 +1685,12 @@ if feature_vector:
                 st.progress(shoulder_stress / 100.0)
     
         with tab_radar:
-            st.markdown("#### ðŸ•¸ï¸ Biomechanical Signature vs Elite Fast Bowlers")
+            st.markdown("#### Biomechanical Signature vs Elite Fast Bowlers")
             st.caption("A wider, balanced polygon indicates closer alignment with ideal aerodynamic and kinematic levers.")
             st.plotly_chart(render_radar_comparison(feature_vector), width='stretch')
     
         with tab_shap:
-            st.markdown("#### ðŸ§  Model Explainability Breakdown")
+            st.markdown("#### 🧠 Model Explainability Breakdown")
             st.caption("Identifies which exact kinematic variables pushed performance up or signalled biomechanical risk.")
             shap_c1, shap_c2 = st.columns(2)
             with shap_c1:
@@ -1692,7 +1707,7 @@ if feature_vector:
                     )
     
         with tab_coaching:
-            st.markdown("### ðŸ‹ï¸ AI Coaching & Prescriptive Drills")
+            st.markdown("### AI Coaching & Prescriptive Drills")
             
             # Categorized recommendations
             if result.coaching_notes:
@@ -1707,7 +1722,7 @@ if feature_vector:
             else:
                 st.success("Action mechanics are well within optimal ranges.")
     
-            st.markdown("#### ðŸ“‹ Recommended Corrective Exercise Protocols")
+            st.markdown("#### 📋 Recommended Corrective Exercise Protocols")
             d1, d2 = st.columns(2)
             with d1:
                 st.markdown("""
@@ -1723,9 +1738,9 @@ if feature_vector:
                 """)
     
         with tab_clinical:
-            st.markdown("### ðŸ¥ Literature-Informed Biomechanical Risk Thresholds")
+            st.markdown("### Literature-Informed Biomechanical Risk Thresholds")
             st.caption("Literature-derived trigger thresholds (data/cricket_injury_recovery_benchmarks.json) "
-                       "evaluated against this delivery. Screening reference only â€” not a medical diagnosis, "
+                       "evaluated against this delivery. Screening reference only — not a medical diagnosis, "
                        "not a prediction of actual injury.")
     
             clinical_feats = injury_kb.map_from_pipeline_features(feature_vector)
@@ -1765,13 +1780,13 @@ if feature_vector:
                                        help="Sweet spot 0.80-1.30; >1.50 = 2.5x-3.3x injury likelihood.")
             with w2:
                 seven_day_load = st.number_input("7-day bowling load (balls)", 0, 2000, 180, 1,
-                                                 help=">234 balls in 7 days â‰ˆ 11x lumbar stress-fracture risk vs <197.")
+                                                 help=">234 balls in 7 days ≈ 11x lumbar stress-fracture risk vs <197.")
             with w3:
                 rest_days = st.number_input("Rest days between spells", 0, 14, 3, 1,
                                             help="<2 rest days between spells = 2.4x higher injury rate.")
             for check in injury_kb.workload_risk(acwr=acwr, seven_day_load=seven_day_load, rest_days=rest_days):
-                icon = {"at_risk": "ðŸš¨", "warning": "âš ï¸", "ok": "âœ…"}.get(check["status"], "â€¢")
-                st.markdown(f"{icon} **{check['check']}** â€” {check['detail']}")
+                icon = {"at_risk": "!", "warning": "~", "ok": "V"}.get(check["status"], "o")
+                st.markdown(f"{icon} **{check['check']}** — {check['detail']}")
     
             with st.expander("Full clinical benchmark table"):
                 bench_df = pd.DataFrame(injury_kb.all_benchmarks())
@@ -1786,7 +1801,7 @@ if feature_vector:
                 st.dataframe(bench_df, width='stretch', hide_index=True)
     
         with tab_export:
-            st.markdown("### ðŸ“‘ Biomechanical Delivery Report")
+            st.markdown("### 📑 Biomechanical Delivery Report")
             feat_df = pd.DataFrame([
                 {
                     "Kinematic Feature": FEATURE_LABELS.get(k, (k,))[0],
@@ -1814,7 +1829,7 @@ if feature_vector:
             }, indent=2)
     
             st.download_button(
-                label="ðŸ“¥ Download Full Delivery Analysis (JSON)",
+                label="📥 Download Full Delivery Analysis (JSON)",
                 data=report_json,
                 file_name="bowling_biomechanics_report.json",
                 mime="application/json"
@@ -1829,7 +1844,7 @@ if feature_vector:
             render_timings(stage_times)
 
     # ---------------- SAVE TO HISTORY ----------------
-    st.markdown("### ðŸ’¾ Save to History")
+    st.markdown("### 💾 Save to History")
     st.caption("Persist this delivery's results to the local history database so you can "
                "compare it against future sessions and track your performance over time. "
                "Saving the same result twice is idempotent -- it won't create a duplicate.")
@@ -1838,7 +1853,7 @@ if feature_vector:
                                key="save_label")
     save_tags = st.text_input("Tags (comma-separated, optional)",
                               placeholder="e.g. nets, match, hard-length", key="save_tags")
-    if st.button("ðŸ’¾ Save this result", type="primary"):
+    if st.button("💾 Save this result", type="primary"):
         saved_id, inserted = history_db.save_analysis(
             result, label=save_label, input_mode=input_mode,
             bowling_arm=bowling_arm.lower().split("-")[0], model=model_choice,
@@ -1855,7 +1870,7 @@ else:
 
 st.markdown("---")
 st.caption(
-    "âš¡ **PaceAI Biomechanics Engine** â€¢ Demo models are trained on synthetic data "
+    "⚡ **PaceAI Biomechanics Engine** • Demo models are trained on synthetic data "
     "(src/synthetic_data.py) -- retrain on real labeled data (`python train_demo_model.py "
     "--data your_dataset.csv`) before using for real coaching/medical decisions. "
     "Designed for elite high-performance cricket centers, coaches, and sports physiotherapists."

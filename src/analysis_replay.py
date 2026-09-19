@@ -33,6 +33,8 @@ import numpy as np
 from . import config
 from .pose_estimation import _SKELETON_CONNECTIONS, _SKELETON_POINTS
 from . import ball_tracking_v2 as bt
+from .tracking import (ROLE_BATSMAN, ROLE_WICKETKEEPER, ROLE_UMPIRE,
+                       ROLE_FIELDER, ROLE_UNKNOWN)
 
 # Accent palette (BGR), matching the app's restrained dark theme.
 _BALL_DETECTED = (0, 0, 255)          # red ball box -- used for ALL ball sources in the
@@ -49,6 +51,19 @@ _TRAJ = (0, 230, 118)                 # trajectory path
 _HEADER_BG = (14, 18, 26)
 _HEADER_TEXT = (240, 246, 252)
 _DEBUG_TEXT = (255, 220, 120)         # warm amber for debug diagnostics
+
+# ---- Broadcast-style role colors (BGR) ----
+_ROLE_COLORS = {
+    ROLE_BATSMAN:       (0, 0, 255),       # red — batsman
+    ROLE_WICKETKEEPER:  (0, 200, 255),     # orange — wicketkeeper
+    ROLE_UMPIRE:        (200, 200, 0),     # cyan — umpire
+    ROLE_FIELDER:       (180, 180, 180),   # grey — fielder
+    ROLE_UNKNOWN:       (128, 128, 128),   # dark grey — unknown
+}
+_ROLE_THICKNESS = 2                       # box outline weight for non-bowler roles
+_ROLE_LABEL_SCALE = 0.45                  # font scale for role labels
+_ROLE_LABEL_PAD = 5                       # horizontal padding in label bands
+_ROLE_BAND_H = 16                         # label band height
 
 # ---- Styling constants (lifted out of the draw functions) ----
 _BOWLER_THICKNESS = 3                  # bowler box outline weight
@@ -337,6 +352,32 @@ def _apply_focus_treatment(img, bowler_bbox, frame_h, frame_w):
     return img
 
 
+def _draw_player_role(img, bbox, role, confidence, frame_h, frame_w):
+    """Draw a broadcast-style labeled box for a non-bowler player role.
+
+    Uses role-specific colors: red for batsman, orange for wicketkeeper,
+    cyan for umpire, grey for fielder.  The box and label band are drawn
+    directly on `img` (in-place).
+    """
+    if bbox is None:
+        return
+    color = _ROLE_COLORS.get(role, _ROLE_COLORS[ROLE_UNKNOWN])
+    x1, y1, x2, y2 = [int(round(v)) for v in bbox]
+    x1, y1 = _clamp_pt(x1, y1, frame_w, frame_h)
+    x2, y2 = _clamp_pt(x2, y2, frame_w, frame_h)
+    cv2.rectangle(img, (x1, y1), (x2, y2), color, _ROLE_THICKNESS, cv2.LINE_AA)
+    bw = max(1, x2 - x1)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    label = f"{role.upper()} {confidence:.2f}"
+    (tw, th), _ = cv2.getTextSize(label, font, _ROLE_LABEL_SCALE, 1)
+    label_w = max(tw + 2 * _ROLE_LABEL_PAD, bw + 2 * _ROLE_LABEL_PAD)
+    y_bottom = min(frame_h - 1, y2)
+    cv2.rectangle(img, (x1, y_bottom - _ROLE_BAND_H), (x1 + label_w, y_bottom),
+                  color, -1)
+    cv2.putText(img, label, (x1 + _ROLE_LABEL_PAD, y_bottom - 4), font,
+                _ROLE_LABEL_SCALE, (14, 18, 26), 1, cv2.LINE_AA)
+
+
 def render_analysis_replay(
     frames,                # list[(idx, ts, BGR_full)]
     trajectory,            # list[BallPoint] full-frame coords (merged display track)
@@ -351,6 +392,8 @@ def render_analysis_replay(
     bowler_track_id=None,       # int | None  (locked bowler identity)
     bowler_confidence=None,     # float | None
     pose_in_full_frame: bool = False,  # landmarks normalized to the full frame
+    player_roles: dict = None,        # track_id -> {role, confidence, scores}
+    all_tracks: dict = None,          # track_id -> Track (all tracked persons)
 ) -> str:
     """Render ONE synchronized analysis video. Returns the output path.
 
@@ -358,6 +401,9 @@ def render_analysis_replay(
       * bowler box -- the identity-locked bowler crop bbox for this frame
                       (no box when the bowler is not in frame -- never a
                       substitute person)
+      * player roles -- broadcast-style labeled boxes for batsman,
+                        wicketkeeper, umpire, fielder (when player_roles
+                        and all_tracks are provided)
       * ball box   -- red for detected/wrist-proxy/blended, amber dashed for
                       predicted (from trajectory[frame_idx]) -- nearest by index
       * trajectory -- running polyline through REAL track points up to now
@@ -384,6 +430,20 @@ def render_analysis_replay(
             in_full_frame=pose_in_full_frame)
 
     ordered_idx_set = set(ordered_idx)
+
+    # Build per-frame bbox index for non-bowler roles.
+    # role_bboxes_by_frame: {frame_idx: [(bbox, role, confidence), ...]}
+    role_bboxes_by_frame = {}
+    if player_roles is not None and all_tracks is not None:
+        for tid, role_info in player_roles.items():
+            tr = all_tracks.get(tid)
+            if tr is None:
+                continue
+            for fi, bbox in zip(tr.frames, tr.bboxes):
+                if fi not in role_bboxes_by_frame:
+                    role_bboxes_by_frame[fi] = []
+                role_bboxes_by_frame[fi].append(
+                    (bbox, role_info["role"], role_info["confidence"]))
 
     # Running path points (real, in order) so we render O(n), not O(n^2).
     path_pts = []
@@ -452,6 +512,13 @@ def render_analysis_replay(
         if bowler_bboxes:
             _draw_bowler_box(img, bowler_bboxes.get(idx), h, w,
                              bowler_track_id=bowler_track_id)
+
+        # --- 6b. Broadcast-style role labels for non-bowler players ---
+        # Drawn after the bowler box so all role boxes share the same visual
+        # weight; the bowler's thicker box + distinct orange color still
+        # stands out as the primary subject.
+        for bbox, role, conf in role_bboxes_by_frame.get(idx, []):
+            _draw_player_role(img, bbox, role, conf, h, w)
 
         # --- 7. Info header ---
         _draw_header(img, idx, release_frame, w,
