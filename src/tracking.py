@@ -673,7 +673,7 @@ def _score_role(track: Track, frame_diag: float, frame_h: float,
 
     # --- Wicketkeeper score ---
     # Crouching (low aspect), near camera (high Y), low motion
-    keeper_aspect_score = max(0.0, 1.0 - abs(aspect - 1.2) / 0.8)  # peak at ~1.2
+    keeper_aspect_score = max(0.0, 1.0 - abs(aspect - 1.5) / 1.0)  # peak at ~1.5
     keeper_position_score = max(0.0, (y_frac - _KEEPER_MIN_Y_FRAC) / (1.0 - _KEEPER_MIN_Y_FRAC))
     keeper_motion_score = max(0.0, 1.0 - motion / _KEEPER_MAX_MOTION)
     keeper_size_score = min(1.0, size_frac / 0.04)
@@ -685,7 +685,7 @@ def _score_role(track: Track, frame_diag: float, frame_h: float,
     # --- Umpire score ---
     # Standing upright (high aspect), mid-position, low motion
     umpire_aspect_score = max(0.0, min(1.0, (aspect - 1.5) / 1.0))  # grows above 1.5
-    umpire_position_score = max(0.0, 1.0 - abs(y_frac - 0.55) / 0.35)  # peak around mid-to-lower
+    umpire_position_score = max(0.0, 1.0 - abs(y_frac - 0.55) / 0.20)  # peak mid-frame, narrow band
     umpire_motion_score = max(0.0, 1.0 - motion / 0.10)  # very still
     umpire_size_score = min(1.0, size_frac / 0.03)
     umpire = (0.30 * umpire_aspect_score +
@@ -729,9 +729,54 @@ def classify_player_roles(tracks: Dict[int, Track], bowler_track_id: int,
     for tid, tr in tracks.items():
         if tid == bowler_track_id:
             continue
-        if len(tr) < 1:
+        if len(tr) < 3:
             continue
         result[tid] = _score_role(tr, frame_diag, frame_h, frame_w, bowler_track_id)
+
+    # --- Spatial deduplication: merge overlapping tracks of same person ---
+    if len(result) > 1:
+        tids = list(result.keys())
+        to_remove = set()
+        for i in range(len(tids)):
+            if tids[i] in to_remove:
+                continue
+            tr_i = tracks.get(tids[i])
+            if tr_i is None or not tr_i.bboxes:
+                continue
+            for j in range(i + 1, len(tids)):
+                if tids[j] in to_remove:
+                    continue
+                tr_j = tracks.get(tids[j])
+                if tr_j is None or not tr_j.bboxes:
+                    continue
+                fi_set = set(tr_i.frames)
+                fj_set = set(tr_j.frames)
+                common = fi_set & fj_set
+                if len(common) < 2:
+                    continue
+                overlaps = 0
+                for fi in common:
+                    bi = tr_i.bboxes[tr_i.frames.index(fi)]
+                    bj = tr_j.bboxes[tr_j.frames.index(fi)]
+                    if _iou(bi, bj) > 0.3:
+                        overlaps += 1
+                if overlaps / max(len(common), 1) > 0.5:
+                    if len(tr_i) >= len(tr_j):
+                        to_remove.add(tids[j])
+                    else:
+                        to_remove.add(tids[i])
+                        break
+        for tid in to_remove:
+            result.pop(tid, None)
+
+    # --- Cap umpire count to at most 1 (highest confidence) ---
+    umpire_tids = [tid for tid, r in result.items() if r["role"] == ROLE_UMPIRE]
+    if len(umpire_tids) > 1:
+        umpire_tids.sort(key=lambda t: result[t]["confidence"], reverse=True)
+        for tid in umpire_tids[1:]:
+            result[tid]["role"] = ROLE_FIELDER
+            result[tid]["scores"][ROLE_UMPIRE] = 0.0
+
     return result
 
 

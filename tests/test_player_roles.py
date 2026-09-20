@@ -66,16 +66,23 @@ class TestRoleClassification:
         scores = result[4]["scores"]
         assert scores[ROLE_UMPIRE] > 0.0
 
-    def test_single_frame_track_classified(self):
+    def test_single_frame_track_filtered(self):
         bowler = _make_track(1, list(range(10)),
                              [(100, 50, 200, 300)] * 10)
         short = _make_track(5, [0], [(100, 50, 200, 300)])
         result = classify_player_roles(
             {1: bowler, 5: short}, bowler_track_id=1,
             frame_dims=(360, 640))
-        assert 5 in result
-        assert "role" in result[5]
-        assert "confidence" in result[5]
+        assert 5 not in result  # single-frame tracks filtered out
+
+    def test_short_track_filtered(self):
+        bowler = _make_track(1, list(range(10)),
+                             [(100, 50, 200, 300)] * 10)
+        short = _make_track(5, [0, 1], [(100, 50, 200, 300)] * 2)
+        result = classify_player_roles(
+            {1: bowler, 5: short}, bowler_track_id=1,
+            frame_dims=(360, 640))
+        assert 5 not in result  # 2-frame tracks also filtered out
 
     def test_all_roles_have_valid_structure(self):
         bowler = _make_track(1, list(range(5)),

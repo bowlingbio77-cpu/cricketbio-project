@@ -63,7 +63,7 @@ except (ImportError, OSError):
     _HAS_ULTRALYTICS = False
 
 BALL_CLASS_ID = 32          # COCO "sports ball"
-SEED_MIN_CONF = 0.3         # only YOLO detections this confident can start a track
+SEED_MIN_CONF = 0.15        # only YOLO detections this confident can start a track
 MOTION_CONF = 0.15          # motion-blob votes (extend only, never seed with a model)
 MAX_GAP_FRAMES = 8          # longest gap (frames) a track survives with no match
 MIN_TRACK_FRAMES = 3        # below this many frames a track/segment is discarded
@@ -134,8 +134,8 @@ MOTION_MAX_ASPECT = 2.5     # width/height ratio -- elongated blobs are limbs
 # span this much of the frame; MIN_TRACK_PATH = travel at least this far in
 # total. A slow object whose box keeps growing (a person walking toward the
 # camera) is rejected by the combined box-growth + speed rule.
-MIN_TRACK_SPREAD_PX = 60.0
-MIN_TRACK_PATH_PX = 100.0
+MIN_TRACK_SPREAD_PX = 40.0
+MIN_TRACK_PATH_PX = 60.0
 MAX_SEGMENT_JUMP_PX = 80.0   # a same-track point can't teleport this far in 1 frame
 BOX_GROWTH_LIMIT = 5.0       # box grew more than this AND moved slowly => a person
 MIN_AVG_SPEED_PX_S = 400.0
@@ -787,7 +787,17 @@ class BallTracker:
             if self._model is None:
                 seedable = unclaimed
             else:
-                seedable = [(ci, c) for ci, c in unclaimed if c[5] == "yolo" and c[2] >= self.seed_min_conf]
+                seedable = [(ci, c) for ci, c in unclaimed
+                            if c[5] == "yolo" and c[2] >= self.seed_min_conf]
+                # Allow motion blobs to seed when no active track has had a
+                # YOLO hit recently (ball too small/far for COCO to score >0.15).
+                has_yolo_support = any(
+                    t.last_yolo >= idx - 5 for t in still_active)
+                if not has_yolo_support:
+                    motion_seeds = [(ci, c) for ci, c in unclaimed
+                                    if c[5] == "motion"
+                                    and ci not in {s[0] for s in seedable}]
+                    seedable.extend(motion_seeds)
             seedable.sort(key=lambda ic: ic[1][2], reverse=True)  # highest confidence first
             room = MAX_ACTIVE_TRACKS - len(still_active)
             for ci, (cx, cy, conf, cw, ch, src) in seedable[:room]:
