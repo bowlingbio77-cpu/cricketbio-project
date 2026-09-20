@@ -1164,7 +1164,7 @@ with st.sidebar:
                     help="Analyze: run a new delivery. History: browse saved results and compare.")
 
     if page == "⚡ Analyze":
-        input_mode = st.radio("Analysis Mode", ["Interactive Bio-Simulator", "Video Motion Capture"], index=0,
+        input_mode = st.radio("Analysis Mode", ["Interactive Bio-Simulator", "\U0001f4f9 Video Motion Capture"], index=0,
                               help="Simulator: adjust the biomechanics with sliders — no video needed. "
                                    "Video: upload a clip and the app measures the delivery automatically.")
     else:
@@ -1270,7 +1270,7 @@ feature_vector = {}
 stage_times = {}
 
 # ---------------- FEATURE GUIDE (plain English) ----------------
-with st.expander("â“ New here? Every feature explained in plain English", expanded=False):
+with st.expander("New here? Every feature explained in plain English", expanded=False):
     render_features_guide()
 
 # ---------------- INPUT SECTION ----------------
@@ -1378,7 +1378,7 @@ def render_analysis_replay(hero_video, result, feature_vector, ball_stats):
           <h2>Analysis Replay</h2>
           <p>One synchronized view of the bowling action, ball path and available pose evidence.</p>
         </div>
-        <div class="replay-pill">â— LIVE ANALYSIS DATA</div>
+        <div class="replay-pill">&#9679; LIVE ANALYSIS DATA</div>
       </div>
     </section>
     """, unsafe_allow_html=True)
@@ -1840,7 +1840,7 @@ if feature_vector:
 
     # ---------------- RUN TIMING ----------------
     if stage_times:
-        with st.expander("â±ï¸ Run timing (advanced)", expanded=False):
+        with st.expander("Run timing (advanced)", expanded=False):
             render_timings(stage_times)
 
     # ---------------- SAVE TO HISTORY ----------------
