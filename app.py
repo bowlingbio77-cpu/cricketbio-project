@@ -49,6 +49,7 @@ class _LazyModule:
 
 from src import config, history_db, injury_knowledge_base as injury_kb
 from src import analysis_ui
+from src import kinetic_ui
 from src.synthetic_data import generate_clinical_synthetic_dataset
 
 # Heavy modules loaded lazily (only on first use), see _LazyModule above.
@@ -98,8 +99,9 @@ st.markdown("""
         position: absolute; left: -9999px; top: auto;
         width: 1px; height: 1px; overflow: hidden;
         z-index: 999999; padding: 12px 20px; margin: 8px;
-        background: #29b6f6; color: #0d1117; font-weight: 700;
+        background: #ffffff; color: #1a3d64; font-weight: 700;
         border-radius: 8px; text-decoration: none; font-size: 0.95rem;
+        border: 1px solid #1d546c;
     }
     .skip-link:focus {
         position: fixed; left: 12px; top: 12px;
@@ -244,23 +246,23 @@ st.markdown("""
 
     /* --- Premium Analysis Replay --- */
     .analysis-replay-shell {
-        background: linear-gradient(145deg, #111820 0%, #161b22 100%);
-        border: 1px solid #30363d; border-bottom: 0;
+        background: linear-gradient(145deg, #ffffff 0%, #f4f8fc 100%);
+        border: 1px solid #d0dce7; border-bottom: 0;
         border-radius: 16px 16px 0 0; padding: 20px 22px 10px;
         margin-top: 20px;
     }
     .analysis-replay-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
-    .analysis-replay-head h2 { margin:4px 0 3px; font-size:1.65rem; }
-    .analysis-replay-head p { margin:0; color:#8b949e; font-size:.9rem; }
-    .eyebrow,.priority-kicker { color:#29b6f6; font-size:.68rem; letter-spacing:.14em; font-weight:800; }
-    .replay-pill { border:1px solid rgba(41,182,246,.25); color:#8bd7ff; background:rgba(41,182,246,.07); border-radius:999px; padding:7px 10px; font-size:.68rem; font-weight:800; white-space:nowrap; }
-    .priority-card { margin:18px 0; padding:18px 20px; border:1px solid rgba(0,230,118,.22); background:linear-gradient(145deg, rgba(0,230,118,.08), rgba(17,24,32,.85)); border-radius:14px; }
-    .priority-title { font-size:1.15rem; font-weight:800; margin:4px 0 7px; }
-    .priority-copy { color:#c9d1d9; line-height:1.55; }
-    .analysis-empty { margin:20px 0; padding:30px; border:1px dashed #484f58; border-radius:16px; background:#111820; }
-    .analysis-empty-kicker { color:#8b949e; font-size:.7rem; letter-spacing:.14em; font-weight:800; }
-    .analysis-empty-title { font-size:1.3rem; font-weight:800; margin:5px 0; }
-    .analysis-empty-copy { color:#8b949e; }
+    .analysis-replay-head h2 { margin:4px 0 3px; font-size:1.65rem; color:#1a3d64; }
+    .analysis-replay-head p { margin:0; color:#6b7a8f; font-size:.9rem; }
+    .eyebrow,.priority-kicker { color:#1d546c; font-size:.68rem; letter-spacing:.14em; font-weight:800; }
+    .replay-pill { border:1px solid rgba(26,61,100,.25); color:#1a3d64; background:rgba(217,234,253,.5); border-radius:999px; padding:7px 10px; font-size:.68rem; font-weight:800; white-space:nowrap; }
+    .priority-card { margin:18px 0; padding:18px 20px; border:1px solid rgba(21,128,61,.3); background:linear-gradient(145deg, rgba(21,128,61,.07), #ffffff); border-radius:14px; }
+    .priority-title { font-size:1.15rem; font-weight:800; margin:4px 0 7px; color:#1a3d64; }
+    .priority-copy { color:#495867; line-height:1.55; }
+    .analysis-empty { margin:20px 0; padding:30px; border:1px dashed #b7c8db; border-radius:16px; background:#ffffff; }
+    .analysis-empty-kicker { color:#6b7a8f; font-size:.7rem; letter-spacing:.14em; font-weight:800; }
+    .analysis-empty-title { font-size:1.3rem; font-weight:800; margin:5px 0; color:#1a3d64; }
+    .analysis-empty-copy { color:#6b7a8f; }
 
     /* --- Streamlit column stacking on narrow viewports --- */
     @media (max-width: 768px) {
@@ -294,34 +296,34 @@ _PRELOADER_CSS = """
     @keyframes paceaiSuccessGlow { 0% { opacity:0; transform:scale(.6); } 40% { opacity:1; transform:scale(1.15); } 100% { opacity:0; transform:scale(1.4); } }
     @keyframes paceaiDrawCheck { to { stroke-dashoffset:0; } }
 
-    .pace-preloader { position:fixed; inset:0; z-index:99999; background:#0b0f16;
+    .pace-preloader { position:fixed; inset:0; z-index:99999; background:#f4f4f4;
         display:flex; align-items:center; justify-content:center; overflow:hidden;
         font-family:'Segoe UI',Arial,sans-serif;
         animation:paceaiFadeOut .6s ease 3.3s forwards; opacity:1; }
     .pace-preloader .glow { position:absolute; width:min(420px,80vw); height:min(420px,80vw); border-radius:50%;
-        background:radial-gradient(circle, rgba(41,182,246,.16) 0%, rgba(124,77,255,.10) 45%, rgba(0,0,0,0) 72%);
+        background:radial-gradient(circle, rgba(26,61,100,.14) 0%, rgba(29,84,108,.10) 45%, rgba(0,0,0,0) 72%);
         animation:paceaiPulse 4.5s ease-in-out infinite; }
     .pace-preloader .stage { position:relative; width:180px; height:180px; display:flex; align-items:center; justify-content:center; }
-    .pace-preloader .orbit-ring { position:absolute; width:132px; height:132px; border-radius:50%; border:1px solid rgba(148,163,184,.18); }
+    .pace-preloader .orbit-ring { position:absolute; width:132px; height:132px; border-radius:50%; border:1px solid rgba(26,61,100,.18); }
     .pace-preloader .orbit-spin { position:absolute; width:132px; height:132px; will-change:transform;
         animation:paceaiOrbit 2.6s linear infinite, paceaiHide .35s ease 2.5s forwards; }
     .pace-preloader .orbit-dot { position:absolute; top:-4px; left:50%; margin-left:-4px; width:8px; height:8px; border-radius:50%;
-        background:#7dd3fc; box-shadow:0 0 6px 2px rgba(125,211,252,.85), 0 0 16px 6px rgba(124,77,255,.45); }
+        background:#1a3d64; box-shadow:0 0 6px 2px rgba(26,61,100,.55), 0 0 16px 6px rgba(29,84,108,.25); }
     .pace-preloader .logo-badge { position:relative; width:64px; height:64px; border-radius:50%;
-        background:linear-gradient(145deg,#161b22 0%,#21262d 100%); border:1px solid #30363d;
-        display:flex; align-items:center; justify-content:center; font-size:26px; box-shadow:0 4px 24px rgba(0,0,0,.45);
+        background:linear-gradient(145deg,#ffffff 0%,#eef3f9 100%); border:1px solid #d0dce7;
+        display:flex; align-items:center; justify-content:center; font-size:26px; box-shadow:0 4px 24px rgba(26,61,100,.18);
         animation:paceaiHide .35s ease 2.5s forwards; }
     .pace-preloader .loading-text { position:absolute; bottom:-64px; left:50%; transform:translateX(-50%);
-        color:#8b949e; font-size:13px; letter-spacing:1.5px; text-transform:uppercase;
+        color:#6b7a8f; font-size:13px; letter-spacing:1.5px; text-transform:uppercase;
         white-space:nowrap; text-align:center; max-width:80vw; }
     .pace-preloader .success { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
         opacity:0; visibility:hidden; animation:paceaiSuccessIn .35s ease 2.5s forwards; }
     .pace-preloader .success .sglow { position:absolute; width:110px; height:110px; border-radius:50%;
-        background:radial-gradient(circle, rgba(0,230,118,.30) 0%, rgba(0,230,118,0) 70%);
+        background:radial-gradient(circle, rgba(21,128,61,.30) 0%, rgba(21,128,61,0) 70%);
         animation:paceaiSuccessGlow .6s ease-out 2.5s both; }
     .pace-preloader .check-badge { width:64px; height:64px; border-radius:50%;
-        background:linear-gradient(145deg,#161b22 0%,#21262d 100%); border:1px solid rgba(0,230,118,.55);
-        display:flex; align-items:center; justify-content:center; box-shadow:0 4px 24px rgba(0,0,0,.45); }
+        background:linear-gradient(145deg,#ffffff 0%,#eef3f9 100%); border:1px solid rgba(21,128,61,.6);
+        display:flex; align-items:center; justify-content:center; box-shadow:0 4px 24px rgba(26,61,100,.18); }
     .pace-preloader .checkmark-path { stroke-dasharray:28; stroke-dashoffset:28; animation:paceaiDrawCheck .32s ease-out 2.56s forwards; }
 
     @media (prefers-reduced-motion: reduce) {
@@ -348,7 +350,7 @@ def _paceai_preloader(message: str) -> str:
             <div class="check-badge">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
                     <path class="checkmark-path" d="M4 12.5 L9.5 18 L20 5.5"
-                          stroke="#00e676" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                          stroke="#15803d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </div>
         </div>
@@ -609,32 +611,32 @@ PRESETS = {
 # ---------------- CHART BUILDERS ----------------
 def render_modern_gauge(value, title, subtitle="", max_val=100, is_risk=False):
     if is_risk:
-        bar_color = "#ef5350" if value >= 70 else "#fbc02d" if value >= 40 else "#00e676"
+        bar_color = "#cf222e" if value >= 70 else "#d4a72c" if value >= 40 else "#15803d"
     else:
-        bar_color = "#00e676" if value >= 70 else "#fbc02d" if value >= 50 else "#ef5350"
+        bar_color = "#15803d" if value >= 70 else "#d4a72c" if value >= 50 else "#cf222e"
 
     fig = go.Figure(go.Indicator(
         mode="gauge+number+delta",
         value=value,
-        title={"text": f"<b>{title}</b><br><span style='font-size:0.8em;color:#8b949e'>{subtitle}</span>"},
-        number={"font": {"size": 42, "color": "#ffffff"}, "suffix": "%" if is_risk else ""},
+        title={"text": f"<b>{title}</b><br><span style='font-size:0.8em;color:#6b7a8f'>{subtitle}</span>"},
+        number={"font": {"size": 42, "color": "#1a3d64"}, "suffix": "%" if is_risk else ""},
         gauge={
-            "axis": {"range": [0, max_val], "tickcolor": "#8b949e", "tickfont": {"color": "#8b949e"}},
+            "axis": {"range": [0, max_val], "tickcolor": "#788ca0", "tickfont": {"color": "#788ca0"}},
             "bar": {"color": bar_color, "thickness": 0.3},
-            "bgcolor": "#161b22",
+            "bgcolor": "#ffffff",
             "borderwidth": 1,
-            "bordercolor": "#30363d",
+            "bordercolor": "#d0dce7",
             "steps": [
-                {"range": [0, 40], "color": "rgba(46, 125, 50, 0.15)" if not is_risk else "rgba(0, 230, 118, 0.15)"},
-                {"range": [40, 70], "color": "rgba(249, 168, 37, 0.15)"},
-                {"range": [70, max_val], "color": "rgba(0, 230, 118, 0.2)" if not is_risk else "rgba(239, 83, 80, 0.25)"},
+                {"range": [0, 40], "color": "rgba(21, 128, 61, 0.12)"},
+                {"range": [40, 70], "color": "rgba(154, 103, 0, 0.10)"},
+                {"range": [70, max_val], "color": "rgba(21, 128, 61, 0.16)" if not is_risk else "rgba(207, 34, 46, 0.16)"},
             ],
         },
     ))
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font={"color": "#e6edf3"},
+        font={"color": "#1a1c1c"},
         height=240,
         margin=dict(l=25, r=25, t=60, b=20)
     )
@@ -676,24 +678,24 @@ def render_radar_comparison(current_feats: dict):
     fig.add_trace(go.Scatterpolar(
         r=user_vals, theta=categories, fill='toself',
         name='Current Bowler',
-        line=dict(color='#00e676', width=2),
-        fillcolor='rgba(0, 230, 118, 0.2)'
+        line=dict(color='#15803d', width=2),
+        fillcolor='rgba(21, 128, 61, 0.18)'
     ))
     fig.add_trace(go.Scatterpolar(
         r=bench_vals, theta=categories, fill='toself',
         name='Elite Benchmark (145 km/h)',
-        line=dict(color='#29b6f6', width=2, dash='dot'),
-        fillcolor='rgba(41, 182, 246, 0.1)'
+        line=dict(color='#1a3d64', width=2, dash='dot'),
+        fillcolor='rgba(26, 61, 100, 0.12)'
     ))
 
     fig.update_layout(
         polar=dict(
-            radialaxis=dict(visible=True, range=[0, 100], color="#6e7681", gridcolor="#30363d"),
-            angularaxis=dict(color="#c9d1d9", gridcolor="#30363d")
+            radialaxis=dict(visible=True, range=[0, 100], color="#788ca0", gridcolor="#e0e6ee"),
+            angularaxis=dict(color="#495867", gridcolor="#e0e6ee")
         ),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#e6edf3"),
+        font=dict(color="#1a1c1c"),
         legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
         height=380,
         margin=dict(l=40, r=40, t=30, b=40)
@@ -706,19 +708,19 @@ def render_shap_bar(contributions: dict, title: str):
     items = sorted(items, key=lambda kv: kv[1])
     names = [FEATURE_LABELS.get(k, (k,))[0] for k, _ in items]
     values = [v for _, v in items]
-    colors = ["#ef5350" if v > 0 else "#29b6f6" for v in values]
+    colors = ["#cf222e" if v > 0 else "#1a3d64" for v in values]
 
     fig = go.Figure(go.Bar(
         x=values, y=names, orientation="h",
         marker=dict(color=colors, line=dict(width=0)),
     ))
     fig.update_layout(
-        title=dict(text=f"<b>{title}</b>", font=dict(color="#ffffff", size=14)),
+        title=dict(text=f"<b>{title}</b>", font=dict(color="#1a3d64", size=14)),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#c9d1d9"),
-        xaxis=dict(title="Relative Model Impact (SHAP value)", gridcolor="#30363d", zerolinecolor="#8b949e"),
-        yaxis=dict(gridcolor="#21262d"),
+        font=dict(color="#495867"),
+        xaxis=dict(title="Relative Model Impact (SHAP value)", gridcolor="#e0e6ee", zerolinecolor="#788ca0"),
+        yaxis=dict(gridcolor="#edf3f9"),
         height=340,
         margin=dict(l=10, r=20, t=40, b=20)
     )
@@ -733,11 +735,11 @@ def render_timings(stage_times: dict):
     labels = [k.replace("_", " ").title() for k, _ in ordered]
     values = [v for _, v in ordered]
     fig = go.Figure(go.Bar(x=values, y=labels, orientation="h",
-                           marker_color=["#29b6f6" if k != "total" else "#00e676"
+                           marker_color=["#1a3d64" if k != "total" else "#15803d"
                                          for k, _ in ordered]))
     fig.update_layout(title="Stage timing", height=320,
                       paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                      font=dict(color="#c9d1d9"),
+                      font=dict(color="#495867"),
                       margin=dict(l=10, r=10, t=40, b=10), xaxis_title="Seconds")
     st.plotly_chart(fig, width='stretch')
     total = stage_times.get("total")
@@ -1002,10 +1004,10 @@ def render_history_page():
                 mode="lines+markers+text",
                 text=[f"#{r['id']}" for r in chrono],
                 textposition="top center",
-                line=dict(color="#00e676", width=2),
+                line=dict(color="#15803d", width=2),
             ))
         fig.update_layout(height=350, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                          font=dict(color="#c9d1d9"), margin=dict(l=10, r=10, t=30, b=10),
+                          font=dict(color="#495867"), margin=dict(l=10, r=10, t=30, b=10),
                           xaxis_title="Date", yaxis_title="Performance score",
                           yaxis=dict(range=[0, 100]))
         st.plotly_chart(fig, width='stretch')
@@ -1028,22 +1030,22 @@ def render_history_page():
         with c1:
             fig = go.Figure(go.Bar(
                 x=sel_names, y=[r.get("performance_score") for r in sel],
-                marker_color="#00e676", text=[f"{r.get('performance_score'):.0f}" if r.get('performance_score') is not None else "—" for r in sel],
+                marker_color="#15803d", text=[f"{r.get('performance_score'):.0f}" if r.get('performance_score') is not None else "—" for r in sel],
                 textposition="outside"))
             fig.update_layout(title="Performance score", height=320,
                               paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                              font=dict(color="#c9d1d9"), margin=dict(l=10, r=10, t=40, b=10),
+                              font=dict(color="#495867"), margin=dict(l=10, r=10, t=40, b=10),
                               yaxis=dict(range=[0, 100]))
             st.plotly_chart(fig, width='stretch')
         with c2:
             fig = go.Figure(go.Bar(
                 x=sel_names, y=[_risk_of(r) for r in sel],
-                marker_color=["#ef5350" if _risk_of(r) == "high" else "#fbc02d"
-                              if _risk_of(r) == "moderate" else "#00e676" for r in sel],
+                marker_color=["#cf222e" if _risk_of(r) == "high" else "#d4a72c"
+                              if _risk_of(r) == "moderate" else "#15803d" for r in sel],
                 text=[_risk_of(r).title() for r in sel], textposition="outside"))
             fig.update_layout(title="Biomechanical risk indicator", height=320,
                               paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                              font=dict(color="#c9d1d9"), margin=dict(l=10, r=10, t=40, b=10))
+                              font=dict(color="#495867"), margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig, width='stretch')
 
         st.markdown("**Feature-by-feature comparison**")
@@ -1066,7 +1068,7 @@ def render_history_page():
                 fig.add_trace(go.Bar(x=x, y=y, name=name))
             fig.update_layout(title="Feature values by session", barmode="group",
                               height=400, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                              font=dict(color="#c9d1d9"), margin=dict(l=10, r=10, t=40, b=10))
+                              font=dict(color="#495867"), margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig, width='stretch')
 
         # --- Detail view ---
@@ -1372,46 +1374,11 @@ def render_analysis_replay(hero_video, result, feature_vector, ball_stats):
                 st.warning(_w)
         return
 
-    st.markdown("""
-    <section class="analysis-replay-shell" id="paceai-analysis-replay" aria-label="PaceAI analysis replay">
-      <div class="analysis-replay-head">
-        <div>
-          <div class="eyebrow">PACEAI / DELIVERY ANALYSIS</div>
-          <h2>Analysis Replay</h2>
-          <p>One synchronized view of the bowling action, ball path and available pose evidence.</p>
-        </div>
-        <div class="replay-pill">&#9679; LIVE ANALYSIS DATA</div>
-      </div>
-    </section>
-    """, unsafe_allow_html=True)
-
-    st.video(hero_video)
-
-    moments = _video_key_moments(st.session_state.get("analysis_key_moments"))
-    if moments:
-        labels = [m["label"] for m in moments]
-        selected = st.selectbox("Jump to key moment", ["Start"] + labels, key="paceai_key_moment")
-        if selected != "Start":
-            selected_time = next(m["time_s"] for m in moments if m["label"] == selected)
-            st.video(hero_video, start_time=int(selected_time))
-            st.caption(f"Key moment: **{selected}** · {selected_time:.2f}s")
-    else:
-        st.caption("Use the native player controls for slow motion and frame-by-frame review. Key-event navigation will appear automatically when the pipeline provides event timestamps.")
-
-    bowler_id = getattr(result, "bowler_track_id", None)
-    bowler_conf = getattr(result, "bowler_confidence", None)
-    if bowler_id is not None:
-        conf_s = f" · confidence {bowler_conf:.2f}" if bowler_conf is not None else ""
-        st.caption(f"Bowler identity: locked to track **#{bowler_id}**{conf_s} "
-                   f"(cricket-evidence selection + identity lock; never swapped to batsman/keeper).")
-    else:
-        st.caption("Bowler identity: no bowler-like motion detected in this clip -- no bowler "
-                   "box/pose crop was applied (identity is never guessed).")
-
     bstats = ball_stats or {}
     n_det = int(bstats.get("n_detected", 0) or 0)
     n_pred = int(bstats.get("n_interpolated", 0) or 0)
-    total_frames = max(1, int(bstats.get("n_frames", 1) or 1))
+    total_frames = max(1, int(bstats.get("total_frames", 1) or 1) or
+                       int(bstats.get("n_frames", 1) or 1) or 1)
     coverage = float(bstats.get("coverage_pct", 0) or 0)
     det_ratio = n_det / total_frames
     if det_ratio >= 0.7 and coverage >= 70:
@@ -1421,16 +1388,71 @@ def render_analysis_replay(hero_video, result, feature_vector, ball_stats):
     else:
         quality = "LOW"
 
-    st.markdown("#### Key evidence")
-    m1, m2, m3, m4 = st.columns(4)
-    with m1:
-        st.metric("Release angle", f"{feature_vector.get('release_angle_deg', 0):.1f}°")
-    with m2:
-        st.metric("Front-knee flexion", f"{feature_vector.get('knee_flexion_deg', 0):.1f}°")
-    with m3:
-        st.metric("Tracking quality", quality)
-    with m4:
-        st.metric("Detected ball frames", n_det)
+    fps = float(getattr(config, "TARGET_FPS", 20) or 20)
+    duration_s = total_frames / fps
+    release_idx = bstats.get("release_idx")
+    impact_idx = bstats.get("impact_idx")
+    release_t = (int(release_idx) / fps) if release_idx is not None else None
+    impact_t = (int(impact_idx) / fps) if impact_idx is not None else None
+
+    moments = _video_key_moments(st.session_state.get("analysis_key_moments"))
+
+    risk = result.injury_risk or {}
+    risk_level = str(risk.get("risk_level", "low")).lower()
+    risk_probs = risk.get("probabilities") or []
+    p_high = risk_probs[2] if len(risk_probs) > 2 else None
+    risk_pct = (p_high * 100) if p_high is not None else \
+        {"low": 22, "moderate": 58, "high": 88}.get(risk_level, 22)
+
+    bowler_id = getattr(result, "bowler_track_id", None)
+    bowler_conf = getattr(result, "bowler_confidence", None)
+
+    meta = dict(
+        track=bowler_id,
+        conf=bowler_conf,
+        role=getattr(result, "bowler_role", None) or "bowler",
+        duration_s=duration_s,
+        frames=total_frames,
+        fps=fps,
+        quality=quality,
+        n_det=n_det,
+        n_pred=n_pred,
+        coverage_pct=coverage,
+        release_idx=release_idx,
+        impact_idx=impact_idx,
+        outcome=bstats.get("outcome"),
+        events_n=len(moments),
+        risk_pct=risk_pct if bowler_id is not None else None,
+        risk_level=risk_level,
+        features=feature_vector,
+    )
+
+    st.markdown(kinetic_ui.KINETIC_CSS, unsafe_allow_html=True)
+    st.markdown(kinetic_ui.header_html(meta), unsafe_allow_html=True)
+
+    wc_l, wc_r = st.columns([3, 1])
+    with wc_l:
+        st.markdown(kinetic_ui.viewport_html(meta), unsafe_allow_html=True)
+        st.video(hero_video)
+        if moments:
+            labels = [m["label"] for m in moments]
+            selected = st.selectbox("Jump to key moment", ["Start"] + labels, key="paceai_key_moment")
+            if selected != "Start":
+                selected_time = next(m["time_s"] for m in moments if m["label"] == selected)
+                st.video(hero_video, start_time=int(selected_time))
+                st.caption(f"Key moment: **{selected}** · {selected_time:.2f}s")
+        else:
+            st.caption("Use the native player controls for slow motion and frame-by-frame review. Key-event navigation appears when the pipeline provides event timestamps.")
+        st.markdown(kinetic_ui.timeline_html(moments, duration_s, release_t, impact_t), unsafe_allow_html=True)
+
+    with wc_r:
+        st.markdown(kinetic_ui.rail_html(meta), unsafe_allow_html=True)
+
+    st.markdown(kinetic_ui.reel_html(meta), unsafe_allow_html=True)
+
+    if bowler_id is None:
+        st.caption("Bowler identity: no bowler-like motion detected in this clip -- no bowler "
+                   "box/pose crop was applied (identity is never guessed).")
 
     # "Players Detected" broadcast roster: the locked bowler + every classified
     # non-bowler player, with cricket-evidence confidence (matches the overlay
@@ -1573,15 +1595,15 @@ if feature_vector:
             st.markdown(f"""
             <div class="metric-card" role="region" aria-label="Demonstration Performance Indicator">
                 <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">DEMONSTRATION PERFORMANCE INDICATOR</span>
-                <h2 style="margin:4px 0; color:#00e676;">{result.performance_score:.1f}<span style="font-size:1rem;color:#8b949e"> / 100</span></h2>
+                <h2 style="margin:4px 0; color:#15803d;">{result.performance_score:.1f}<span style="font-size:1rem;color:#8b949e"> / 100</span></h2>
                 <span style="color:#8b949e; font-size:0.78rem;">Literature-informed demo score — not a validated measurement</span>
             </div>
             """, unsafe_allow_html=True)
         else:
             st.markdown("""
             <div class="metric-card" role="region" aria-label="Demonstration Performance Indicator">
-                <span style="color:#ef5350; font-size:0.85rem; font-weight:600;">DEMONSTRATION PERFORMANCE INDICATOR</span>
-                <h2 style="margin:4px 0; color:#ef5350;">WITHHELD</h2>
+                <span style="color:#cf222e; font-size:0.85rem; font-weight:600;">DEMONSTRATION PERFORMANCE INDICATOR</span>
+                <h2 style="margin:4px 0; color:#cf222e;">WITHHELD</h2>
                 <span style="color:#8b949e; font-size:0.78rem;">Not scored — pose subject could not be verified as the bowler.</span>
             </div>
             """, unsafe_allow_html=True)
@@ -1610,7 +1632,7 @@ if feature_vector:
         st.markdown(f"""
         <div class="metric-card" role="region" aria-label="Front Knee Brace">
             <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">FRONT KNEE BRACE</span>
-            <h2 style="margin:4px 0; color:#29b6f6;">{feature_vector.get('knee_flexion_deg', 0):.1f}\u00b0</h2>
+            <h2 style="margin:4px 0; color:#1d546c;">{feature_vector.get('knee_flexion_deg', 0):.1f}\u00b0</h2>
             <span style="color:#8b949e; font-size:0.78rem;">Ideal: &lt; 15\u00b0 for lever efficiency</span>
         </div>
         """, unsafe_allow_html=True)
@@ -1768,17 +1790,17 @@ if feature_vector:
                     <div class="drill-card" role="listitem">
                         <b>\U0001fa7a {_esc(r['injury'])}</b>
                         &nbsp;<span class="status-badge {badge_cls}">{_esc(r['severity'].upper())} RISK</span>
-                        <div style="margin-top:6px; color:#8b949e; font-size:0.85rem;">
+                        <div style="margin-top:6px; color:#6b7a8f; font-size:0.85rem;">
                             <b>Site:</b> {_esc(r['anatomical_site'])} &nbsp;\u2022&nbsp;
                             <b>Incidence:</b> {_esc(r['clinical_incidence'])}
                         </div>
                         <div style="margin-top:4px; font-size:0.9rem;">
                             <b>Trigger:</b>
-                            <ul style="margin:4px 0 4px 18px; color:#e6edf3;">{trig_text}</ul>
+                            <ul style="margin:4px 0 4px 18px; color:#495867;">{trig_text}</ul>
                         </div>
-                        <div style="color:#8b949e; font-size:0.85rem;">
+                        <div style="color:#6b7a8f; font-size:0.85rem;">
                             <b>Recovery:</b> {_esc(r['est_recovery_timeline'])}
-                            (median <b style="color:#ef5350">{_esc(r['median_days_to_match'])}</b> days to match fitness)
+                            (median <b style="color:#cf222e">{_esc(r['median_days_to_match'])}</b> days to match fitness)
                         </div>
                     </div>
                     """, unsafe_allow_html=True)

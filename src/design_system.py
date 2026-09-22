@@ -6,9 +6,9 @@ Single source of truth for all visual tokens, component styles, and layout CSS.
 Imported by app.py and injected via st.markdown(unsafe_allow_html=True).
 No ML/pipeline code lives here -- presentation only.
 
-The active theme is DARK. A reference block of light-theme tokens for the
-"CRICKET-CV v4.2" kinetic-biomechanics prototype lives below the dark tokens
-(see section "KINETIC BIOMECHANICS LIGHT THEME"); it is NOT applied at runtime.
+The active theme is LIGHT "Kinetic Biomechanics" (CRICKET-CV v4.2).
+The full light-token reference block lives in the section
+"KINETIC BIOMECHANICS LIGHT THEME" below the active tokens.
 """
 
 # ---------------------------------------------------------------------------
@@ -16,37 +16,37 @@ The active theme is DARK. A reference block of light-theme tokens for the
 # ---------------------------------------------------------------------------
 
 # Backgrounds
-BG_APP = "#080B10"
-BG_PRIMARY = "#0F141B"
-BG_SECONDARY = "#151B23"
-BG_TERTIARY = "#1C2330"
-BG_ELEVATED = "#1A2030"
+BG_APP = "#f4f4f4"
+BG_PRIMARY = "#ffffff"
+BG_SECONDARY = "#f1f5f9"
+BG_TERTIARY = "#e5ebf2"
+BG_ELEVATED = "#ffffff"
 
 # Borders
-BORDER_DEFAULT = "#252D38"
-BORDER_SUBTLE = "#1E2530"
-BORDER_STRONG = "#333D4A"
+BORDER_DEFAULT = "#d0dce7"
+BORDER_SUBTLE = "#e0e6ee"
+BORDER_STRONG = "#b7c8db"
 
 # Text
-TEXT_PRIMARY = "#E8ECF1"
-TEXT_SECONDARY = "#8B95A5"
-TEXT_MUTED = "#5A6577"
-TEXT_ACCENT = "#3B9EED"
+TEXT_PRIMARY = "#1a1c1c"
+TEXT_SECONDARY = "#495867"
+TEXT_MUTED = "#6b7a8f"
+TEXT_ACCENT = "#1d546c"
 
 # Semantic
-COLOR_SUCCESS = "#22C55E"
-COLOR_WARNING = "#F59E0B"
-COLOR_ERROR = "#EF4444"
-COLOR_INFO = "#3B9EED"
+COLOR_SUCCESS = "#15803d"
+COLOR_WARNING = "#9a6700"
+COLOR_ERROR = "#cf222e"
+COLOR_INFO = "#1d546c"
 
-# Accent (PaceAI cyan)
-ACCENT = "#3B9EED"
-ACCENT_DIM = "rgba(59,158,237,0.12)"
-ACCENT_BORDER = "rgba(59,158,237,0.25)"
+# Accent (PaceAI kinetic navy)
+ACCENT = "#1a3d64"
+ACCENT_DIM = "rgba(26,61,100,0.10)"
+ACCENT_BORDER = "rgba(26,61,100,0.25)"
 
 # Surfaces for cards
-CARD_BG = "linear-gradient(180deg, #131920 0%, #0F141B 100%)"
-CARD_BORDER = "#252D38"
+CARD_BG = "linear-gradient(180deg, #ffffff 0%, #f7fafc 100%)"
+CARD_BORDER = "#d0dce7"
 
 # Typography
 FONT_FAMILY = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
@@ -70,13 +70,13 @@ RADIUS_XL = "18px"
 # ---------------------------------------------------------------------------
 # KINETIC BIOMECHANICS LIGHT THEME  (prototype "CRICKET-CV v4.2")
 # ---------------------------------------------------------------------------
-# Reference block ONLY -- the app's active theme is the dark PaceAI theme above.
-# Tokens below mirror the stitched design package:
+# The app's active theme is now this LIGHT kinetic theme (tokens in
+# "DESIGN TOKENS" above are set to the light values). This block mirrors the
+# full stitched design package:
 #   * docs/DESIGN.md                                        (design spec)
 #   * assets/paceai_cricket_cv_v4_2_prototype.html          (full-screen mockup)
 #   * assets/paceai_cricket_cv_v4_2_screen.png              (screenshot)
-# Nothing in this block is applied at runtime; it exists so a future light-mode
-# refactor can import a single, spec-correct source of truth.
+# It is kept as the exhaustive, spec-correct source of truth.
 
 # --- Light surface palette (from docs/DESIGN.md) ---
 LIGHT_SURFACE = "#f4f4f4"
@@ -236,7 +236,7 @@ section[data-testid="stSidebar"] {{
 .stButton:focus-within,
 .stTextInput:focus-within,
 .stNumberInput:focus-within {{
-    box-shadow: 0 0 0 2px rgba(59,158,237,0.3);
+    box-shadow: 0 0 0 2px rgba(26,61,100,0.3);
 }}
 .sr-only {{
     position: absolute; width: 1px; height: 1px;
@@ -554,7 +554,7 @@ section[data-testid="stSidebar"] {{
    HERO BANNER (Analyze page)
    ============================================================ */
 .p-hero {{
-    background: linear-gradient(135deg, #0D1117 0%, #111827 50%, #0F172A 100%);
+    background: linear-gradient(135deg, #ffffff 0%, #eef3f9 50%, #e8f1f7 100%);
     border: 1px solid {BORDER_DEFAULT};
     border-radius: {RADIUS_XL};
     padding: 32px 36px;
