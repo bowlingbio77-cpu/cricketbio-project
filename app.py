@@ -108,18 +108,18 @@ st.markdown("""
 
     /* Main background & headers */
     .stApp {
-        background-color: #0d1117;
-        color: #e6edf3;
+        background-color: #f4f4f4;
+        color: #1a1c1c;
     }
 
     /* Card Containers */
     .metric-card {
-        background: linear-gradient(145deg, #161b22 0%, #21262d 100%);
-        border: 1px solid #30363d;
+        background: linear-gradient(145deg, #ffffff 0%, #edf3f9 100%);
+        border: 1px solid #d0dce7;
         border-radius: 12px;
         padding: 20px;
         margin-bottom: 15px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 4px 20px rgba(26, 61, 100, 0.06);
     }
     
     .status-badge {
@@ -131,44 +131,45 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
-    .badge-low { background-color: rgba(46, 125, 50, 0.2); color: #4caf50; border: 1px solid #4caf50; }
-    .badge-moderate { background-color: rgba(249, 168, 37, 0.2); color: #fbc02d; border: 1px solid #fbc02d; }
-    .badge-high { background-color: rgba(198, 40, 40, 0.2); color: #ef5350; border: 1px solid #ef5350; }
-    .badge-legal { background-color: rgba(0, 230, 118, 0.15); color: #00e676; border: 1px solid #00e676; }
-    .badge-illegal { background-color: rgba(255, 23, 68, 0.15); color: #ff1744; border: 1px solid #ff1744; }
-    .badge-demo { background-color: rgba(255, 179, 71, 0.15); color: #ffb347; border: 1px solid #ffb347; }
-    .badge-video { background-color: rgba(41, 182, 246, 0.15); color: #29b6f6; border: 1px solid #29b6f6; }
+    .badge-low { background-color: rgba(21, 128, 61, 0.10); color: #15803d; border: 1px solid #2da44e; }
+    .badge-moderate { background-color: rgba(154, 103, 0, 0.10); color: #9a6700; border: 1px solid #d4a72c; }
+    .badge-high { background-color: rgba(207, 34, 46, 0.10); color: #cf222e; border: 1px solid #cf222e; }
+    .badge-legal { background-color: rgba(21, 128, 61, 0.12); color: #15803d; border: 1px solid #2da44e; }
+    .badge-illegal { background-color: rgba(207, 34, 46, 0.12); color: #cf222e; border: 1px solid #cf222e; }
+    .badge-demo { background-color: rgba(154, 103, 0, 0.12); color: #9a6700; border: 1px solid #d4a72c; }
+    .badge-video { background-color: rgba(26, 61, 100, 0.10); color: #1a3d64; border: 1px solid #1a3d64; }
 
     /* Custom Header Banner */
     .hero-banner {
-        background: linear-gradient(90deg, #0f2027, #203a43, #2c5364);
+        background: linear-gradient(90deg, #ffffff 0%, #eef3f9 50%, #e8f1f7 100%);
         border-radius: 14px;
         padding: 24px 30px;
         margin-bottom: 25px;
-        border: 1px solid #38444d;
+        border: 1px solid #d0dce7;
+        box-shadow: 0 4px 20px rgba(26, 61, 100, 0.06);
     }
     .hero-title {
         font-size: 2rem;
         font-weight: 800;
-        color: #ffffff;
+        color: #1a3d64;
         margin: 0;
     }
     .hero-subtitle {
-        color: #8b949e;
+        color: #495867;
         font-size: 0.95rem;
         margin-top: 6px;
     }
 
     /* Drill card */
     .drill-card {
-        border-left: 4px solid #00e676;
-        background: #161b22;
+        border-left: 4px solid #1d546c;
+        background: #ffffff;
         padding: 14px 18px;
         border-radius: 0 8px 8px 0;
         margin-bottom: 10px;
-        border-top: 1px solid #30363d;
-        border-right: 1px solid #30363d;
-        border-bottom: 1px solid #30363d;
+        border-top: 1px solid #d0dce7;
+        border-right: 1px solid #d0dce7;
+        border-bottom: 1px solid #d0dce7;
     }
 
     /* Feature guide tag chips */
@@ -176,9 +177,9 @@ st.markdown("""
         display: inline-block;
         padding: 2px 10px;
         border-radius: 10px;
-        background: #21262d;
-        border: 1px solid #30363d;
-        color: #29b6f6;
+        background: #d9eafd;
+        border: 1px solid #b7c8db;
+        color: #1a3d64;
         font-size: 0.7rem;
         font-weight: 700;
         letter-spacing: 0.5px;
@@ -188,8 +189,8 @@ st.markdown("""
 
     /* Sidebar adjustments */
     section[data-testid="stSidebar"] {
-        background-color: #161b22;
-        border-right: 1px solid #30363d;
+        background-color: #ffffff;
+        border-right: 1px solid #d0dce7;
     }
 
     /* --- Accessibility --- */
@@ -199,7 +200,7 @@ st.markdown("""
         clip: rect(0,0,0,0); white-space: nowrap; border: 0;
     }
     :focus-visible {
-        outline: 2px solid #29b6f6;
+        outline: 2px solid #1d546c;
         outline-offset: 2px;
     }
     /* Ensure focus is visible on Streamlit widgets */
@@ -209,16 +210,16 @@ st.markdown("""
     .stButton:focus-within,
     .stTextInput:focus-within,
     .stNumberInput:focus-within {
-        box-shadow: 0 0 0 2px rgba(41, 182, 246, 0.4);
+        box-shadow: 0 0 0 2px rgba(26, 61, 100, 0.35);
         border-radius: 6px;
     }
     /* Status badges include text labels alongside color for non-color-dependent info */
     .status-badge::before {
         content: none; /* text is already inside the badge element */
     }
-    /* Improved contrast for secondary text (WCAG AA: >=4.5:1 on #0d1117) */
+    /* Improved contrast for secondary text (WCAG AA: >=4.5:1 on #f4f4f4) */
     .hero-subtitle, .metric-card span[style*="8b949e"] {
-        color: #9ca3af !important;
+        color: #6b7a8f !important;
     }
 
     /* --- Responsive: Tablet (768px) --- */

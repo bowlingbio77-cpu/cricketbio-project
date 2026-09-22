@@ -5,6 +5,10 @@ Single source of truth for all visual tokens, component styles, and layout CSS.
 
 Imported by app.py and injected via st.markdown(unsafe_allow_html=True).
 No ML/pipeline code lives here -- presentation only.
+
+The active theme is DARK. A reference block of light-theme tokens for the
+"CRICKET-CV v4.2" kinetic-biomechanics prototype lives below the dark tokens
+(see section "KINETIC BIOMECHANICS LIGHT THEME"); it is NOT applied at runtime.
 """
 
 # ---------------------------------------------------------------------------
@@ -61,6 +65,115 @@ RADIUS_SM = "6px"
 RADIUS_MD = "10px"
 RADIUS_LG = "14px"
 RADIUS_XL = "18px"
+
+
+# ---------------------------------------------------------------------------
+# KINETIC BIOMECHANICS LIGHT THEME  (prototype "CRICKET-CV v4.2")
+# ---------------------------------------------------------------------------
+# Reference block ONLY -- the app's active theme is the dark PaceAI theme above.
+# Tokens below mirror the stitched design package:
+#   * docs/DESIGN.md                                        (design spec)
+#   * assets/paceai_cricket_cv_v4_2_prototype.html          (full-screen mockup)
+#   * assets/paceai_cricket_cv_v4_2_screen.png              (screenshot)
+# Nothing in this block is applied at runtime; it exists so a future light-mode
+# refactor can import a single, spec-correct source of truth.
+
+# --- Light surface palette (from docs/DESIGN.md) ---
+LIGHT_SURFACE = "#f4f4f4"
+LIGHT_SURFACE_DIM = "#dadada"
+LIGHT_SURFACE_BRIGHT = "#f9f9f9"
+LIGHT_SURFACE_CONTAINER_LOWEST = "#ffffff"
+LIGHT_SURFACE_CONTAINER_LOW = "#edf1f5"
+LIGHT_SURFACE_CONTAINER = "#e5ebf2"
+LIGHT_SURFACE_CONTAINER_HIGH = "#dbe3ec"
+LIGHT_SURFACE_CONTAINER_HIGHEST = "#cfd9e5"
+LIGHT_ON_SURFACE = "#0f2238"
+LIGHT_ON_SURFACE_VARIANT = "#34495e"
+LIGHT_INVERSE_SURFACE = "#2f3131"
+LIGHT_INVERSE_ON_SURFACE = "#f1f1f1"
+
+# Outline / stroke tones
+LIGHT_OUTLINE = "#8b9eb5"
+LIGHT_OUTLINE_VARIANT = "#c4d1df"
+LIGHT_SURFACE_TINT = "#506070"
+
+# --- Light brand palette (material tokens) ---
+LIGHT_PRIMARY = "#506070"
+LIGHT_ON_PRIMARY = "#0c2543"
+LIGHT_PRIMARY_CONTAINER = "#d9eafd"
+LIGHT_ON_PRIMARY_CONTAINER = "#596a7a"
+LIGHT_INVERSE_PRIMARY = "#b7c8db"
+LIGHT_SECONDARY = "#406089"
+LIGHT_ON_SECONDARY = "#ffffff"
+LIGHT_SECONDARY_CONTAINER = "#aecefd"
+LIGHT_ON_SECONDARY_CONTAINER = "#375880"
+LIGHT_TERTIARY = "#30647d"
+LIGHT_ON_TERTIARY = "#ffffff"
+LIGHT_TERTIARY_CONTAINER = "#ceecff"
+LIGHT_ON_TERTIARY_CONTAINER = "#3b6e87"
+LIGHT_BACKGROUND = "#f9f9f9"
+LIGHT_ON_BACKGROUND = "#1a1c1c"
+
+# Error state
+LIGHT_ERROR = "#ba1a1a"
+LIGHT_ON_ERROR = "#ffffff"
+LIGHT_ERROR_CONTAINER = "#ffdad6"
+LIGHT_ON_ERROR_CONTAINER = "#93000a"
+
+# --- Component accents actually used in the v4.2 prototype (code.html) ---
+LIGHT_NAVY = "#1a3d64"        # primary structural typography / solid buttons
+LIGHT_NAVY_HOVER = "#142f4c"
+LIGHT_ICE_COBALT = "#d9eafd"  # high-visibility interactive surface / chip selected
+LIGHT_TEAL_SLATE = "#1d546c"  # sports-tech accent: telemetry curves, vectors
+LIGHT_MONO_FAMILY = "'JetBrains Mono', 'SF Mono', Consolas, monospace"
+LIGHT_SANS_FAMILY = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
+
+# --- Typography scale (from docs/DESIGN.md) ---
+LIGHT_DISPLAY_LG = "48px/56px/700/-0.025em"
+LIGHT_DISPLAY_LG_MOBILE = "36px/44px/700/-0.02em"
+LIGHT_HEADLINE_LG = "32px/40px/600/-0.02em"
+LIGHT_HEADLINE_MD = "24px/32px/600/-0.015em"
+LIGHT_HEADLINE_SM = "20px/28px/600/-0.01em"
+LIGHT_TITLE_MD = "16px/24px/600/-0.005em"
+LIGHT_BODY_LG = "16px/24px/400/0em"
+LIGHT_BODY_MD = "14px/20px/400/0em"
+LIGHT_BODY_SM = "12px/16px/400/0.01em"
+LIGHT_LABEL_LG = "14px/20px/500/0.01em"
+LIGHT_LABEL_MD = "12px/16px/500/0.02em"
+LIGHT_LABEL_XS = "10px/14px/600/0.06em"
+LIGHT_METRIC_DISPLAY = "32px/36px/700/-0.03em"   # telemetry readouts; use tabular figures
+
+# --- Layout tokens ---
+LIGHT_SPACING = {
+    "space-xs": "0.25rem",
+    "space-sm": "0.5rem",
+    "space-md": "1rem",
+    "space-lg": "1.5rem",
+    "space-xl": "2rem",
+    "gutter": "1.5rem",
+    "gutter-mobile": "0.75rem",
+    "margin": "2rem",
+    "margin-mobile": "1rem",
+}
+LIGHT_RADIUS = {
+    "sm": "0.125rem",       # standard controls  (~4px)
+    "DEFAULT": "0.25rem",
+    "md": "0.375rem",
+    "lg": "0.5rem",         # cards / telemetry containers (8px)
+    "xl": "0.75rem",        # floating dialogs / modals (12px)
+    "full": "9999px",       # continuous sensor nodes / joint markers
+}
+LIGHT_GRID = {
+    "desktop": (12, 24, 32),   # columns, gutter px, margin px
+    "tablet": (8, 16, 24),
+    "mobile": (4, 12, 16),
+}
+LIGHT_ELEVATION = {
+    "card": "0 1px 3px rgba(26, 61, 100, 0.06), 0 1px 2px rgba(26, 61, 100, 0.04)",
+    "raised": "0 4px 12px rgba(26, 61, 100, 0.10)",
+    "overlay": "0 12px 28px -4px rgba(26, 61, 100, 0.14)",
+    "recessed_inset": "inset 0 1px 2px rgba(26, 61, 100, 0.08)",
+}
 
 
 # ---------------------------------------------------------------------------
