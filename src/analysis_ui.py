@@ -446,6 +446,162 @@ def _find_active_desc(state: AnalysisState) -> str:
     return "Processing the delivery."
 
 
+# ---------------------------------------------------------------------------
+# "Players Detected" broadcast roster (presentation results panel)
+# ---------------------------------------------------------------------------
+
+# Broadcast role palette -- kept in sync with analysis_replay._ROLE_COLORS
+# (BGR) so the roster matches the replay overlays exactly.
+_ROSTER_COLORS = {
+    "bowler": "#ffc861",
+    "batsman": "#ff4d4d",
+    "wicketkeeper": "#ffc800",
+    "umpire": "#00d7d7",
+    "fielder": "#b4b4b4",
+    "unknown": "#8b949e",
+}
+
+_ROSTER_CSS = """
+<style>
+    .paceai-roster {
+        background: var(--lab-panel, #161b22);
+        border: 1px solid var(--lab-line, #30363d);
+        border-radius: 14px;
+        padding: 18px 20px 14px;
+        margin: 18px 0 6px;
+        font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    }
+    .paceai-roster-head {
+        display: flex; align-items: baseline; justify-content: space-between;
+        gap: 12px; flex-wrap: wrap; margin-bottom: 12px;
+    }
+    .paceai-roster-kicker {
+        font-size: 11px; font-weight: 800; letter-spacing: .2em;
+        color: #29b6f6; text-transform: uppercase;
+    }
+    .paceai-roster-note {
+        font-size: 11px; color: #8b949e;
+    }
+    .paceai-roster-row {
+        display: grid; grid-template-columns: 12px 150px 60px minmax(0,1fr) 56px;
+        gap: 10px; align-items: center;
+        padding: 7px 4px; border-radius: 8px;
+        font-size: 13px;
+    }
+    .paceai-roster-row + .paceai-roster-row { border-top: 1px solid rgba(48,54,61,.5); }
+    .paceai-roster-row.bowler-row { background: rgba(255,200,97,.06); }
+    .paceai-roster-dot {
+        width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+        box-shadow: 0 0 6px currentColor; justify-self: center;
+    }
+    .paceai-roster-role { font-weight: 800; color: #e6edf3; letter-spacing: .04em; }
+    .paceai-roster-track {
+        font-family: 'JetBrains Mono', 'Consolas', monospace;
+        font-size: 12px; color: #8b949e;
+    }
+    .paceai-roster-bar {
+        height: 5px; border-radius: 3px; background: rgba(48,54,61,.6);
+        overflow: hidden;
+    }
+    .paceai-roster-bar i {
+        display: block; height: 100%; border-radius: 3px;
+        background: linear-gradient(90deg, #29b6f6, currentColor);
+    }
+    .paceai-roster-conf {
+        font-family: 'JetBrains Mono', 'Consolas', monospace;
+        font-size: 12px; font-weight: 700; color: #e6edf3; text-align: right;
+    }
+    .paceai-roster-empty {
+        padding: 14px 6px 10px; color: #8b949e; font-size: 13px; line-height: 1.5;
+    }
+    @media (max-width: 640px) {
+        .paceai-roster-row { grid-template-columns: 12px 1fr 56px; }
+        .paceai-roster-track, .paceai-roster-bar { display: none; }
+    }
+</style>
+"""
+
+
+def render_role_roster(player_roles: Optional[dict] = None,
+                       bowler_track_id: Optional[int] = None,
+                       bowler_confidence: Optional[float] = None) -> str:
+    """HTML for the "Players Detected" broadcast roster panel.
+
+    Shows the locked bowler first (the analysis subject), then every
+    classified non-bowler player (batsman / wicketkeeper / umpire / fielder),
+    each with its cricket-evidence confidence. Colors match the Analysis
+    Replay overlays (see analysis_replay._ROLE_COLORS).
+
+    Returns an empty string when there is no role data at all (no bowler lock
+    and no player roles) so callers can hide the panel honestly.
+    """
+    if not player_roles and bowler_track_id is None:
+        return ""
+
+    rows = []
+    # --- Bowler (the analysis subject) is always first and highlighted. ---
+    if bowler_track_id is not None:
+        conf = bowler_confidence if bowler_confidence is not None else None
+        rows.append(_roster_row("BOWLER", f"#{bowler_track_id}", conf,
+                                _ROSTER_COLORS["bowler"], prominent=True))
+
+    # --- Non-bowler roles, sorted by confidence (highest first). ---
+    if player_roles:
+        ordered = sorted(
+            player_roles.items(),
+            key=lambda kv: (kv[1].get("confidence") if isinstance(kv[1], dict)
+                            else 0.0) or 0.0,
+            reverse=True,
+        )
+        for tid, info in ordered:
+            role = info.get("role", "unknown") if isinstance(info, dict) else "unknown"
+            conf = info.get("confidence") if isinstance(info, dict) else None
+            rows.append(_roster_row(role.upper(), f"#{tid}", conf,
+                                    _ROSTER_COLORS.get(role, _ROSTER_COLORS["unknown"])))
+
+    if not rows:
+        return ""
+
+    note = "Cricket-evidence classification, matching the overlay labels"
+    body = "".join(rows)
+    return (
+        _ROSTER_CSS
+        + '<div class="paceai-roster" data-testid="paceai-roster">'
+        + '<div class="paceai-roster-head">'
+        + '<span class="paceai-roster-kicker">Players Detected</span>'
+        + f'<span class="paceai-roster-note">{_esc(note)}</span>'
+        + "</div>"
+        + body
+        + "</div>"
+    )
+
+
+def _roster_row(label: str, track_tag: str, confidence: Optional[float],
+                color: str, prominent: bool = False) -> str:
+    pct = None
+    if confidence is not None:
+        try:
+            pct = max(0.0, min(1.0, float(confidence))) * 100.0
+        except (TypeError, ValueError):
+            pct = None
+    if pct is None:
+        conf_text = "n/a"
+        width = 0
+    else:
+        conf_text = f"{pct:.0f}%"
+        width = pct
+    row_cls = "paceai-roster-row" + (" bowler-row" if prominent else "")
+    return (
+        f'<div class="{row_cls}">'
+        f'<span class="paceai-roster-dot" style="background:{color};color:{color}"></span>'
+        f'<span class="paceai-roster-role">{_esc(label)}</span>'
+        f'<span class="paceai-roster-track">{_esc(track_tag)}</span>'
+        f'<span class="paceai-roster-bar"><i style="width:{width:.0f}%;color:{color}"></i></span>'
+        f'<span class="paceai-roster-conf">{_esc(conf_text)}</span>'
+        "</div>"
+    )
+
+
 def render_lab_html(state: AnalysisState, show_art: bool = True) -> str:
     """Return the full HTML markup for the current analysis screen state."""
     top_pill, bot_pill = _stage_badges(state)

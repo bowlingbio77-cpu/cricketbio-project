@@ -187,25 +187,47 @@ class BowlerTracker:
 # Absolute bbox size is deliberately NOT a ranking feature -- it only enters as
 # a *growth ratio over time*, a run-up pattern, never as a "biggest person" test.
 # --------------------------------------------------------------------------- #
-BOWLER_W_MOTION = 2.0    # cumulative bbox-center path length / image diagonal
-BOWLER_W_ACTIVE = 2.0    # fraction of frames with genuine movement (speed, not drift)
-BOWLER_W_GROWTH = 1.2    # bbox grows over the clip (approaching camera) -- temporal
-BOWLER_W_SPAN = 0.8      # temporal continuity: how much of the clip is covered
+BOWLER_W_MOTION = 2.0    # body-normalized locomotion: mean step / OWN bbox diag
+BOWLER_W_RELATIVE = 2.0  # locomotion above the clip's shared camera drift (body units)
+BOWLER_W_ACTIVE = 1.5    # fraction of steps that are real locomotion (>= ACTIVE_BODY_MIN)
+BOWLER_W_GROWTH = 1.0    # monotonic apparent-size trend (closing range on the runway)
+BOWLER_W_SPAN = 0.5      # temporal continuity: how much of the clip is covered
 BOWLER_W_STRAIGHT = 0.8  # straightness of the run-up path (not random wander)
-BOWLER_W_RANGE = 0.8     # spatial coverage of the center path in the frame
-BOWLER_W_BAND = 0.4      # mostly inside the frame's central band (the runway)
-BOWLER_W_DECEL = 0.2     # bowler slows late in the clip (plant + delivery)
-BOWLER_W_VERT = 1.5      # vertical-motion bias: bowlers run toward camera (Y-axis),
-                          # batters swing horizontally (X-axis); rewards Y-dominant paths
-BOWLER_W_DELIVERY = 1.0  # delivery-phase signature: late vertical drop + size change
-                          # unique to bowling action (not present in batting)
+BOWLER_W_RANGE = 0.3     # spatial coverage of the center path in the frame
+BOWLER_W_BAND = 0.3      # mostly inside the frame's central band (the runway)
+BOWLER_W_DECEL = 0.4     # bowler slows late in the clip (plant + delivery)
+BOWLER_W_DIRECTED = 0.6  # direction persistence (a run-up is one-directional)
+BOWLER_W_DELIVERY = 0.4  # late stride "plant" signature (view-agnostic peak step)
+BOWLER_W_VERT = 0.15     # legacy vertical-motion term, kept minimal: it encodes a
+                          # behind-bowler camera view; every other broadcast/side view
+                          # shows the bowler moving horizontally, so it must not dominate
+                          # (see scripts/debug_bowler_selection.py ADVER-1 vs CONTROL).
 
-# No-bowler gate: if the best track shows almost no real movement, the clip has
-# no confidently-detected bowler -- return None (honest) instead of boxing a
-# static batsman/keeper. The motion value is tanh(path/diagonal), so these are
-# deliberately low bars (>= ~8% of a diagonal of travel OR >= 5% active frames).
+# Body-scaled locomotion threshold: a genuine human step moves the center >= 5%
+# of the person's OWN bbox diagonal per frame. Raw pixels reward whoever is
+# nearest the camera (a fidgeting batsman) over the real (far) bowler, so all
+# motion evidence is divided by the actor's own size -- view/zoom-invariant.
+BOWLER_ACTIVE_BODY_MIN = 0.05
+
+# No-bowler gate: if the best track shows almost no real locomotion (in body
+# units), the clip has no confidently-detected bowler -- return None (honest)
+# instead of boxing a static batsman/keeper.
 BOWLER_MIN_MOTION_FRACTION = 0.08
 BOWLER_MIN_ACTIVE_FRACTION = 0.05
+
+# Selection confirmation gate: auto-lock only when the winner's evidence is
+# strong enough AND clearly ahead of the runner-up. When the margin collapses
+# (the reported bowler <-> batsman tie), the clip reports "BOWLER NOT CONFIRMED"
+# so the UI asks the user to lock a candidate instead of silently analysing the
+# wrong person.
+BOWLER_CONFIRM_MIN_SCORE = 0.35
+BOWLER_CONFIRM_MIN_MARGIN = 0.06
+
+# Batting-stance classifier: a non-bowler person is "static" (striker /
+# non-striker) only when its body-normalized speed stays below the same
+# locomotion bar; the two static batting-end players are picked by projecting
+# their mean centers onto the bowler's own run axis.
+BOWLER_STANCE_MIN_SEP_FRAC = 0.12  # minimum axis separation (x frame width) to label both ends
 
 # Identity-stitch limits: merge a continuation track back into the "locked"
 # bowler only when it starts soon after the bowler's last frame (brief
@@ -250,23 +272,79 @@ def _track_centers(tr: Track) -> np.ndarray:
     return np.asarray([_bbox_center(b) for b in tr.bboxes], dtype=float)
 
 
+def _bbox_diag(bbox) -> float:
+    return float(np.hypot(bbox[2] - bbox[0], bbox[3] - bbox[1]))
+
+
+def _step_sequences(tr: Track):
+    """Per-consecutive-step evidence arrays used by the scorer:
+    (end_frames, dx, dy, mags, scales) where ``scales`` is the actor's OWN
+    bbox diagonal at that step (max of the two boxes). Steps over a big
+    internal frame gap (>2) are dropped so a ByteTrack re-acquisition jump
+    never registers as motion."""
+    end_frames, dxs, dys, mags, scales = [], [], [], [], []
+    for k in range(1, len(tr.frames)):
+        if tr.frames[k] - tr.frames[k - 1] > 2:
+            continue
+        c0 = _bbox_center(tr.bboxes[k - 1])
+        c1 = _bbox_center(tr.bboxes[k])
+        _dx = float(c1[0] - c0[0])
+        _dy = float(c1[1] - c0[1])
+        end_frames.append(tr.frames[k])
+        dxs.append(_dx)
+        dys.append(_dy)
+        mags.append(float(np.hypot(_dx, _dy)))
+        scales.append(max(_bbox_diag(tr.bboxes[k - 1]), _bbox_diag(tr.bboxes[k]), 1e-6))
+    return (np.asarray(end_frames, dtype=int), np.asarray(dxs, dtype=float),
+            np.asarray(dys, dtype=float), np.asarray(mags, dtype=float),
+            np.asarray(scales, dtype=float))
+
+
+def _mean_body_speed(tr: Track) -> float:
+    """Mean center speed in units of the actor's OWN bbox diagonal per frame --
+    scale/zoom-invariant, so a far-away small bowler walking is not swamped by a
+    near-camera fidgeting batsman."""
+    _ef, _dx, _dy, mags, scales = _step_sequences(tr)
+    if not len(mags):
+        return 0.0
+    return float(np.mean(mags / scales))
+
+
 def _score_components(tr: Track, diag: float, n_total: int,
-                      frame_w: float, frame_h: float) -> dict:
-    """Per-track normalized (0..1) evidence components for bowler selection."""
-    steps = _consecutive_steps(tr)
+                      frame_w: float, frame_h: float,
+                      rel_mags: Optional[np.ndarray] = None) -> dict:
+    """Per-track normalized (0..1) evidence components for bowler selection.
+
+    Motion evidence is expressed in BODY units (actor's own bbox diagonal):
+      - a raw-pixel path rewards whoever is nearest the camera, which is how a
+        footworking/advancing batsman used to out-move the real bowler;
+      - ``rel_mags`` optionally supplies the same steps AFTER subtracting the
+        clip's shared camera drift, so a sustained pan inflating every static
+        person is cancelled (the bowler keeps moving against/along the pan).
+    """
+    _ef, dxs, dys, steps, scales = _step_sequences(tr)
+    body = steps / scales
+    n = len(body)
+
+    motion = float(np.tanh(4.0 * float(np.mean(body)))) if n else 0.0
+    active = (float(np.mean(body >= BOWLER_ACTIVE_BODY_MIN)) if n else 0.0)
+    relative = 0.0
+    if rel_mags is not None and len(rel_mags) == n and n:
+        relative = float(np.tanh(4.0 * float(np.mean(rel_mags))))
+    span = len(tr) / max(1, n_total)
     path = float(np.sum(steps))
 
-    motion = float(np.tanh(path / max(diag, 1e-6)))
-    active = (float(np.mean(steps > 0.012 * diag))
-              if len(steps) else 0.0)
-    span = len(tr) / max(1, n_total)
-
     areas = np.asarray([_bbox_area(b) for b in tr.bboxes], dtype=float)
-    if len(areas):
+    growth = 0.0
+    if len(areas) >= 3:
         med_area = max(float(np.median(areas)), 1e-6)
-        growth = float(np.clip(np.tanh(areas.max() / med_area - 1.0), 0.0, 1.0))
-    else:
-        growth = 0.0
+        diffs = np.diff(areas)
+        nonzero = diffs[diffs != 0]
+        if len(nonzero) and abs(areas[-1] - areas[0]) > 1e-6:
+            direction = np.sign(areas[-1] - areas[0])
+            consistent = float(np.mean(np.sign(nonzero) == direction))
+            mag = float(np.clip(abs(areas[-1] - areas[0]) / med_area, 0.0, 2.0))
+            growth = float(np.clip(consistent * min(1.0, 0.5 * mag), 0.0, 1.0))
 
     centers = _track_centers(tr)
     straight = 0.0
@@ -291,37 +369,46 @@ def _score_components(tr: Track, diag: float, n_total: int,
         band = float(inner * (0.4 + 0.6 * v_cov))
 
     decel = 0.0
-    if len(steps) >= 8:
-        k = max(2, int(0.2 * len(steps)))
+    if n >= 8:
+        k = max(2, int(0.2 * n))
         late = float(np.median(steps[-k:]))
         overall = float(np.median(steps))
         if overall > 1e-6 and late < overall * 0.85:
             decel = float(np.clip(1.0 - late / (overall * 0.85), 0.0, 1.0))
 
-    # Vertical-motion bias: bowlers run toward/away from camera (Y-axis
-    # dominant), while batters swing bats horizontally (X-axis dominant).
-    # Compute per-step vertical fraction and average it.
+    # Direction persistence: a run-up keeps one heading; jitter/batting
+    # footwork toggles. View-agnostic (horizontal OR vertical run -> ~1).
+    directed = 0.0
+    if n >= 2 and np.any(steps > 1e-6):
+        hx = float(np.sum(dxs))
+        hy = float(np.sum(dys))
+        hn = np.hypot(hx, hy)
+        if hn > 1e-6:
+            hx, hy = hx / hn, hy / hn
+            align = (dxs * hx + dys * hy) / np.maximum(steps, 1e-6)
+            directed = float(np.mean(align > 0.5))
+
+    # Legacy vertical-motion term (kept for the metric shape and old tests but
+    # weighted near-zero): only meaningful for a behind-bowler camera.
     vert = 0.0
     if len(centers) >= 2:
         dy = np.abs(np.diff(centers[:, 1]))
         dx = np.abs(np.diff(centers[:, 0]))
         total_dist = dy + dx + 1e-6
-        vert_fracs = dy / total_dist  # 1.0 = pure vertical, 0.0 = pure horizontal
-        vert = float(np.mean(vert_fracs))
+        vert = float(np.mean(dy / total_dist))
 
-    # Delivery-phase signature: detect the characteristic late vertical drop
-    # (bowler's center moves DOWN as they plant and deliver) combined with
-    # size change. This is unique to bowling -- batters don't drop vertically.
+    # Delivery-phase signature, view-agnostic: the LATE stride of a real run-up
+    # culminates in one pronounced "plant" step near the end of the clip.
     delivery = 0.0
-    if len(centers) >= 6 and len(areas) >= 6:
-        third = max(2, len(centers) // 3)
-        late_dy = float(np.mean(np.diff(centers[-third:, 1])))  # positive = downward
-        early_dy = float(np.mean(np.diff(centers[:third, 1])))
-        # Late phase should move downward (positive dy) more than early
-        if late_dy > early_dy + 0.005 * frame_h:
-            # Also check size change in late phase
-            late_growth = float(np.mean(areas[-third:] / max(np.mean(areas[:third]), 1e-6)))
-            delivery = float(np.clip(np.tanh(late_growth - 1.0) * min(1.0, (late_dy - early_dy) / (0.02 * frame_h)), 0.0, 1.0))
+    if n >= 10:
+        k = max(2, n // 5 * 2)  # last 40%
+        late_mags = steps[-k:]
+        overall_med = float(np.median(steps))
+        peak = float(late_mags.max())
+        if overall_med > 1e-6 and peak > 1.4 * overall_med:
+            peak_frac = float(np.argmax(steps)) / (n - 1)
+            if peak_frac >= 0.6:
+                delivery = float(np.clip((peak / overall_med - 1.4) / 1.0, 0.0, 1.0))
 
     return {
         "motion": float(motion),
@@ -332,14 +419,17 @@ def _score_components(tr: Track, diag: float, n_total: int,
         "range": float(range_cov),
         "band": float(band),
         "decel": float(decel),
-        "vert": float(vert),
+        "directed": float(directed),
         "delivery": float(delivery),
+        "vert": float(vert),
+        "relative": float(relative),
     }
 
 
 def _weighted_score(comps: dict) -> float:
     w = {
         "motion": BOWLER_W_MOTION,
+        "relative": BOWLER_W_RELATIVE,
         "active": BOWLER_W_ACTIVE,
         "growth": BOWLER_W_GROWTH,
         "span": BOWLER_W_SPAN,
@@ -347,8 +437,9 @@ def _weighted_score(comps: dict) -> float:
         "range": BOWLER_W_RANGE,
         "band": BOWLER_W_BAND,
         "decel": BOWLER_W_DECEL,
-        "vert": BOWLER_W_VERT,
+        "directed": BOWLER_W_DIRECTED,
         "delivery": BOWLER_W_DELIVERY,
+        "vert": BOWLER_W_VERT,
     }
     total = float(sum(w[k] * comps[k] for k in w))
     return total / float(sum(w.values()))
@@ -503,9 +594,33 @@ def score_bowler_tracks(tracks: Dict[int, Track], frame_dims=None,
     frame_diag = float(np.hypot(frame_w, frame_h))
     n_total = total_frames if (total_frames and total_frames > 0) else \
         max((len(tr.frames) for tr in tracks.values()), default=1)
+    # Shared camera-drift estimate: mean step vector over every track that has
+    # a step ending at the same frame. A sustained pan moves everyone equally;
+    # a bowler running against/along the pan keeps a large residual, while a
+    # static batsman that merely "rides" the pan is cancelled out.
+    pair_steps: Dict[int, list] = {}
+    for _tid, tr in tracks.items():
+        ef, dxs, dys, _m, _s = _step_sequences(tr)
+        for i, f in enumerate(ef):
+            pair_steps.setdefault(int(f), []).append((dxs[i], dys[i]))
+    drift = {}
+    for f, vecs in pair_steps.items():
+        if len(vecs) >= 2:
+            drift[f] = tuple(np.mean(np.asarray(vecs), axis=0))
     ranked = []
     for tid, tr in sorted(tracks.items()):
-        comps = _score_components(tr, frame_diag, n_total, float(frame_w), float(frame_h))
+        ef, dxs, dys, _m, scales = _step_sequences(tr)
+        rel_mags = None
+        if len(ef):
+            resid = []
+            for i, f in enumerate(ef):
+                d = drift.get(int(f))
+                rd = (dxs[i] - d[0]) if d is not None else dxs[i]
+                rdy = (dys[i] - d[1]) if d is not None else dys[i]
+                resid.append(float(np.hypot(rd, rdy)) / scales[i])
+            rel_mags = np.asarray(resid, dtype=float)
+        comps = _score_components(tr, frame_diag, n_total, float(frame_w),
+                                  float(frame_h), rel_mags=rel_mags)
         score = _weighted_score(comps)
         ranked.append({
             "track_id": tid,
@@ -518,6 +633,31 @@ def score_bowler_tracks(tracks: Dict[int, Track], frame_dims=None,
         })
     ranked.sort(key=lambda d: d["score"], reverse=True)
     return ranked
+
+
+def count_bowler_identity_switches(tracks: Dict[int, Track], final_track_id: int,
+                                   frame_dims=None,
+                                   total_frames: Optional[int] = None) -> int:
+    """How many half-clip windows produced a different top bowler candidate than
+    the final lock -- an observable, honest measure of bowler <-> batsman
+    switching (returns 0 for a stable lock, >0 when the top scorer churns)."""
+    fs = [f for tr in tracks.values() for f in tr.frames] or [0]
+    n_total = total_frames if (total_frames and total_frames > 0) else int(max(fs)) + 1
+    edges = np.linspace(0, n_total, 3)
+    switches = 0
+    for a, b in zip(edges[:-1], edges[1:]):
+        sub = {tid: Track(track_id=tid,
+                          frames=[f for f in tr.frames if a <= f < b],
+                          bboxes=[bb for f, bb in zip(tr.frames, tr.bboxes)
+                                  if a <= f < b])
+               for tid, tr in tracks.items() if tr.frames}
+        sub = {tid: tr for tid, tr in sub.items() if tr.frames}
+        if not sub:
+            continue
+        ranked = score_bowler_tracks(sub, frame_dims, n_total)
+        if ranked and ranked[0]["track_id"] != final_track_id:
+            switches += 1
+    return switches
 
 
 def select_bowler_track_with_meta(tracks: Dict[int, Track], frame_dims=None,
@@ -542,6 +682,25 @@ def select_bowler_track_with_meta(tracks: Dict[int, Track], frame_dims=None,
     frame_diag = float(np.hypot(frame_w, frame_h))
     ranked = score_bowler_tracks(tracks, frame_dims, total_frames)
     best = ranked[0]
+    # Confirmation gate (G-margin): auto-lock only when the winner is strong
+    # ENOUGH and clearly ahead. A tight top-1 vs top-2 margin is exactly the
+    # reported BOWLER <-> BATSMAN tie -> report NOT CONFIRMED so the UI asks
+    # the user instead of silently analysing the wrong person.
+    confirmed = True
+    confirm_reason = None
+    if best["score"] < BOWLER_CONFIRM_MIN_SCORE:
+        confirmed, confirm_reason = False, "low_evidence"
+    elif len(ranked) >= 2 and best["score"] - ranked[1]["score"] < BOWLER_CONFIRM_MIN_MARGIN:
+        confirmed, confirm_reason = False, "ambiguous_margin"
+    best["confirmed"] = confirmed
+    best["confirm_reason"] = confirm_reason
+    best["identity_switch_count"] = count_bowler_identity_switches(
+        tracks, best["track_id"], frame_dims, total_frames)
+    best["candidates"] = [
+        {"track_id": r["track_id"], "score": float(r["score"]),
+         "confidence": float(r["confidence"]), "motion": float(r["motion"]),
+         "active": float(r["active"]), "n_frames": int(r["n_frames"])}
+        for r in ranked]
     # Debug: log top-3 candidates so we can see why the wrong person won
     import logging
     _log = logging.getLogger(__name__)
@@ -551,21 +710,27 @@ def select_bowler_track_with_meta(tracks: Dict[int, Track], frame_dims=None,
             min(3, len(ranked)),
             [(r["track_id"], f"score={r['score']:.3f}",
               f"motion={r['motion']:.3f}", f"active={r['active']:.3f}",
-              f"growth={r['growth']:.3f}", f"vert={r['vert']:.3f}",
-              f"delivery={r['delivery']:.3f}", f"frames={r['n_frames']}")
+              f"relative={r['relative']:.3f}", f"growth={r['growth']:.3f}",
+              f"dir={r['directed']:.3f}", f"delivery={r['delivery']:.3f}",
+              f"frames={r['n_frames']}")
              for r in ranked[:3]])
     if best["motion"] < BOWLER_MIN_MOTION_FRACTION and best["active"] < BOWLER_MIN_ACTIVE_FRACTION:
         _log.info("No bowler: best motion=%.3f active=%.3f below thresholds",
                   best["motion"], best["active"])
         return None, None
+    if not confirmed:
+        _log.info("Bowler NOT confirmed: reason=%s (top1=%.3f top2=%.3f margin=%.3f)",
+                  confirm_reason, ranked[0]["score"],
+                  ranked[1]["score"] if len(ranked) > 1 else 0.0,
+                  (ranked[0]["score"] - ranked[1]["score"]) if len(ranked) > 1 else 0.0)
     winner = _stitch_continuations(tracks[best["track_id"]], tracks, frame_diag,
                                    frame_provider=frame_provider)
     best["track_id"] = winner.track_id
     best["n_frames"] = len(winner)
     best["start_frame"] = winner.frames[0] if winner.frames else None
     best["end_frame"] = winner.frames[-1] if winner.frames else None
-    _log.info("Selected bowler track #%d (score=%.3f, frames=%d)",
-              winner.track_id, best["score"], len(winner))
+    _log.info("Selected bowler track #%d (score=%.3f, frames=%d, confirmed=%s)",
+              winner.track_id, best["score"], len(winner), confirmed)
     return winner, best
 
 
@@ -777,6 +942,66 @@ def classify_player_roles(tracks: Dict[int, Track], bowler_track_id: int,
             result[tid]["role"] = ROLE_FIELDER
             result[tid]["scores"][ROLE_UMPIRE] = 0.0
 
+    return result
+
+
+ROLE_STRIKER = "striker"
+ROLE_NON_STRIKER = "non_striker"
+
+
+def classify_batting_stances(tracks: Dict[int, Track], bowler: Optional[Track],
+                             frame_dims=None,
+                             total_frames: Optional[int] = None) -> dict:
+    """Identify the two batting-end players from view-agnostic geometry.
+
+    Uses the bowler's OWN run axis (start -> end of its center path), which is
+    the only cricket geometry available without a pitch/camera model:
+
+      * STRIKER     -- the *static* non-bowler person farthest ALONG the run
+                       direction (the crease the bowler runs towards);
+      * NON-STRIKER -- the static non-bowler person farthest BACK (bowler's end).
+
+    "Static" means body-normalized speed below the locomotion bar, so a running
+    fielder or moving keeper is rejected. Returns
+        {track_id: {"role": "striker"|"non_striker", "confidence": float}}
+    with 0-2 entries -- a clean BOWLER / STRIKER / NON-STRIKER picture for the
+    main pipeline; everything else is ignored.
+    """
+    result = {}
+    if bowler is None or not bowler.bboxes or len(bowler) < 6:
+        return result
+    frame_h, frame_w = frame_dims if frame_dims is not None else _FRAME_DIMS_DEFAULT
+    centers = _track_centers(bowler)
+    if len(centers) < 6:
+        return result
+    start = centers[0]
+    run_vec = centers[-1] - start
+    axis_len = float(np.hypot(*run_vec))
+    if axis_len < 1e-6:
+        return result
+    axis = run_vec / axis_len
+
+    cands = []
+    for tid, tr in tracks.items():
+        if tid == bowler.track_id or len(tr) < 3:
+            continue
+        if _mean_body_speed(tr) > BOWLER_ACTIVE_BODY_MIN:
+            continue  # actively moving -> not a stationary batting-end player
+        mid = len(tr.bboxes) // 2
+        c = np.asarray(_bbox_center(tr.bboxes[mid]), dtype=float)
+        proj = float(np.dot(c - start, axis))
+        cands.append({"track_id": tid, "proj": proj})
+    if not cands:
+        return result
+    cands.sort(key=lambda d: d["proj"])
+    sep = float(cands[-1]["proj"] - cands[0]["proj"]) if len(cands) > 1 else 0.0
+    min_sep = BOWLER_STANCE_MIN_SEP_FRAC * frame_w
+    conf = float(np.clip(sep / max(min_sep, 1e-6), 0.0, 1.0)) if len(cands) > 1 else 0.5
+
+    striker = cands[-1]
+    result[striker["track_id"]] = {"role": ROLE_STRIKER, "confidence": conf}
+    if len(cands) >= 2:
+        result[cands[0]["track_id"]] = {"role": ROLE_NON_STRIKER, "confidence": conf}
     return result
 
 

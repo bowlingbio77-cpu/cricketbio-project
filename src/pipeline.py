@@ -51,6 +51,17 @@ class AnalysisResult:
     stage_backends: dict = field(default_factory=dict)  # detection/tracking backend actually used
     delivery_reliable: Optional[bool] = None  # from pose-quality diagnostics (G6)
     player_roles: Optional[dict] = None  # track_id -> {role, confidence, scores} for non-bowler players
+    # Bowler-identification confirmation state (Phase 12/19): when the top
+    # cricket-evidence candidate is weak or tied with the runner-up, the system
+    # reports BOWLER NOT CONFIRMED instead of silently analysing the wrong person.
+    bowler_confirmed: Optional[bool] = None  # False -> auto-lock rejected, UI confirmation needed
+    bowler_confirm_reason: Optional[str] = None  # "low_evidence" | "ambiguous_margin" | None
+    bowler_candidates: list = field(default_factory=list)  # ranked candidate evidence for the UI picker
+    identity_switch_count: int = 0  # half-clip windows where the top bowler candidate churned
+    # Clean main-pipeline picture: BOWLER / STRIKER / NON-STRIKER (everything else ignored).
+    batting_stances: Optional[dict] = None  # track_id -> {role: "striker"|"non_striker", confidence}
+    striker_track_id: Optional[int] = None
+    non_striker_track_id: Optional[int] = None
 
     def to_dict(self):
         return asdict(self)
@@ -313,7 +324,8 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
                    run_ml: bool = True,
                    precheck: bool = True,
                    progress_cb=None,
-                   debug_overlay: bool = False) -> AnalysisResult:
+                   debug_overlay: bool = False,
+                   bowler_track_override: Optional[int] = None) -> AnalysisResult:
     """
     Full pipeline on a single delivery video clip. Requires:
       - models/pose_landmarker_heavy.task (MediaPipe pose model, download separately)
@@ -427,6 +439,13 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     bowler_confidence = None
     stage_backends = {}
     player_roles = None
+    bowler_confirmed = None
+    bowler_confirm_reason = None
+    bowler_candidates = []
+    identity_switch_count = 0
+    batting_stances = None
+    striker_track_id = None
+    non_striker_track_id = None
     try:
         # Snapshot full-frame dimensions before any cropping
         if frames:
@@ -454,9 +473,25 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
                 return None
             return fr
 
-        bowler, bowler_meta = tracking.select_bowler_track_with_meta(
-            tracks, frame_dims=(h, w), total_frames=len(frames),
-            frame_provider=_frame_provider)
+        if bowler_track_override is not None and bowler_track_override in tracks:
+            # User-confirmed lock (Phase 19): analyse the chosen track directly.
+            bowler = tracks[bowler_track_override]
+            bowler_meta = {
+                "track_id": bowler.track_id,
+                "score": None,
+                "confidence": None,
+                "confirmed": True,
+                "confirm_reason": "user_override",
+                "candidates": [],
+                "identity_switch_count": 0,
+            }
+            warnings.append(
+                f"Bowler track #{bowler_track_override} locked by user confirmation."
+            )
+        else:
+            bowler, bowler_meta = tracking.select_bowler_track_with_meta(
+                tracks, frame_dims=(h, w), total_frames=len(frames),
+                frame_provider=_frame_provider)
         if bowler is not None and len(bowler) >= 3:
             bowler_bboxes = _padded_bowler_bboxes(
                 bowler, len(frames), h, w,
@@ -465,11 +500,29 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
             crop_stats = {"track_id": bowler.track_id, "frames_tracked": len(bowler)}
             bowler_track_id = bowler_meta["track_id"] if bowler_meta else bowler.track_id
             bowler_confidence = bowler_meta.get("confidence") if bowler_meta else None
+            bowler_confirmed = bool(bowler_meta.get("confirmed", True))
+            bowler_confirm_reason = bowler_meta.get("confirm_reason")
+            bowler_candidates = list(
+                bowler_meta.get("candidates") or []) if bowler_meta else []
+            identity_switch_count = int(
+                bowler_meta.get("identity_switch_count", 0)) if bowler_meta else 0
             conf_txt = f"{bowler_confidence:.2f}" if bowler_confidence is not None else "n/a"
             warnings.append(
                 f"Detection/tracking: locked to bowler track #{bowler_track_id} "
                 f"({len(bowler)} frames, confidence {conf_txt}) before pose estimation."
             )
+            if not bowler_confirmed:
+                warnings.append(
+                    "BOWLER NOT CONFIRMED: the cricket-evidence score is "
+                    f"{bowler_confirm_reason or 'weak'}. ML/coaching are withheld "
+                    "until the bowler is confirmed in the UI."
+                )
+            if identity_switch_count > 0:
+                warnings.append(
+                    f"Identity check: the top bowler candidate switched "
+                    f"{identity_switch_count}x across the clip (bowler <-> batsman "
+                    "churn observed)."
+                )
             # Classify remaining tracks into cricket roles (batsman, keeper, umpire)
             player_roles = tracking.classify_player_roles(
                 tracks, bowler.track_id, frame_dims=(h, w), total_frames=len(frames))
@@ -478,6 +531,19 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
                     f"#{tid}: {r['role']}({r['confidence']:.2f})"
                     for tid, r in player_roles.items())
                 warnings.append(f"Player roles: {role_summary}")
+            # Clean main-pipeline picture: bowler + striker + non-striker
+            batting_stances = tracking.classify_batting_stances(
+                tracks, bowler, frame_dims=(h, w), total_frames=len(frames))
+            for tid, st in (batting_stances or {}).items():
+                if st["role"] == tracking.ROLE_STRIKER:
+                    striker_track_id = tid
+                elif st["role"] == tracking.ROLE_NON_STRIKER:
+                    non_striker_track_id = tid
+            if batting_stances and bowler_bboxes:
+                stance_summary = ", ".join(
+                    f"#{tid}: {st['role']}({st['confidence']:.2f})"
+                    for tid, st in batting_stances.items())
+                warnings.append(f"Batting stances: {stance_summary}")
         else:
             bowler_track_id = None
             bowler_confidence = None
@@ -551,7 +617,17 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     # is still bowler-bound because those frames are already bowler crops).
     subject_verified = True
     scoring_blocked_reason = None
-    if pose_source == "full_frames":
+    if bowler_track_id is not None and bowler_confirmed is False:
+        # Fail-safe (Phase 19): a selected-but-unconfirmed bowler (low evidence
+        # or a tight bowler<->batsman margin) is never silently scored. The UI
+        # asks the user to lock a candidate; ML/coaching stay refused until then.
+        subject_verified = False
+        scoring_blocked_reason = (
+            "bowler not confirmed (cricket-evidence "
+            f"{bowler_confirm_reason or 'weak'}); ML/coaching withheld until the "
+            "bowler is confirmed in the UI."
+        )
+    elif pose_source == "full_frames":
         pose_frames = sum(1 for pf in pose_sequence if pf.n_people > 1)
         if pose_frames > 0:
             subject_verified = False
@@ -813,6 +889,13 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         stage_backends=stage_backends,
         delivery_reliable=delivery_reliable,
         player_roles=player_roles,
+        bowler_confirmed=bowler_confirmed,
+        bowler_confirm_reason=bowler_confirm_reason,
+        bowler_candidates=bowler_candidates,
+        identity_switch_count=identity_switch_count,
+        batting_stances=batting_stances,
+        striker_track_id=striker_track_id,
+        non_striker_track_id=non_striker_track_id,
     )
 
 

@@ -477,6 +477,7 @@ def _run_video_analysis(uploaded, perf_bundle, injury_bundle, bowling_arm,
         st.session_state["analysis_replay_path"] = getattr(result, "analysis_replay_path", None)
         st.session_state["analysis_key_moments"] = getattr(result, "key_moments", None) or getattr(result, "events", None) or []
         st.session_state["ball_stats"] = getattr(result, "ball_stats", {})
+        st.session_state["video_player_roles"] = getattr(result, "player_roles", None)
 
         balls = result.ball_stats or {}
         screen.render(_live_state(
@@ -1429,6 +1430,17 @@ def render_analysis_replay(hero_video, result, feature_vector, ball_stats):
         st.metric("Tracking quality", quality)
     with m4:
         st.metric("Detected ball frames", n_det)
+
+    # "Players Detected" broadcast roster: the locked bowler + every classified
+    # non-bowler player, with cricket-evidence confidence (matches the overlay
+    # labels in the replay video). Hidden honestly when there is no data.
+    roster_html = analysis_ui.render_role_roster(
+        st.session_state.get("video_player_roles") or result.player_roles,
+        bowler_track_id=getattr(result, "bowler_track_id", None),
+        bowler_confidence=getattr(result, "bowler_confidence", None),
+    )
+    if roster_html:
+        st.markdown(roster_html, unsafe_allow_html=True)
 
     coaching = result.coaching_notes or []
     if coaching:
