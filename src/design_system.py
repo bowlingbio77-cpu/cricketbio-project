@@ -6,8 +6,9 @@ Single source of truth for all visual tokens, component styles, and layout CSS.
 Imported by app.py and injected via st.markdown(unsafe_allow_html=True).
 No ML/pipeline code lives here -- presentation only.
 
-The active theme is LIGHT "Kinetic Biomechanics" (CRICKET-CV v4.2).
-The full light-token reference block lives in the section
+The active theme is DUSK "Kinetic Biomechanics" (between the original
+dark and light; neutral slate panels with light text and ice-cobalt
+accents). The archived light-token reference block lives in the section
 "KINETIC BIOMECHANICS LIGHT THEME" below the active tokens.
 """
 
@@ -16,37 +17,37 @@ The full light-token reference block lives in the section
 # ---------------------------------------------------------------------------
 
 # Backgrounds
-BG_APP = "#f4f4f4"
-BG_PRIMARY = "#ffffff"
-BG_SECONDARY = "#f1f5f9"
-BG_TERTIARY = "#e5ebf2"
-BG_ELEVATED = "#ffffff"
+BG_APP = "#212833"
+BG_PRIMARY = "#2b3442"
+BG_SECONDARY = "#323d4d"
+BG_TERTIARY = "#3a4657"
+BG_ELEVATED = "#2e3949"
 
 # Borders
-BORDER_DEFAULT = "#d0dce7"
-BORDER_SUBTLE = "#e0e6ee"
-BORDER_STRONG = "#b7c8db"
+BORDER_DEFAULT = "#3d4859"
+BORDER_SUBTLE = "#35404f"
+BORDER_STRONG = "#4b586c"
 
 # Text
-TEXT_PRIMARY = "#1a1c1c"
-TEXT_SECONDARY = "#495867"
-TEXT_MUTED = "#6b7a8f"
-TEXT_ACCENT = "#1d546c"
+TEXT_PRIMARY = "#e9eef5"
+TEXT_SECONDARY = "#aeb9c8"
+TEXT_MUTED = "#7e8b9d"
+TEXT_ACCENT = "#63d4cf"
 
 # Semantic
-COLOR_SUCCESS = "#15803d"
-COLOR_WARNING = "#9a6700"
-COLOR_ERROR = "#cf222e"
-COLOR_INFO = "#1d546c"
+COLOR_SUCCESS = "#43d9a3"
+COLOR_WARNING = "#e8b34a"
+COLOR_ERROR = "#ff7086"
+COLOR_INFO = "#63d4cf"
 
-# Accent (PaceAI kinetic navy)
-ACCENT = "#1a3d64"
-ACCENT_DIM = "rgba(26,61,100,0.10)"
-ACCENT_BORDER = "rgba(26,61,100,0.25)"
+# Accent (PaceAI kinetic ice-cobalt, tuned for dusk surfaces)
+ACCENT = "#8ec1ee"
+ACCENT_DIM = "rgba(142,193,238,0.14)"
+ACCENT_BORDER = "rgba(142,193,238,0.35)"
 
 # Surfaces for cards
-CARD_BG = "linear-gradient(180deg, #ffffff 0%, #f7fafc 100%)"
-CARD_BORDER = "#d0dce7"
+CARD_BG = "linear-gradient(180deg, #2e3949 0%, #232b38 100%)"
+CARD_BORDER = "#3d4859"
 
 # Typography
 FONT_FAMILY = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
@@ -70,13 +71,13 @@ RADIUS_XL = "18px"
 # ---------------------------------------------------------------------------
 # KINETIC BIOMECHANICS LIGHT THEME  (prototype "CRICKET-CV v4.2")
 # ---------------------------------------------------------------------------
-# The app's active theme is now this LIGHT kinetic theme (tokens in
-# "DESIGN TOKENS" above are set to the light values). This block mirrors the
-# full stitched design package:
+# ARCHIVED REFERENCE: this block documents the ORIGINAL light theme spec
+# (the "CRICKET-CV v4.2" prototype). The app's ACTIVE theme is now the
+# "light-dusk" medium theme (see DESIGN TOKENS above). This block is kept
+# as the exhaustive, spec-correct archive of the light prototype design:
 #   * docs/DESIGN.md                                        (design spec)
 #   * assets/paceai_cricket_cv_v4_2_prototype.html          (full-screen mockup)
 #   * assets/paceai_cricket_cv_v4_2_screen.png              (screenshot)
-# It is kept as the exhaustive, spec-correct source of truth.
 
 # --- Light surface palette (from docs/DESIGN.md) ---
 LIGHT_SURFACE = "#f4f4f4"
@@ -236,7 +237,7 @@ section[data-testid="stSidebar"] {{
 .stButton:focus-within,
 .stTextInput:focus-within,
 .stNumberInput:focus-within {{
-    box-shadow: 0 0 0 2px rgba(26,61,100,0.3);
+    box-shadow: 0 0 0 2px rgba(142,193,238,0.35);
 }}
 .sr-only {{
     position: absolute; width: 1px; height: 1px;
@@ -379,24 +380,24 @@ section[data-testid="stSidebar"] {{
     text-transform: uppercase; white-space: nowrap;
 }}
 .p-badge-success {{
-    background: rgba(34,197,94,0.12); color: {COLOR_SUCCESS};
-    border: 1px solid rgba(34,197,94,0.25);
+    background: rgba(67,217,163,0.14); color: {COLOR_SUCCESS};
+    border: 1px solid rgba(67,217,163,0.35);
 }}
 .p-badge-warning {{
-    background: rgba(245,158,11,0.12); color: {COLOR_WARNING};
-    border: 1px solid rgba(245,158,11,0.25);
+    background: rgba(232,179,74,0.14); color: {COLOR_WARNING};
+    border: 1px solid rgba(232,179,74,0.35);
 }}
 .p-badge-error {{
-    background: rgba(239,68,68,0.12); color: {COLOR_ERROR};
-    border: 1px solid rgba(239,68,68,0.25);
+    background: rgba(255,112,134,0.14); color: {COLOR_ERROR};
+    border: 1px solid rgba(255,112,134,0.35);
 }}
 .p-badge-info {{
     background: {ACCENT_DIM}; color: {ACCENT};
     border: 1px solid {ACCENT_BORDER};
 }}
 .p-badge-neutral {{
-    background: rgba(90,101,119,0.15); color: {TEXT_SECONDARY};
-    border: 1px solid rgba(90,101,119,0.25);
+    background: rgba(126,139,157,0.16); color: {TEXT_SECONDARY};
+    border: 1px solid rgba(126,139,157,0.3);
 }}
 .p-badge-dot::before {{
     content: '';
@@ -414,10 +415,10 @@ section[data-testid="stSidebar"] {{
     color: white; font-weight: 700; font-size: 0.85rem;
     letter-spacing: 0.02em; border: none; cursor: pointer;
     transition: all 0.2s ease; width: 100%;
-    box-shadow: 0 2px 8px rgba(59,158,237,0.25);
+    box-shadow: 0 2px 8px rgba(142,193,238,0.25);
 }}
 .p-btn-primary:hover {{
-    box-shadow: 0 4px 16px rgba(59,158,237,0.35);
+    box-shadow: 0 4px 16px rgba(142,193,238,0.35);
     transform: translateY(-1px);
 }}
 .p-btn-secondary {{
@@ -488,14 +489,14 @@ section[data-testid="stSidebar"] {{
     font-size: 0.65rem; font-weight: 700; flex-shrink: 0;
 }}
 .p-stage-icon.done {{
-    background: rgba(34,197,94,0.15); color: {COLOR_SUCCESS};
+    background: rgba(67,217,163,0.16); color: {COLOR_SUCCESS};
 }}
 .p-stage-icon.active {{
     background: {ACCENT_DIM}; color: {ACCENT};
     animation: pPulse 1.5s ease-in-out infinite;
 }}
 .p-stage-icon.pending {{
-    background: rgba(90,101,119,0.1); color: {TEXT_MUTED};
+    background: rgba(126,139,157,0.12); color: {TEXT_MUTED};
 }}
 .p-stage-label.done {{ color: {TEXT_SECONDARY}; }}
 .p-stage-label.active {{ color: {TEXT_PRIMARY}; font-weight: 600; }}
@@ -554,7 +555,7 @@ section[data-testid="stSidebar"] {{
    HERO BANNER (Analyze page)
    ============================================================ */
 .p-hero {{
-    background: linear-gradient(135deg, #ffffff 0%, #eef3f9 50%, #e8f1f7 100%);
+    background: linear-gradient(135deg, #2e394b 0%, #27313f 50%, #222c3a 100%);
     border: 1px solid {BORDER_DEFAULT};
     border-radius: {RADIUS_XL};
     padding: 32px 36px;
@@ -649,8 +650,8 @@ section[data-testid="stSidebar"] {{
    PRIORITY / FINDINGS CARD
    ============================================================ */
 .p-finding {{
-    border: 1px solid rgba(59,158,237,0.2);
-    background: linear-gradient(135deg, rgba(59,158,237,0.06), {BG_PRIMARY});
+    border: 1px solid rgba(142,193,238,0.28);
+    background: linear-gradient(135deg, rgba(142,193,238,0.08), {BG_PRIMARY});
     border-radius: {RADIUS_LG};
     padding: 20px;
     margin: 16px 0;

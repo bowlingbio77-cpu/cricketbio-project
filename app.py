@@ -50,6 +50,7 @@ class _LazyModule:
 from src import config, history_db, injury_knowledge_base as injury_kb
 from src import analysis_ui
 from src import kinetic_ui
+from src import result_view
 from src.synthetic_data import generate_clinical_synthetic_dataset
 
 # Heavy modules loaded lazily (only on first use), see _LazyModule above.
@@ -99,9 +100,9 @@ st.markdown("""
         position: absolute; left: -9999px; top: auto;
         width: 1px; height: 1px; overflow: hidden;
         z-index: 999999; padding: 12px 20px; margin: 8px;
-        background: #ffffff; color: #1a3d64; font-weight: 700;
+        background: #2b3442; color: #a9cdec; font-weight: 700;
         border-radius: 8px; text-decoration: none; font-size: 0.95rem;
-        border: 1px solid #1d546c;
+        border: 1px solid #63d4cf;
     }
     .skip-link:focus {
         position: fixed; left: 12px; top: 12px;
@@ -110,18 +111,18 @@ st.markdown("""
 
     /* Main background & headers */
     .stApp {
-        background-color: #f4f4f4;
-        color: #1a1c1c;
+        background-color: #212833;
+        color: #e9eef5;
     }
 
     /* Card Containers */
     .metric-card {
-        background: linear-gradient(145deg, #ffffff 0%, #edf3f9 100%);
-        border: 1px solid #d0dce7;
+        background: linear-gradient(145deg, #2e3949 0%, #232b38 100%);
+        border: 1px solid #3d4859;
         border-radius: 12px;
         padding: 20px;
         margin-bottom: 15px;
-        box-shadow: 0 4px 20px rgba(26, 61, 100, 0.06);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
     }
     
     .status-badge {
@@ -133,45 +134,45 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
-    .badge-low { background-color: rgba(21, 128, 61, 0.10); color: #15803d; border: 1px solid #2da44e; }
-    .badge-moderate { background-color: rgba(154, 103, 0, 0.10); color: #9a6700; border: 1px solid #d4a72c; }
-    .badge-high { background-color: rgba(207, 34, 46, 0.10); color: #cf222e; border: 1px solid #cf222e; }
-    .badge-legal { background-color: rgba(21, 128, 61, 0.12); color: #15803d; border: 1px solid #2da44e; }
-    .badge-illegal { background-color: rgba(207, 34, 46, 0.12); color: #cf222e; border: 1px solid #cf222e; }
-    .badge-demo { background-color: rgba(154, 103, 0, 0.12); color: #9a6700; border: 1px solid #d4a72c; }
-    .badge-video { background-color: rgba(26, 61, 100, 0.10); color: #1a3d64; border: 1px solid #1a3d64; }
+    .badge-low { background-color: rgba(67, 217, 163, 0.14); color: #5fe0b0; border: 1px solid #3cb98c; }
+    .badge-moderate { background-color: rgba(232, 179, 74, 0.14); color: #f0c169; border: 1px solid #c99c42; }
+    .badge-high { background-color: rgba(255, 112, 134, 0.14); color: #ff8699; border: 1px solid #e05a6f; }
+    .badge-legal { background-color: rgba(67, 217, 163, 0.16); color: #5fe0b0; border: 1px solid #3cb98c; }
+    .badge-illegal { background-color: rgba(255, 112, 134, 0.16); color: #ff8699; border: 1px solid #e05a6f; }
+    .badge-demo { background-color: rgba(232, 179, 74, 0.16); color: #f0c169; border: 1px solid #c99c42; }
+    .badge-video { background-color: rgba(142, 193, 238, 0.14); color: #9cc8ee; border: 1px solid #5f93c8; }
 
     /* Custom Header Banner */
     .hero-banner {
-        background: linear-gradient(90deg, #ffffff 0%, #eef3f9 50%, #e8f1f7 100%);
+        background: linear-gradient(90deg, #2e394b 0%, #27313f 50%, #222c3a 100%);
         border-radius: 14px;
         padding: 24px 30px;
         margin-bottom: 25px;
-        border: 1px solid #d0dce7;
-        box-shadow: 0 4px 20px rgba(26, 61, 100, 0.06);
+        border: 1px solid #3d4859;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
     }
     .hero-title {
         font-size: 2rem;
         font-weight: 800;
-        color: #1a3d64;
+        color: #a9cdec;
         margin: 0;
     }
     .hero-subtitle {
-        color: #495867;
+        color: #aeb9c8;
         font-size: 0.95rem;
         margin-top: 6px;
     }
 
     /* Drill card */
     .drill-card {
-        border-left: 4px solid #1d546c;
-        background: #ffffff;
+        border-left: 4px solid #63d4cf;
+        background: #2b3442;
         padding: 14px 18px;
         border-radius: 0 8px 8px 0;
         margin-bottom: 10px;
-        border-top: 1px solid #d0dce7;
-        border-right: 1px solid #d0dce7;
-        border-bottom: 1px solid #d0dce7;
+        border-top: 1px solid #3d4859;
+        border-right: 1px solid #3d4859;
+        border-bottom: 1px solid #3d4859;
     }
 
     /* Feature guide tag chips */
@@ -179,9 +180,9 @@ st.markdown("""
         display: inline-block;
         padding: 2px 10px;
         border-radius: 10px;
-        background: #d9eafd;
-        border: 1px solid #b7c8db;
-        color: #1a3d64;
+        background: rgba(142, 193, 238, 0.16);
+        border: 1px solid #4b586c;
+        color: #9cc8ee;
         font-size: 0.7rem;
         font-weight: 700;
         letter-spacing: 0.5px;
@@ -191,8 +192,8 @@ st.markdown("""
 
     /* Sidebar adjustments */
     section[data-testid="stSidebar"] {
-        background-color: #ffffff;
-        border-right: 1px solid #d0dce7;
+        background-color: #232b38;
+        border-right: 1px solid #3d4859;
     }
 
     /* --- Accessibility --- */
@@ -202,7 +203,7 @@ st.markdown("""
         clip: rect(0,0,0,0); white-space: nowrap; border: 0;
     }
     :focus-visible {
-        outline: 2px solid #1d546c;
+        outline: 2px solid #63d4cf;
         outline-offset: 2px;
     }
     /* Ensure focus is visible on Streamlit widgets */
@@ -212,16 +213,16 @@ st.markdown("""
     .stButton:focus-within,
     .stTextInput:focus-within,
     .stNumberInput:focus-within {
-        box-shadow: 0 0 0 2px rgba(26, 61, 100, 0.35);
+        box-shadow: 0 0 0 2px rgba(142, 193, 238, 0.35);
         border-radius: 6px;
     }
     /* Status badges include text labels alongside color for non-color-dependent info */
     .status-badge::before {
         content: none; /* text is already inside the badge element */
     }
-    /* Improved contrast for secondary text (WCAG AA: >=4.5:1 on #f4f4f4) */
+    /* Improved contrast for secondary text (WCAG AA: >=4.5:1 on #212833) */
     .hero-subtitle, .metric-card span[style*="8b949e"] {
-        color: #6b7a8f !important;
+        color: #aeb9c8 !important;
     }
 
     /* --- Responsive: Tablet (768px) --- */
@@ -246,23 +247,23 @@ st.markdown("""
 
     /* --- Premium Analysis Replay --- */
     .analysis-replay-shell {
-        background: linear-gradient(145deg, #ffffff 0%, #f4f8fc 100%);
-        border: 1px solid #d0dce7; border-bottom: 0;
+        background: linear-gradient(145deg, #2e3949 0%, #222b39 100%);
+        border: 1px solid #3d4859; border-bottom: 0;
         border-radius: 16px 16px 0 0; padding: 20px 22px 10px;
         margin-top: 20px;
     }
     .analysis-replay-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
-    .analysis-replay-head h2 { margin:4px 0 3px; font-size:1.65rem; color:#1a3d64; }
-    .analysis-replay-head p { margin:0; color:#6b7a8f; font-size:.9rem; }
-    .eyebrow,.priority-kicker { color:#1d546c; font-size:.68rem; letter-spacing:.14em; font-weight:800; }
-    .replay-pill { border:1px solid rgba(26,61,100,.25); color:#1a3d64; background:rgba(217,234,253,.5); border-radius:999px; padding:7px 10px; font-size:.68rem; font-weight:800; white-space:nowrap; }
-    .priority-card { margin:18px 0; padding:18px 20px; border:1px solid rgba(21,128,61,.3); background:linear-gradient(145deg, rgba(21,128,61,.07), #ffffff); border-radius:14px; }
-    .priority-title { font-size:1.15rem; font-weight:800; margin:4px 0 7px; color:#1a3d64; }
-    .priority-copy { color:#495867; line-height:1.55; }
-    .analysis-empty { margin:20px 0; padding:30px; border:1px dashed #b7c8db; border-radius:16px; background:#ffffff; }
-    .analysis-empty-kicker { color:#6b7a8f; font-size:.7rem; letter-spacing:.14em; font-weight:800; }
-    .analysis-empty-title { font-size:1.3rem; font-weight:800; margin:5px 0; color:#1a3d64; }
-    .analysis-empty-copy { color:#6b7a8f; }
+    .analysis-replay-head h2 { margin:4px 0 3px; font-size:1.65rem; color:#a9cdec; }
+    .analysis-replay-head p { margin:0; color:#7e8b9d; font-size:.9rem; }
+    .eyebrow,.priority-kicker { color:#63d4cf; font-size:.68rem; letter-spacing:.14em; font-weight:800; }
+    .replay-pill { border:1px solid rgba(142,193,238,.35); color:#9cc8ee; background:rgba(142,193,238,.12); border-radius:999px; padding:7px 10px; font-size:.68rem; font-weight:800; white-space:nowrap; }
+    .priority-card { margin:18px 0; padding:18px 20px; border:1px solid rgba(67,217,163,.35); background:linear-gradient(145deg, rgba(67,217,163,.08), #2b3442); border-radius:14px; }
+    .priority-title { font-size:1.15rem; font-weight:800; margin:4px 0 7px; color:#a9cdec; }
+    .priority-copy { color:#aeb9c8; line-height:1.55; }
+    .analysis-empty { margin:20px 0; padding:30px; border:1px dashed #4b586c; border-radius:16px; background:#2b3442; }
+    .analysis-empty-kicker { color:#7e8b9d; font-size:.7rem; letter-spacing:.14em; font-weight:800; }
+    .analysis-empty-title { font-size:1.3rem; font-weight:800; margin:5px 0; color:#a9cdec; }
+    .analysis-empty-copy { color:#7e8b9d; }
 
     /* --- Streamlit column stacking on narrow viewports --- */
     @media (max-width: 768px) {
@@ -296,34 +297,34 @@ _PRELOADER_CSS = """
     @keyframes paceaiSuccessGlow { 0% { opacity:0; transform:scale(.6); } 40% { opacity:1; transform:scale(1.15); } 100% { opacity:0; transform:scale(1.4); } }
     @keyframes paceaiDrawCheck { to { stroke-dashoffset:0; } }
 
-    .pace-preloader { position:fixed; inset:0; z-index:99999; background:#f4f4f4;
+    .pace-preloader { position:fixed; inset:0; z-index:99999; background:#212833;
         display:flex; align-items:center; justify-content:center; overflow:hidden;
         font-family:'Segoe UI',Arial,sans-serif;
         animation:paceaiFadeOut .6s ease 3.3s forwards; opacity:1; }
     .pace-preloader .glow { position:absolute; width:min(420px,80vw); height:min(420px,80vw); border-radius:50%;
-        background:radial-gradient(circle, rgba(26,61,100,.14) 0%, rgba(29,84,108,.10) 45%, rgba(0,0,0,0) 72%);
+        background:radial-gradient(circle, rgba(142,193,238,.16) 0%, rgba(99,212,207,.10) 45%, rgba(0,0,0,0) 72%);
         animation:paceaiPulse 4.5s ease-in-out infinite; }
     .pace-preloader .stage { position:relative; width:180px; height:180px; display:flex; align-items:center; justify-content:center; }
-    .pace-preloader .orbit-ring { position:absolute; width:132px; height:132px; border-radius:50%; border:1px solid rgba(26,61,100,.18); }
+    .pace-preloader .orbit-ring { position:absolute; width:132px; height:132px; border-radius:50%; border:1px solid rgba(142,193,238,.25); }
     .pace-preloader .orbit-spin { position:absolute; width:132px; height:132px; will-change:transform;
         animation:paceaiOrbit 2.6s linear infinite, paceaiHide .35s ease 2.5s forwards; }
     .pace-preloader .orbit-dot { position:absolute; top:-4px; left:50%; margin-left:-4px; width:8px; height:8px; border-radius:50%;
-        background:#1a3d64; box-shadow:0 0 6px 2px rgba(26,61,100,.55), 0 0 16px 6px rgba(29,84,108,.25); }
+        background:#8ec1ee; box-shadow:0 0 6px 2px rgba(142,193,238,.55), 0 0 16px 6px rgba(99,212,207,.25); }
     .pace-preloader .logo-badge { position:relative; width:64px; height:64px; border-radius:50%;
-        background:linear-gradient(145deg,#ffffff 0%,#eef3f9 100%); border:1px solid #d0dce7;
-        display:flex; align-items:center; justify-content:center; font-size:26px; box-shadow:0 4px 24px rgba(26,61,100,.18);
+        background:linear-gradient(145deg,#2e3949 0%,#232b38 100%); border:1px solid #3d4859;
+        display:flex; align-items:center; justify-content:center; font-size:26px; box-shadow:0 4px 24px rgba(0,0,0,.35);
         animation:paceaiHide .35s ease 2.5s forwards; }
     .pace-preloader .loading-text { position:absolute; bottom:-64px; left:50%; transform:translateX(-50%);
-        color:#6b7a8f; font-size:13px; letter-spacing:1.5px; text-transform:uppercase;
+        color:#7e8b9d; font-size:13px; letter-spacing:1.5px; text-transform:uppercase;
         white-space:nowrap; text-align:center; max-width:80vw; }
     .pace-preloader .success { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
         opacity:0; visibility:hidden; animation:paceaiSuccessIn .35s ease 2.5s forwards; }
     .pace-preloader .success .sglow { position:absolute; width:110px; height:110px; border-radius:50%;
-        background:radial-gradient(circle, rgba(21,128,61,.30) 0%, rgba(21,128,61,0) 70%);
+        background:radial-gradient(circle, rgba(67,217,163,.30) 0%, rgba(67,217,163,0) 70%);
         animation:paceaiSuccessGlow .6s ease-out 2.5s both; }
     .pace-preloader .check-badge { width:64px; height:64px; border-radius:50%;
-        background:linear-gradient(145deg,#ffffff 0%,#eef3f9 100%); border:1px solid rgba(21,128,61,.6);
-        display:flex; align-items:center; justify-content:center; box-shadow:0 4px 24px rgba(26,61,100,.18); }
+        background:linear-gradient(145deg,#2e3949 0%,#232b38 100%); border:1px solid rgba(67,217,163,.6);
+        display:flex; align-items:center; justify-content:center; box-shadow:0 4px 24px rgba(0,0,0,.35); }
     .pace-preloader .checkmark-path { stroke-dasharray:28; stroke-dashoffset:28; animation:paceaiDrawCheck .32s ease-out 2.56s forwards; }
 
     @media (prefers-reduced-motion: reduce) {
@@ -350,7 +351,7 @@ def _paceai_preloader(message: str) -> str:
             <div class="check-badge">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
                     <path class="checkmark-path" d="M4 12.5 L9.5 18 L20 5.5"
-                          stroke="#15803d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                          stroke="#43d9a3" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </div>
         </div>
@@ -611,32 +612,32 @@ PRESETS = {
 # ---------------- CHART BUILDERS ----------------
 def render_modern_gauge(value, title, subtitle="", max_val=100, is_risk=False):
     if is_risk:
-        bar_color = "#cf222e" if value >= 70 else "#d4a72c" if value >= 40 else "#15803d"
+        bar_color = "#ff7086" if value >= 70 else "#e8b34a" if value >= 40 else "#43d9a3"
     else:
-        bar_color = "#15803d" if value >= 70 else "#d4a72c" if value >= 50 else "#cf222e"
+        bar_color = "#43d9a3" if value >= 70 else "#e8b34a" if value >= 50 else "#ff7086"
 
     fig = go.Figure(go.Indicator(
         mode="gauge+number+delta",
         value=value,
-        title={"text": f"<b>{title}</b><br><span style='font-size:0.8em;color:#6b7a8f'>{subtitle}</span>"},
-        number={"font": {"size": 42, "color": "#1a3d64"}, "suffix": "%" if is_risk else ""},
+        title={"text": f"<b>{title}</b><br><span style='font-size:0.8em;color:#7e8b9d'>{subtitle}</span>"},
+        number={"font": {"size": 42, "color": "#8ec1ee"}, "suffix": "%" if is_risk else ""},
         gauge={
-            "axis": {"range": [0, max_val], "tickcolor": "#788ca0", "tickfont": {"color": "#788ca0"}},
+            "axis": {"range": [0, max_val], "tickcolor": "#5f6d80", "tickfont": {"color": "#5f6d80"}},
             "bar": {"color": bar_color, "thickness": 0.3},
-            "bgcolor": "#ffffff",
+            "bgcolor": "#2b3442",
             "borderwidth": 1,
-            "bordercolor": "#d0dce7",
+            "bordercolor": "#3d4859",
             "steps": [
-                {"range": [0, 40], "color": "rgba(21, 128, 61, 0.12)"},
-                {"range": [40, 70], "color": "rgba(154, 103, 0, 0.10)"},
-                {"range": [70, max_val], "color": "rgba(21, 128, 61, 0.16)" if not is_risk else "rgba(207, 34, 46, 0.16)"},
+                {"range": [0, 40], "color": "rgba(67, 217, 163, 0.14)"},
+                {"range": [40, 70], "color": "rgba(232, 179, 74, 0.14)"},
+                {"range": [70, max_val], "color": "rgba(67, 217, 163, 0.18)" if not is_risk else "rgba(255, 112, 134, 0.18)"},
             ],
         },
     ))
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font={"color": "#1a1c1c"},
+        font={"color": "#e9eef5"},
         height=240,
         margin=dict(l=25, r=25, t=60, b=20)
     )
@@ -678,24 +679,24 @@ def render_radar_comparison(current_feats: dict):
     fig.add_trace(go.Scatterpolar(
         r=user_vals, theta=categories, fill='toself',
         name='Current Bowler',
-        line=dict(color='#15803d', width=2),
-        fillcolor='rgba(21, 128, 61, 0.18)'
+        line=dict(color='#43d9a3', width=2),
+        fillcolor='rgba(67, 217, 163, 0.18)'
     ))
     fig.add_trace(go.Scatterpolar(
         r=bench_vals, theta=categories, fill='toself',
         name='Elite Benchmark (145 km/h)',
-        line=dict(color='#1a3d64', width=2, dash='dot'),
-        fillcolor='rgba(26, 61, 100, 0.12)'
+        line=dict(color='#8ec1ee', width=2, dash='dot'),
+        fillcolor='rgba(142, 193, 238, 0.14)'
     ))
 
     fig.update_layout(
         polar=dict(
-            radialaxis=dict(visible=True, range=[0, 100], color="#788ca0", gridcolor="#e0e6ee"),
-            angularaxis=dict(color="#495867", gridcolor="#e0e6ee")
+            radialaxis=dict(visible=True, range=[0, 100], color="#5f6d80", gridcolor="#35404f"),
+            angularaxis=dict(color="#aeb9c8", gridcolor="#35404f")
         ),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#1a1c1c"),
+        font=dict(color="#e9eef5"),
         legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
         height=380,
         margin=dict(l=40, r=40, t=30, b=40)
@@ -708,19 +709,19 @@ def render_shap_bar(contributions: dict, title: str):
     items = sorted(items, key=lambda kv: kv[1])
     names = [FEATURE_LABELS.get(k, (k,))[0] for k, _ in items]
     values = [v for _, v in items]
-    colors = ["#cf222e" if v > 0 else "#1a3d64" for v in values]
+    colors = ["#ff7086" if v > 0 else "#8ec1ee" for v in values]
 
     fig = go.Figure(go.Bar(
         x=values, y=names, orientation="h",
         marker=dict(color=colors, line=dict(width=0)),
     ))
     fig.update_layout(
-        title=dict(text=f"<b>{title}</b>", font=dict(color="#1a3d64", size=14)),
+        title=dict(text=f"<b>{title}</b>", font=dict(color="#8ec1ee", size=14)),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#495867"),
-        xaxis=dict(title="Relative Model Impact (SHAP value)", gridcolor="#e0e6ee", zerolinecolor="#788ca0"),
-        yaxis=dict(gridcolor="#edf3f9"),
+        font=dict(color="#aeb9c8"),
+        xaxis=dict(title="Relative Model Impact (SHAP value)", gridcolor="#35404f", zerolinecolor="#5f6d80"),
+        yaxis=dict(gridcolor="#2b3442"),
         height=340,
         margin=dict(l=10, r=20, t=40, b=20)
     )
@@ -735,11 +736,11 @@ def render_timings(stage_times: dict):
     labels = [k.replace("_", " ").title() for k, _ in ordered]
     values = [v for _, v in ordered]
     fig = go.Figure(go.Bar(x=values, y=labels, orientation="h",
-                           marker_color=["#1a3d64" if k != "total" else "#15803d"
+                           marker_color=["#8ec1ee" if k != "total" else "#43d9a3"
                                          for k, _ in ordered]))
     fig.update_layout(title="Stage timing", height=320,
                       paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                      font=dict(color="#495867"),
+                      font=dict(color="#aeb9c8"),
                       margin=dict(l=10, r=10, t=40, b=10), xaxis_title="Seconds")
     st.plotly_chart(fig, width='stretch')
     total = stage_times.get("total")
@@ -804,73 +805,6 @@ def render_model_quality_expander(perf_bundle, injury_bundle):
         if src == "synthetic":
             st.caption("These numbers tell you the model fits the demo generator, not that it "
                        "predicts bowling outcomes. Treat all scores on the dashboard as illustrative.")
-
-
-def render_ood_warnings(feature_vector, bundle):
-    ood = ml_models.out_of_distribution_warnings(feature_vector, bundle)
-    if ood:
-        lines = [f"- **{FEATURE_LABELS.get(f, (f,))[0]}** = {v:.2f} "
-                 f"(training range {lo:.2f}–{hi:.2f})" for f, v, lo, hi in ood]
-        st.warning("Some input features fall outside the model's training range -- predictions "
-                   "extrapolate beyond what the model has seen and may be unreliable:\n"
-                   + "\n".join(lines))
-
-
-def render_plain_language_summary(result, risk_level, is_icc_legal, elbow_flex):
-    """One-glance, jargon-free takeaways so users don't have to parse every chart."""
-    perf = result.performance_score
-    bullets = []
-
-    if perf is not None:
-        if perf >= 80:
-            band = "a strong, technically sound action — focus on consistency and repeatability"
-        elif perf >= 60:
-            band = "a solid foundation with a few refinements to make"
-        else:
-            band = "below benchmark — several technical elements need focused work"
-        bullets.append(f"**Performance: {perf:.0f}/100** — {band}.")
-
-    risk_desc = {
-        "low": "no literature-informed biomechanical trigger thresholds were exceeded for this delivery",
-        "moderate": "a few literature-informed trigger thresholds were flagged — review before heavy workload",
-        "high": "several literature-informed trigger thresholds were exceeded — review technique before more bowling",
-    }.get(risk_level, "see detailed breakdown")
-    bullets.append(f"**Biomechanical risk indicator: {risk_level.upper()}** — {risk_desc}.")
-
-    if is_icc_legal:
-        bullets.append(f"**ICC screening: WITHIN LIMIT** -- elbow extension {elbow_flex:.1f}\u00b0 is within the "
-                       f"{config.ICC_ELBOW_EXTENSION_LIMIT_DEG}° reference value. This is a screening "
-                       f"indicator, not an official ICC on-field measurement.")
-    else:
-        bullets.append(f"**ICC screening: ABOVE REFERENCE** -- elbow extension {elbow_flex:.1f}\u00b0 exceeds the "
-                       f"{config.ICC_ELBOW_EXTENSION_LIMIT_DEG}° reference value; a straighter arm path "
-                       f"through release is the priority. This is a screening indicator, not an official "
-                       f"ICC on-field measurement.")
-
-    top_fix = next((n for n in (result.coaching_notes or [])
-                    if not n.startswith("No significant")), None)
-    if top_fix:
-        bullets.append(f"**Top fix:** {top_fix}")
-
-    if result.shap_contributions_injury:
-        top_feat = max(result.shap_contributions_injury, key=lambda k: abs(result.shap_contributions_injury[k]))
-        label = FEATURE_LABELS.get(top_feat, (top_feat.replace("_", " ").title(),))[0]
-        bullets.append(f"**Main risk-indicator driver:** {label} has the biggest effect on the "
-                       f"biomechanical risk-indicator score (see Explainable AI tab for the full picture).")
-
-    bstats = st.session_state.get("ball_stats") or {}
-    if bstats.get("n_frames"):
-        n_tracked = bstats["n_detected"] + bstats["n_interpolated"]
-        bullets.append(f"**Ball tracking:** the ball was followed for {n_tracked} frames "
-                       f"({bstats.get('coverage_pct', 0):.0f}% of the clip) — watch the video above.")
-
-    summary_text = "### What this means for you\n" + "\n".join(f"- {b}" for b in bullets)
-    if risk_level == "high":
-        st.error(summary_text)
-    elif risk_level == "moderate":
-        st.warning(summary_text)
-    else:
-        st.success(summary_text)
 
 
 # Every feature in the app, explained in plain English (tag, title, description).
@@ -1004,10 +938,10 @@ def render_history_page():
                 mode="lines+markers+text",
                 text=[f"#{r['id']}" for r in chrono],
                 textposition="top center",
-                line=dict(color="#15803d", width=2),
+                line=dict(color="#43d9a3", width=2),
             ))
         fig.update_layout(height=350, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                          font=dict(color="#495867"), margin=dict(l=10, r=10, t=30, b=10),
+                          font=dict(color="#aeb9c8"), margin=dict(l=10, r=10, t=30, b=10),
                           xaxis_title="Date", yaxis_title="Performance score",
                           yaxis=dict(range=[0, 100]))
         st.plotly_chart(fig, width='stretch')
@@ -1030,22 +964,22 @@ def render_history_page():
         with c1:
             fig = go.Figure(go.Bar(
                 x=sel_names, y=[r.get("performance_score") for r in sel],
-                marker_color="#15803d", text=[f"{r.get('performance_score'):.0f}" if r.get('performance_score') is not None else "—" for r in sel],
+                marker_color="#43d9a3", text=[f"{r.get('performance_score'):.0f}" if r.get('performance_score') is not None else "—" for r in sel],
                 textposition="outside"))
             fig.update_layout(title="Performance score", height=320,
                               paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                              font=dict(color="#495867"), margin=dict(l=10, r=10, t=40, b=10),
+                              font=dict(color="#aeb9c8"), margin=dict(l=10, r=10, t=40, b=10),
                               yaxis=dict(range=[0, 100]))
             st.plotly_chart(fig, width='stretch')
         with c2:
             fig = go.Figure(go.Bar(
                 x=sel_names, y=[_risk_of(r) for r in sel],
-                marker_color=["#cf222e" if _risk_of(r) == "high" else "#d4a72c"
-                              if _risk_of(r) == "moderate" else "#15803d" for r in sel],
+                marker_color=["#ff7086" if _risk_of(r) == "high" else "#e8b34a"
+                              if _risk_of(r) == "moderate" else "#43d9a3" for r in sel],
                 text=[_risk_of(r).title() for r in sel], textposition="outside"))
             fig.update_layout(title="Biomechanical risk indicator", height=320,
                               paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                              font=dict(color="#495867"), margin=dict(l=10, r=10, t=40, b=10))
+                              font=dict(color="#aeb9c8"), margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig, width='stretch')
 
         st.markdown("**Feature-by-feature comparison**")
@@ -1068,7 +1002,7 @@ def render_history_page():
                 fig.add_trace(go.Bar(x=x, y=y, name=name))
             fig.update_layout(title="Feature values by session", barmode="group",
                               height=400, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                              font=dict(color="#495867"), margin=dict(l=10, r=10, t=40, b=10))
+                              font=dict(color="#aeb9c8"), margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig, width='stretch')
 
         # --- Detail view ---
@@ -1305,7 +1239,10 @@ else:
         processed = st.session_state.get("video_processed_file_id")
         if processed != uploaded.file_id:
             screen = _LiveAnalysisScreen()
-            _run_video_analysis(
+            # Keep the REAL video AnalysisResult. It carries the identity,
+            # provenance and landmark fields that the ML-only result created
+            # later cannot supply (it is rebuilt from a bare feature vector).
+            st.session_state["video_result"] = _run_video_analysis(
                 uploaded, perf_bundle, injury_bundle, bowling_arm,
                 target_fps, resize_choice, denoise, camera_view,
                 slow_factor, zoom_end, debug_overlay, screen,
@@ -1398,11 +1335,14 @@ def render_analysis_replay(hero_video, result, feature_vector, ball_stats):
     moments = _video_key_moments(st.session_state.get("analysis_key_moments"))
 
     risk = result.injury_risk or {}
-    risk_level = str(risk.get("risk_level", "low")).lower()
+    risk_level = str(risk.get("risk_level", "")).lower()
     risk_probs = risk.get("probabilities") or []
     p_high = risk_probs[2] if len(risk_probs) > 2 else None
-    risk_pct = (p_high * 100) if p_high is not None else \
-        {"low": 22, "moderate": 58, "high": 88}.get(risk_level, 22)
+    # Only a real classifier probability may appear on the replay overlay. When
+    # scoring was refused there is no probability to show, and inventing one
+    # ("low" -> 22%) would put a fabricated number on top of the video.
+    risk_pct = (p_high * 100) if p_high is not None else None
+    risk_withheld = result.subject_verified is False or not risk_level
 
     bowler_id = getattr(result, "bowler_track_id", None)
     bowler_conf = getattr(result, "bowler_confidence", None)
@@ -1422,8 +1362,8 @@ def render_analysis_replay(hero_video, result, feature_vector, ball_stats):
         impact_idx=impact_idx,
         outcome=bstats.get("outcome"),
         events_n=len(moments),
-        risk_pct=risk_pct if bowler_id is not None else None,
-        risk_level=risk_level,
+        risk_pct=risk_pct if (bowler_id is not None and not risk_withheld) else None,
+        risk_level=risk_level if not risk_withheld else "",
         features=feature_vector,
     )
 
@@ -1495,6 +1435,42 @@ def render_analysis_replay(hero_video, result, feature_vector, ball_stats):
 
 
 # ---------------- ANALYSIS & VISUALIZATION ----------------
+_VIDEO_ONLY_FIELDS = (
+    "feature_provenance", "landmark_source_summary", "stage_backends",
+    "bowler_bboxes", "bowler_track_id", "bowler_confidence",
+    "bowler_confirmed", "bowler_confirm_reason", "bowler_candidates",
+    "identity_switch_count", "batting_stances", "striker_track_id",
+    "non_striker_track_id", "original_frame_dims", "player_roles",
+    "ball_stats", "video_path", "pose_video_path", "reels_video_path",
+    "analysis_replay_path", "bowling_arm", "camera_view", "warnings",
+    "subject_verified", "delivery_reliable", "scoring_blocked_reason",
+)
+
+
+def _merge_video_result(result, video_result):
+    """Overlay the video-only fields of the real pipeline result onto the ML result.
+
+    `analyze_feature_vector` is called from a bare feature vector, so it cannot
+    know anything about the clip: no provenance, no landmark source, no bowler
+    identity, no artefact paths. Without this merge the result screen renders a
+    permanently incomplete object. Returns a NEW result; the input is untouched.
+    """
+    if video_result is None:
+        return result
+    import dataclasses
+    overrides = {}
+    for name in _VIDEO_ONLY_FIELDS:
+        value = getattr(video_result, name, None)
+        # Only override when the video run actually produced something, so the
+        # ML path's own gating decisions are never clobbered by a stale value.
+        if value is None or value == {} or value == []:
+            continue
+        overrides[name] = value
+    if not overrides:
+        return result
+    return dataclasses.replace(result, **overrides)
+
+
 if feature_vector:
     video_subject_verified = (
         st.session_state.get("video_subject_verified")
@@ -1506,10 +1482,8 @@ if feature_vector:
         feature_vector, perf_bundle, injury_bundle,
         subject_verified=video_subject_verified,
         reliable=video_delivery_reliable)
-    risk = result.injury_risk or {}
-    risk_level = str(risk.get("risk_level", "low")).lower()
-    risk_score = {"low": 22, "moderate": 58, "high": 88}.get(risk_level, 22)
-    risk_probs = risk.get("probabilities") or []
+    if input_mode.startswith("📹"):
+        result = _merge_video_result(result, st.session_state.get("video_result"))
 
     # Make the latest analysis available to the sidebar chat assistant.
     merged_shap = dict(result.shap_contributions_performance or {})
@@ -1538,367 +1512,168 @@ if feature_vector:
     else:
         stage_times = dict(result.stage_times or {})
 
-    elbow_flex = feature_vector.get("elbow_flexion_deg", 10.0)
-    is_icc_legal = elbow_flex <= config.ICC_ELBOW_EXTENSION_LIMIT_DEG
+    _is_video = input_mode.startswith("📹")
+    _ball_stats = dict(st.session_state.get("ball_stats") or {})
 
-    st.markdown("---")
+    # ---------------- REPORT / EXPORT (built once, reused by §10 and §11) ----
+    _report = {
+        "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "input_mode": input_mode,
+        "bowling_arm": result.bowling_arm,
+        "model": getattr(perf_bundle, "model_name", model_choice),
+        "performance_score": result.performance_score,
+        "injury_risk": result.injury_risk,
+        "icc_legal": (result.feature_vector.get("elbow_flexion_deg") is not None
+                      and result.feature_vector["elbow_flexion_deg"]
+                      <= config.ICC_ELBOW_EXTENSION_LIMIT_DEG),
+        "coaching_feedback": result.coaching_notes,
+        "shap_performance": result.shap_contributions_performance,
+        "shap_injury": result.shap_contributions_injury,
+        "features": result.feature_vector,
+        "feature_provenance": result.feature_provenance,
+        "landmark_source_summary": result.landmark_source_summary,
+        "subject_verified": result.subject_verified,
+        "delivery_reliable": result.delivery_reliable,
+        "scoring_blocked_reason": result.scoring_blocked_reason,
+        "bowler_track_id": result.bowler_track_id,
+        "bowler_confidence": result.bowler_confidence,
+        "ball_stats": _ball_stats,
+        "stage_backends": result.stage_backends,
+        "stage_times": stage_times,
+        "warnings": list(result.warnings or []),
+        "model_note": ("Demo models trained on synthetic data -- illustrative only, "
+                       "not a validated research measurement."),
+    }
+    _report_json = json.dumps(_report, indent=2, default=str)
 
-    for warning in st.session_state.get("last_warnings", []):
-        st.warning(warning)
+    # ---------------- ADVANCED SECTION RENDERERS (§10) --------------------
+    def _adv_gauges_and_radar():
+        if result.performance_score is not None:
+            st.plotly_chart(
+                render_modern_gauge(result.performance_score,
+                                    "Demonstration Performance Indicator",
+                                    "Demo score — not a validated measurement"),
+                width="stretch")
+        else:
+            st.caption("No performance score was produced for this delivery — no gauge "
+                       "is shown, because an empty dial would imply a score of zero.")
+        if result.injury_risk:
+            risk = result.injury_risk
+            probs = risk.get("probabilities") or []
+            st.markdown("**Model risk output (raw)**")
+            st.json({"risk_level": risk.get("risk_level"),
+                     "probabilities": probs})
+            if probs:
+                st.caption("Class probabilities come from the demo classifier. They are "
+                           "listed for transparency, not as a risk percentage.")
+        if all(k in result.feature_vector for k in
+               ("shoulder_rotation_deg", "elbow_flexion_deg", "wrist_angle_deg",
+                "hip_rotation_deg", "knee_flexion_deg", "trunk_lean_deg",
+                "stride_length_norm", "angular_velocity_deg_s")):
+            st.plotly_chart(render_radar_comparison(result.feature_vector),
+                            width="stretch")
+        else:
+            st.caption("Radar comparison needs all eight benchmarked measurements; this "
+                       "delivery is missing at least one, so it is not shown.")
 
-    subject_blocked = result.subject_verified is False
-    if subject_blocked:
-        st.error(
-            "**Scoring withheld — subject not verified.** "
-            "The pose skeleton could not be confirmed as the bowler (multiple "
-            "people detected with no bowler identity lock), so the measured "
-            "features below may belong to another player. Performance / risk "
-            "predictions, coaching notes and SHAP explanations are refused for "
-            "this run — the features and replay are still shown for manual "
-            "review, clearly marked as from an unverified subject."
+    def _adv_shap():
+        c1, c2 = st.columns(2)
+        with c1:
+            if result.shap_contributions_performance:
+                st.plotly_chart(
+                    render_shap_bar(result.shap_contributions_performance,
+                                    "Performance drivers"),
+                    width="stretch")
+            else:
+                st.caption("No performance SHAP data was produced for this delivery.")
+        with c2:
+            if result.shap_contributions_injury:
+                st.plotly_chart(
+                    render_shap_bar(result.shap_contributions_injury,
+                                    "Biomechanical risk drivers"),
+                    width="stretch")
+            else:
+                st.caption("No biomechanical-risk SHAP data was produced for this delivery.")
+
+    def _adv_literature_table():
+        st.markdown("**Full clinical benchmark table**")
+        st.dataframe(injury_kb.all_benchmarks(), width="stretch", hide_index=True)
+        st.markdown("**Workload & ACWR (optional inputs)**")
+        a1, a2, a3 = st.columns(3)
+        acwr = a1.number_input("ACWR", 0.0, 3.0, 0.8, 0.05)
+        load7 = a2.number_input("7-day ball load", 0, 500, 0)
+        rest = a3.number_input("Rest days", 0, 30, 3)
+        for check in injury_kb.workload_risk(acwr=acwr, seven_day_load=load7 or None,
+                                             rest_days=rest):
+            _cls = {"at_risk": "error", "warning": "warning"}.get(check["status"])
+            getattr(st, _cls or "caption")(f"**{check['check']}** — {check['detail']}")
+
+    def _adv_model_quality():
+        render_model_quality_expander(perf_bundle, injury_bundle)
+
+    def _adv_timing():
+        if stage_times:
+            render_timings(stage_times)
+        else:
+            st.caption("No timing data available for this run.")
+
+    def _adv_notes():
+        for w in result.warnings or []:
+            st.warning(w)
+        if not result.warnings:
+            st.caption("The pipeline reported no degradation notes for this run.")
+
+    def _session_writer():
+        st.markdown("### 💾 Save to History")
+        st.caption("Persist this delivery so you can compare it against future sessions. "
+                   "Saving the same result twice is idempotent.")
+        save_athlete = st.text_input("Bowler name", key="save_athlete")
+        save_label = st.text_input("Label (optional)", key="save_label")
+        save_tags = st.text_input("Tags (comma-separated, optional)", key="save_tags")
+        if st.button("💾 Save this result", type="primary"):
+            saved_id, inserted = history_db.save_analysis(
+                result, label=save_label, input_mode=input_mode,
+                bowling_arm=bowling_arm.lower().split("-")[0], model=model_choice,
+                athlete=save_athlete, tags=save_tags)
+            if inserted:
+                st.success(f"Saved to history (id #{saved_id}). Open **History & Compare** "
+                           f"in the sidebar to view and compare your saved results.")
+            else:
+                st.info(f"This result was already saved (id #{saved_id}) — no duplicate was "
+                        f"created. Change the label/tags or bowler name to log it separately.")
+        st.download_button(
+            label="📥 Download Full Delivery Analysis (JSON)",
+            data=_report_json,
+            file_name="bowling_biomechanics_report.json",
+            mime="application/json",
         )
 
-    # DEMO vs RESEARCH / input-mode badges (research transparency)
-    ds = getattr(perf_bundle, "data_source", "synthetic")
-    if ds == "synthetic":
-        model_badge = ('<span class="status-badge badge-demo">DEMO MODELS • SYNTHETIC-TRAINED</span>',
-                       "Scored by demo models trained on synthetic biomechanical data "
-                       "(labels derived from the features themselves). Illustrative only, "
-                       "not a validated research measurement.")
-    elif ds == "real":
-        model_badge = ('<span class="status-badge badge-legal">REAL-DATA-TRAINED MODELS</span>',
-                       "Scored by models trained on a real labeled dataset. Still not a "
-                       "clinically validated measurement -- benchmark against a fresh holdout "
-                       "population before research use.")
-    else:
-        model_badge = ('<span class="status-badge badge-demo">MODEL SOURCE UNKNOWN</span>',
-                       "Bundle saved by an older version without provenance -- treat as demo.")
-    if input_mode.startswith("📹"):
-        input_badge = ('<span class="status-badge badge-video">REAL VIDEO • FEATURES MEASURED</span>',
-                       f"Features measured from the uploaded clip via MediaPipe "
-                       f"({result.landmark_source_summary and result.landmark_source_summary.get('world_3d_frames', 0)} "
-                       f"world-3D / {result.landmark_source_summary and result.landmark_source_summary.get('normalized_2d_frames', 0)} "
-                       f"2D pose frames).")
-    else:
-        input_badge = ('<span class="status-badge badge-video">MANUAL SLIDER INPUT</span>',
-                       "Features entered by hand in the simulator -- not measured from video.")
-    st.markdown(
-        f'<div style="display:flex; gap:8px; flex-wrap:wrap; margin:6px 0;">'
-        f'{model_badge[0]}{input_badge[0]}</div>',
-        unsafe_allow_html=True)
-    st.caption(f"{model_badge[1]} {input_badge[1]}")
+    # ---------------- ADAPTIVE RESULT PAGE (§01-§11) -----------------------
+    result_view.render_result_page(
+        result,
+        perf_bundle=perf_bundle,
+        injury_bundle=injury_bundle,
+        is_video=_is_video,
+        replay_fn=render_analysis_replay if _is_video else None,
+        replay_path=_analysis_replay,
+        ball_stats=_ball_stats,
+        advanced_renderers={
+            "gauges_and_radar": _adv_gauges_and_radar,
+            "shap": _adv_shap,
+            "literature_table": _adv_literature_table,
+            "model_quality": _adv_model_quality,
+            "timing": _adv_timing,
+            "notes": _adv_notes,
+        },
+        session_writer=_session_writer,
+    )
 
-    # Key Summary Metric Header
-    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-    with col_m1:
-        if result.performance_score is not None:
-            st.markdown(f"""
-            <div class="metric-card" role="region" aria-label="Demonstration Performance Indicator">
-                <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">DEMONSTRATION PERFORMANCE INDICATOR</span>
-                <h2 style="margin:4px 0; color:#15803d;">{result.performance_score:.1f}<span style="font-size:1rem;color:#8b949e"> / 100</span></h2>
-                <span style="color:#8b949e; font-size:0.78rem;">Literature-informed demo score — not a validated measurement</span>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown("""
-            <div class="metric-card" role="region" aria-label="Demonstration Performance Indicator">
-                <span style="color:#cf222e; font-size:0.85rem; font-weight:600;">DEMONSTRATION PERFORMANCE INDICATOR</span>
-                <h2 style="margin:4px 0; color:#cf222e;">WITHHELD</h2>
-                <span style="color:#8b949e; font-size:0.78rem;">Not scored — pose subject could not be verified as the bowler.</span>
-            </div>
-            """, unsafe_allow_html=True)
-    with col_m2:
-        badge_cls = "badge-illegal" if subject_blocked else f"badge-{risk_level}"
-        risk_display = "WITHHELD" if subject_blocked else risk_level.upper()
-        p_high = f"{risk_probs[2]:.2f}" if len(risk_probs) > 2 else "n/a"
-        st.markdown(f"""
-        <div class="metric-card" role="region" aria-label="Biomechanical Risk Indicator">
-            <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">BIOMECHANICAL RISK INDICATOR</span>
-            <div style="margin:8px 0;"><span class="status-badge {badge_cls}">{_esc(risk_display)} RISK</span></div>
-            <span style="color:#8b949e; font-size:0.78rem;">P(High) = {_esc(p_high)} (demo model)</span>
-        </div>
-        """, unsafe_allow_html=True)
-    with col_m3:
-        icc_badge = "badge-legal" if is_icc_legal else "badge-illegal"
-        icc_text = "WITHIN LIMIT (\u226415\u00b0)" if is_icc_legal else "ABOVE REF (>15\u00b0)"
-        st.markdown(f"""
-        <div class="metric-card" role="region" aria-label="ICC Screening Indicator">
-            <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">ICC SCREENING INDICATOR</span>
-            <div style="margin:8px 0;"><span class="status-badge {icc_badge}">{_esc(icc_text)}</span></div>
-            <span style="color:#8b949e; font-size:0.78rem;">Flexion: <b>{elbow_flex:.1f}\u00b0</b> (screening, not an official ICC measurement)</span>
-        </div>
-        """, unsafe_allow_html=True)
-    with col_m4:
-        st.markdown(f"""
-        <div class="metric-card" role="region" aria-label="Front Knee Brace">
-            <span style="color:#8b949e; font-size:0.85rem; font-weight:600;">FRONT KNEE BRACE</span>
-            <h2 style="margin:4px 0; color:#1d546c;">{feature_vector.get('knee_flexion_deg', 0):.1f}\u00b0</h2>
-            <span style="color:#8b949e; font-size:0.78rem;">Ideal: &lt; 15\u00b0 for lever efficiency</span>
-        </div>
-        """, unsafe_allow_html=True)
-
-    if not subject_blocked:
-        render_plain_language_summary(result, risk_level, is_icc_legal, elbow_flex)
-    else:
-        st.info("**No scoring summary available** — predictions were withheld because "
-                "the pose subject could not be verified as the bowler.")
-
-    if input_mode.startswith("📹"):
-        render_analysis_replay(_analysis_replay, result, feature_vector, st.session_state.get("ball_stats") or {})
-        if st.session_state.pop("scroll_to_replay", False):
-            st.components.v1.html(
-                '<script>document.getElementById("paceai-analysis-replay")'
-                "?.scrollIntoView({behavior:'smooth'});</script>",
-                height=1,
-            )
-
-    render_ood_warnings(feature_vector, perf_bundle)
-    render_ood_warnings(feature_vector, injury_bundle)
-
-    # Model confidence disclaimer
-    data_source = getattr(perf_bundle, "data_source", "synthetic")
-    if data_source == "synthetic":
-        st.info("**Note:** Performance and biomechanical risk-indicator predictions are trained on "
-                "synthetic biomechanical data and labelled **demo models**. Scores are experimental and "
-                "should not be treated as clinical diagnoses or real-world validated measurements. "
-                "Use for technique feedback only.")
-
-    # ---------------- DETAILED BREAKDOWN (deep dive, collapsed by default) ----------------
-    with st.expander("Deep-dive analysis -- gauges, radar, SHAP, drills, risk thresholds, report", expanded=False):
-        # ---------------- TABBED DETAILED BREAKDOWN ----------------
-        tab_summary, tab_radar, tab_shap, tab_coaching, tab_clinical, tab_export = st.tabs([
-            "📊 Gauges & Joint Stress",
-            "Kinetic Radar vs Pro Benchmark",
-            "🧠 Explainable AI (SHAP)",
-            "Coaching & Rehab Drills",
-            "Literature Risk Thresholds",
-            "📑 Biomechanical Report"
-        ])
-    
-        with tab_summary:
-            if result.performance_score is not None:
-                col_g1, col_g2 = st.columns(2)
-                with col_g1:
-                    st.plotly_chart(
-                        render_modern_gauge(result.performance_score, "Demonstration Performance Indicator", "Demo score — not a validated measurement"),
-                        width='stretch'
-                    )
-                    interval = ml_models.prediction_interval_performance(perf_bundle, feature_vector)
-                    if interval:
-                        st.caption(f"68% prediction interval: **{interval[0]:.0f}–{interval[1]:.0f}** "
-                                   f"(model uncertainty)")
-                with col_g2:
-                    st.plotly_chart(
-                        render_modern_gauge(risk_score, "Biomechanical Risk Index", f"Overall Risk: {risk_level.upper()}", is_risk=True),
-                        width='stretch'
-                    )
-                    if len(risk_probs) >= 3:
-                        st.caption(f"P(low)={risk_probs[0]:.2f}  P(moderate)={risk_probs[1]:.2f}  "
-                                   f"P(high)={risk_probs[2]:.2f}")
-            else:
-                st.error(
-                    "**Scored gauges withheld.** Predictions were refused because the "
-                    "pose subject could not be verified as the bowler. The raw "
-                    "biomechanical measurements below are still shown for manual review."
-                )
-    
-            st.markdown("#### 🦴 Joint & Segment Kinetic Stress Levels")
-            # Estimate stress indexes based on biomechanics
-            trunk_stress = min(100, int((feature_vector['trunk_lean_deg'] / 50.0) * 100))
-            knee_stress = min(100, int((feature_vector['knee_flexion_deg'] / 40.0) * 100))
-            shoulder_stress = min(100, int((feature_vector['angular_velocity_deg_s'] / 1200.0) * 100))
-    
-            stress_cols = st.columns(3)
-            with stress_cols[0]:
-                st.markdown(f"**Lumbar Spine Lateral Shear**: `{trunk_stress}%`")
-                st.progress(trunk_stress / 100.0)
-            with stress_cols[1]:
-                st.markdown(f"**Front Knee Impact Load**: `{knee_stress}%`")
-                st.progress(knee_stress / 100.0)
-            with stress_cols[2]:
-                st.markdown(f"**Rotator Cuff Dynamic Strain**: `{shoulder_stress}%`")
-                st.progress(shoulder_stress / 100.0)
-    
-        with tab_radar:
-            st.markdown("#### Biomechanical Signature vs Elite Fast Bowlers")
-            st.caption("A wider, balanced polygon indicates closer alignment with ideal aerodynamic and kinematic levers.")
-            st.plotly_chart(render_radar_comparison(feature_vector), width='stretch')
-    
-        with tab_shap:
-            st.markdown("#### 🧠 Model Explainability Breakdown")
-            st.caption("Identifies which exact kinematic variables pushed performance up or signalled biomechanical risk.")
-            shap_c1, shap_c2 = st.columns(2)
-            with shap_c1:
-                if result.shap_contributions_performance:
-                    st.plotly_chart(
-                        render_shap_bar(result.shap_contributions_performance, "Performance Contributors (Blue = Positive, Red = Drag)"),
-                        width='stretch'
-                    )
-            with shap_c2:
-                if result.shap_contributions_injury:
-                    st.plotly_chart(
-                        render_shap_bar(result.shap_contributions_injury, "Biomechanical Risk Drivers (Red = Elevates Risk)"),
-                        width='stretch'
-                    )
-    
-        with tab_coaching:
-            st.markdown("### AI Coaching & Prescriptive Drills")
-            
-            # Categorized recommendations
-            if result.coaching_notes:
-                st.markdown('<div role="list" aria-label="Coaching recommendations">', unsafe_allow_html=True)
-                for note in result.coaching_notes:
-                    st.markdown(f"""
-                    <div class="drill-card" role="listitem">
-                        <b>\U0001f3af Biomechanics Note:</b> {_esc(note)}
-                    </div>
-                    """, unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-            else:
-                st.success("Action mechanics are well within optimal ranges.")
-    
-            st.markdown("#### 📋 Recommended Corrective Exercise Protocols")
-            d1, d2 = st.columns(2)
-            with d1:
-                st.markdown("""
-                **1. Front Knee Block Stability (Brace Reinforcement)**
-                - *Drill:* Single-leg box deceleration landings + resistance band knee blocks.
-                - *Target:* Prevent collapse of the front knee at Front Foot Contact (FFC).
-                """)
-            with d2:
-                st.markdown("""
-                **2. Anti-Lateral Flexion Core Bracing**
-                - *Drill:* Half-kneeling Pallof presses & suitcase carries.
-                - *Target:* Minimize excessive trunk lateral flexion to prevent L4/L5 lumbar stress fractures.
-                """)
-    
-        with tab_clinical:
-            st.markdown("### Literature-Informed Biomechanical Risk Thresholds")
-            st.caption("Literature-derived trigger thresholds (data/cricket_injury_recovery_benchmarks.json) "
-                       "evaluated against this delivery. Screening reference only — not a medical diagnosis, "
-                       "not a prediction of actual injury.")
-    
-            clinical_feats = injury_kb.map_from_pipeline_features(feature_vector)
-            risks = injury_kb.assess_biomechanical_risks(clinical_feats)
-    
-            if risks:
-                st.markdown('<div role="list" aria-label="Literature-informed biomechanical risk assessments">', unsafe_allow_html=True)
-                for r in risks:
-                    badge_cls = "badge-high" if r["severity"] == "High" else "badge-moderate"
-                    trig_text = "".join(f"<li>{_esc(t)}</li>" for t in r["trigger_detected"])
-                    st.markdown(f"""
-                    <div class="drill-card" role="listitem">
-                        <b>\U0001fa7a {_esc(r['injury'])}</b>
-                        &nbsp;<span class="status-badge {badge_cls}">{_esc(r['severity'].upper())} RISK</span>
-                        <div style="margin-top:6px; color:#6b7a8f; font-size:0.85rem;">
-                            <b>Site:</b> {_esc(r['anatomical_site'])} &nbsp;\u2022&nbsp;
-                            <b>Incidence:</b> {_esc(r['clinical_incidence'])}
-                        </div>
-                        <div style="margin-top:4px; font-size:0.9rem;">
-                            <b>Trigger:</b>
-                            <ul style="margin:4px 0 4px 18px; color:#495867;">{trig_text}</ul>
-                        </div>
-                        <div style="color:#6b7a8f; font-size:0.85rem;">
-                            <b>Recovery:</b> {_esc(r['est_recovery_timeline'])}
-                            (median <b style="color:#cf222e">{_esc(r['median_days_to_match'])}</b> days to match fitness)
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-            else:
-                st.success("No clinical benchmark trigger thresholds exceeded for this delivery.")
-    
-            st.markdown("#### \U0001f9ec Workload & ACWR (optional inputs)")
-            w1, w2, w3 = st.columns(3)
-            with w1:
-                acwr = st.number_input("ACWR (acute:chronic workload ratio)", 0.0, 3.0, 1.0, 0.05,
-                                       help="Sweet spot 0.80-1.30; >1.50 = 2.5x-3.3x injury likelihood.")
-            with w2:
-                seven_day_load = st.number_input("7-day bowling load (balls)", 0, 2000, 180, 1,
-                                                 help=">234 balls in 7 days ≈ 11x lumbar stress-fracture risk vs <197.")
-            with w3:
-                rest_days = st.number_input("Rest days between spells", 0, 14, 3, 1,
-                                            help="<2 rest days between spells = 2.4x higher injury rate.")
-            for check in injury_kb.workload_risk(acwr=acwr, seven_day_load=seven_day_load, rest_days=rest_days):
-                icon = {"at_risk": "!", "warning": "~", "ok": "V"}.get(check["status"], "o")
-                st.markdown(f"{icon} **{check['check']}** — {check['detail']}")
-    
-            with st.expander("Full clinical benchmark table"):
-                bench_df = pd.DataFrame(injury_kb.all_benchmarks())
-                bench_df = bench_df.rename(columns={
-                    "injury": "Injury", "anatomical_site": "Anatomical Site",
-                    "clinical_incidence": "Reported Incidence",
-                    "primary_triggers": "Primary Triggers",
-                    "avg_days_to_return": "Avg Days to Return",
-                    "median_days_to_match": "Median Days to Match",
-                    "recovery_window": "Recovery Window",
-                })
-                st.dataframe(bench_df, width='stretch', hide_index=True)
-    
-        with tab_export:
-            st.markdown("### 📑 Biomechanical Delivery Report")
-            feat_df = pd.DataFrame([
-                {
-                    "Kinematic Feature": FEATURE_LABELS.get(k, (k,))[0],
-                    "Measured Value": f"{v:.2f} {FEATURE_LABELS.get(k, ('', ''))[1]}",
-                    "Benchmark Range": f"{FEATURE_LABELS.get(k, ('','',0,0,0))[2]} - {FEATURE_LABELS.get(k, ('','',0,0,0))[3]} {FEATURE_LABELS.get(k, ('', ''))[1]}"
-                }
-                for k, v in feature_vector.items()
-            ])
-            st.dataframe(feat_df, width='stretch', hide_index=True)
-    
-            report_json = json.dumps({
-                "performance_score": result.performance_score,
-                "injury_risk": result.injury_risk,
-                "icc_legal": is_icc_legal,
-                "kinematics": feature_vector,
-                "coaching_feedback": result.coaching_notes,
-                "feature_provenance": result.feature_provenance or {},
-                "landmark_source_summary": result.landmark_source_summary or {},
-                "subject_verified": result.subject_verified,
-                "scoring_blocked_reason": result.scoring_blocked_reason,
-                "delivery_reliable": result.delivery_reliable,
-                "stage_backends": result.stage_backends,
-                "model_note": "Demo models trained on synthetic/literature-derived data - "
-                              "screening indicators, not clinical diagnoses or validated measurements."
-            }, indent=2)
-    
-            st.download_button(
-                label="📥 Download Full Delivery Analysis (JSON)",
-                data=report_json,
-                file_name="bowling_biomechanics_report.json",
-                mime="application/json"
-            )
-
-    # ---------------- MODEL QUALITY HONESTY PANEL ----------------
-    render_model_quality_expander(perf_bundle, injury_bundle)
-
-    # ---------------- RUN TIMING ----------------
-    if stage_times:
-        with st.expander("Run timing (advanced)", expanded=False):
-            render_timings(stage_times)
-
-    # ---------------- SAVE TO HISTORY ----------------
-    st.markdown("### 💾 Save to History")
-    st.caption("Persist this delivery's results to the local history database so you can "
-               "compare it against future sessions and track your performance over time. "
-               "Saving the same result twice is idempotent -- it won't create a duplicate.")
-    save_athlete = st.text_input("Bowler name", placeholder="e.g. Usman Afridi", key="save_athlete")
-    save_label = st.text_input("Label (optional)", placeholder="e.g. Net session 1, match 3 over 4",
-                               key="save_label")
-    save_tags = st.text_input("Tags (comma-separated, optional)",
-                              placeholder="e.g. nets, match, hard-length", key="save_tags")
-    if st.button("💾 Save this result", type="primary"):
-        saved_id, inserted = history_db.save_analysis(
-            result, label=save_label, input_mode=input_mode,
-            bowling_arm=bowling_arm.lower().split("-")[0], model=model_choice,
-            athlete=save_athlete, tags=save_tags)
-        if inserted:
-            st.success(f"Saved to history (id #{saved_id}). Open **History & Compare** in the sidebar "
-                       f"to view and compare your saved results.")
-        else:
-            st.info(f"This result was already saved (id #{saved_id}) -- no duplicate was created. "
-                    f"Change the label/tags or bowler name to log it as a separate session.")
+    if _is_video and st.session_state.pop("scroll_to_replay", False):
+        st.components.v1.html(
+            '<script>document.getElementById("paceai-analysis-replay")'
+            "?.scrollIntoView({behavior:'smooth'});</script>",
+            height=1,
+        )
 
 else:
     st.info("Enter features manually or upload a video to run the analysis.")

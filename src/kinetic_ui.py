@@ -17,20 +17,20 @@ logic lives here -- callers supply already-computed values.
 import html as _html
 
 
-SURFACE = "#f4f4f4"
-PANEL = "#edf3f9"
-LINE = "#d0dce7"
-BORDER_STRONG = "#b7c8db"
-NAVY = "#1a3d64"
-TEAL = "#1d546c"
-BODY = "#1a1c1c"
-SECONDARY = "#495867"
-MUTED = "#6b7a8f"
-OUTLINE = "#788ca0"
-ICE = "#d9eafd"
-OK = "#15803d"
-WARN = "#9a6700"
-DANGER = "#cf222e"
+SURFACE = "#212833"
+PANEL = "#2b3442"
+LINE = "#3d4859"
+BORDER_STRONG = "#4b586c"
+NAVY = "#8ec1ee"
+TEAL = "#63d4cf"
+BODY = "#e9eef5"
+SECONDARY = "#aeb9c8"
+MUTED = "#7e8b9d"
+OUTLINE = "#5f6d80"
+ICE = "rgba(142, 193, 238, 0.16)"
+OK = "#43d9a3"
+WARN = "#e8b34a"
+DANGER = "#ff7086"
 
 
 def esc(value) -> str:
@@ -65,7 +65,7 @@ KINETIC_CSS = """
         display: flex; align-items: flex-end; justify-content: space-between;
         gap: 16px; flex-wrap: wrap;
         padding: 16px 20px; border-radius: 14px 14px 0 0;
-        background: linear-gradient(135deg, #ffffff 0%%, #eef3f9 100%%);
+        background: linear-gradient(135deg, %(PANEL)s 0%%, %(SURFACE)s 100%%);
         border: 1px solid var(--k-line); border-bottom: 0;
     }
     .kin-eyebrow { color: var(--k-teal); font-size: .66rem; letter-spacing: .18em;
@@ -77,17 +77,17 @@ KINETIC_CSS = """
     .kin-chip {
         font-family: 'JetBrains Mono', 'Consolas', monospace;
         font-size: .64rem; font-weight: 700; letter-spacing: .08em;
-        color: var(--k-nav); background: rgba(217, 234, 253, .55);
+        color: var(--k-nav); background: var(--k-ice);
         border: 1px solid var(--k-line); border-radius: 999px;
         padding: 4px 10px; text-transform: uppercase; white-space: nowrap;
     }
-    .kin-chip.kin-ok { color: var(--k-ok, %(OK)s); background: rgba(21,128,61,.08); border-color: rgba(21,128,61,.35); }
-    .kin-chip.kin-amber { color: %(WARN)s; background: rgba(154,103,0,.08); border-color: rgba(154,103,0,.35); }
-    .kin-chip.kin-red { color: %(DANGER)s; background: rgba(207,34,46,.08); border-color: rgba(207,34,46,.35); }
+    .kin-chip.kin-ok { color: var(--k-ok, %(OK)s); background: rgba(67,217,163,.14); border-color: rgba(67,217,163,.40); }
+    .kin-chip.kin-amber { color: %(WARN)s; background: rgba(232,179,74,.14); border-color: rgba(232,179,74,.40); }
+    .kin-chip.kin-red { color: %(DANGER)s; background: rgba(255,112,134,.14); border-color: rgba(255,112,134,.40); }
 
     /* ---------- video viewport chrome ---------- */
     .kin-viewport {
-        background: #ffffff; border: 1px solid var(--k-line);
+        background: %(PANEL)s; border: 1px solid var(--k-line);
         border-radius: 10px; overflow: hidden; margin-bottom: 10px;
     }
     .kin-vp-hud { display: flex; align-items: center; justify-content: space-between;
@@ -99,7 +99,7 @@ KINETIC_CSS = """
 
     /* ---------- telemetry rail ---------- */
     .kin-rail { display: flex; flex-direction: column; gap: 10px; }
-    .kin-card { background: #ffffff; border: 1px solid var(--k-line);
+    .kin-card { background: %(PANEL)s; border: 1px solid var(--k-line);
         border-radius: 10px; padding: 12px 13px; }
     .kin-card-kicker { font-size: .6rem; letter-spacing: .18em; font-weight: 800;
         text-transform: uppercase; color: var(--k-muted); margin-bottom: 6px; }
@@ -128,9 +128,9 @@ KINETIC_CSS = """
     .kin-load { display: flex; align-items: center; gap: 14px; }
     .kin-donut { --p: 0; --ring: %(OK)s;
         width: 68px; height: 68px; border-radius: 50%%; flex: 0 0 68px;
-        background: conic-gradient(var(--ring) calc(var(--p) * 1%%), rgba(26,61,100,.12) 0);
+        background: conic-gradient(var(--ring) calc(var(--p) * 1%%), rgba(142,193,238,.16) 0);
         display: flex; align-items: center; justify-content: center; position: relative; }
-    .kin-donut::after { content: ""; position: absolute; inset: 8px; border-radius: 50%%; background: #ffffff; }
+    .kin-donut::after { content: ""; position: absolute; inset: 8px; border-radius: 50%%; background: %(PANEL)s; }
     .kin-donut span { position: relative; z-index: 1; font-family: 'JetBrains Mono', 'Consolas', monospace;
         font-size: .78rem; font-weight: 800; color: var(--k-nav); }
     .kin-load-meta { min-width: 0; }
@@ -139,17 +139,17 @@ KINETIC_CSS = """
 
     /* ---------- timeline ---------- */
     .kin-timeline { padding: 14px 20px 16px; border: 1px solid var(--k-line);
-        border-radius: 10px; background: #ffffff; }
+        border-radius: 10px; background: %(PANEL)s; }
     .kin-tl-track { position: relative; height: 6px; border-radius: 3px;
-        background: rgba(26,61,100,.12); margin: 0 10px; }
+        background: rgba(142,193,238,.16); margin: 0 10px; }
     .kin-tl-marker { position: absolute; top: -4px; width: 14px; height: 14px;
-        border-radius: 50%%; background: #ffffff; border: 3px solid var(--k-nav);
-        box-shadow: 0 0 0 3px rgba(26,61,100,.15); }
-    .kin-tl-marker.release { border-color: %(DANGER)s; box-shadow: 0 0 0 3px rgba(207,34,46,.15); }
-    .kin-tl-marker.impact { border-color: %(OK)s; box-shadow: 0 0 0 3px rgba(21,128,61,.15); }
+        border-radius: 50%%; background: %(PANEL)s; border: 3px solid var(--k-nav);
+        box-shadow: 0 0 0 3px rgba(142,193,238,.25); }
+    .kin-tl-marker.release { border-color: %(DANGER)s; box-shadow: 0 0 0 3px rgba(255,112,134,.25); }
+    .kin-tl-marker.impact { border-color: %(OK)s; box-shadow: 0 0 0 3px rgba(67,217,163,.25); }
     .kin-phases { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 12px; }
     .kin-phase { text-align: center; padding: 8px 4px; border-radius: 8px;
-        border: 1px solid var(--k-line); background: #ffffff; }
+        border: 1px solid var(--k-line); background: %(PANEL)s; }
     .kin-phase.active { border-color: var(--k-nav); background: var(--k-ice); }
     .kin-phase-name { font-size: .58rem; font-weight: 800; letter-spacing: .1em;
         color: var(--k-secondary); text-transform: uppercase; }
@@ -165,13 +165,13 @@ KINETIC_CSS = """
     .kin-reel-label { font-size: .6rem; font-weight: 800; letter-spacing: .14em;
         text-transform: uppercase; color: var(--k-muted); margin-right: 4px; }
     .kin-thumb { width: 74px; height: 42px; border-radius: 6px;
-        background: linear-gradient(135deg, var(--k-ice), #ffffff);
+        background: linear-gradient(135deg, var(--k-ice), %(PANEL)s);
         border: 1px solid var(--k-line); position: relative; overflow: hidden; }
     .kin-thumb i { position: absolute; left: 6px; right: 6px; height: 2px;
         background: var(--k-nav); top: 50%%; transform: rotate(-12deg); }
     .kin-thumb b { position: absolute; bottom: 3px; left: 5px; font-size: .52rem;
         color: var(--k-nav); font-family: 'JetBrains Mono', 'Consolas', monospace; }
-    .kin-reel .kin-chip { background: #ffffff; }
+    .kin-reel .kin-chip { background: %(PANEL)s; }
 
     @media (max-width: 900px) {
         .kin-phases { grid-template-columns: 1fr; }
@@ -284,7 +284,8 @@ def timeline_html(moments, duration_s=None, release_t=None, impact_t=None) -> st
 def rail_html(meta: dict) -> str:
     fv = meta.get("features") or {}
     risk_pct = meta.get("risk_pct")
-    risk_level = str(meta.get("risk_level") or "low").lower()
+    # No fabricated default: a withheld risk assessment must not read as "LOW".
+    risk_level = str(meta.get("risk_level") or "").lower()
 
     ring = OK
     if risk_pct is not None:
