@@ -128,15 +128,15 @@ _SHELL_CSS = """
 <style>
     /* scoped under .paceai-lab to avoid collisions with the rest of the app */
 .paceai-lab {
-        --lab-bg: #212833;
-        --lab-panel: #2b3442;
-        --lab-line: #3d4859;
-        --lab-muted: #7e8b9d;
-        --lab-body: #e9eef5;
-        --lab-teal: #63d4cf;
-        --lab-ok: #43d9a3;
-        --lab-warn: #e8b34a;
-        --lab-danger: #ff7086;
+        --lab-bg: #EDF0F5;
+        --lab-panel: #F7F9FC;
+        --lab-line: #D6DDE6;
+        --lab-muted: #6C7889;
+        --lab-body: #17233A;
+        --lab-teal: #0F7B6C;
+        --lab-ok: #12805C;
+        --lab-warn: #9A6B00;
+        --lab-danger: #C42B45;
         --lab-font: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
         --lab-mono: 'JetBrains Mono', 'Consolas', monospace;
         font-family: var(--lab-font);
@@ -145,7 +145,7 @@ _SHELL_CSS = """
         border-radius: 16px;
         overflow: hidden;
         border: 1px solid var(--lab-line);
-        box-shadow: 0 12px 40px rgba(0,0,0,.35);
+        box-shadow: 0 12px 40px rgba(11,37,69,.10);
     }
 
     .paceai-lab * { box-sizing: border-box; }
@@ -157,38 +157,38 @@ _SHELL_CSS = """
     }
 
     /* ---------- LEFT: video hero + current op ---------- */
-    .lab-stage { position: relative; min-height: 380px; background: #252d3a; }
+    .lab-stage { position: relative; min-height: 380px; background: #E9EEF5; }
 
     .lab-stage-bg {
         position: absolute; inset: 0;
         background:
-            radial-gradient(120% 120% at 20% 0%, rgba(142,193,238,.12), transparent 55%),
-            radial-gradient(100% 100% at 100% 100%, rgba(99,212,207,.08), transparent 55%),
-            linear-gradient(160deg, #2a3341 0%, #212a37 100%);
+            radial-gradient(120% 120% at 20% 0%, rgba(18,58,114,.07), transparent 55%),
+            radial-gradient(100% 100% at 100% 100%, rgba(166,124,0,.06), transparent 55%),
+            linear-gradient(160deg, #F2F6FA 0%, #E6ECF3 100%);
     }
 
     /* subtle motion-analysis stage illustration (only while no real frame) */
     .lab-stage-art { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
     .lab-art-field {
         position: relative; width: 60%; max-width: 520px; height: 200px;
-        border: 1px solid rgba(142,193,238,.30); border-radius: 12px;
-        background: repeating-linear-gradient(90deg, rgba(142,193,238,.08) 0 2px, transparent 2px calc(100%/10)),
-                    linear-gradient(rgba(67,217,163,.06), transparent);
+        border: 1px solid rgba(18,58,114,.22); border-radius: 12px;
+        background: repeating-linear-gradient(90deg, rgba(18,58,114,.07) 0 2px, transparent 2px calc(100%/10)),
+                    linear-gradient(rgba(18,128,92,.06), transparent);
     }
     .lab-art-field::after { /* horizon / pitch line */
         content: ""; position: absolute; left: 8%; right: 8%; top: 78%;
-        height: 1px; background: linear-gradient(90deg, transparent, rgba(99,212,207,.4), transparent);
+        height: 1px; background: linear-gradient(90deg, transparent, rgba(15,123,108,.35), transparent);
     }
     .lab-art-bowler {
         position: absolute; left: 16%; bottom: 20%; width: 46px; height: 96px;
         border-radius: 46px 46px 0 0;
-        background: linear-gradient(90deg, rgba(142,193,238,.28), rgba(142,193,238,.10));
-        border: 1px solid rgba(142,193,238,.5);
+        background: linear-gradient(90deg, rgba(18,58,114,.20), rgba(18,58,114,.07));
+        border: 1px solid rgba(18,58,114,.40);
     }
     .lab-art-ball {
         position: absolute; right: 18%; bottom: 34%; width: 16px; height: 16px;
-        border-radius: 50%; background: #ff7086; border: 2px solid #ff8699;
-        box-shadow: 0 0 0 3px rgba(255,112,134,.25);
+        border-radius: 50%; background: #C42B45; border: 2px solid #D9607A;
+        box-shadow: 0 0 0 3px rgba(196,43,69,.20);
     }
     .lab-scan {
         position: absolute; left: 0; right: 0; height: 2px;
@@ -205,7 +205,7 @@ _SHELL_CSS = """
     .hud-bl { bottom: 12px; left: 14px; }
     .hud-br { bottom: 12px; right: 14px; }
     .hud-brand { display: flex; flex-direction: column; line-height: 1.1; }
-    .hud-brand b { font-size: 12px; letter-spacing: .28em; color: #9cc8ee; }
+    .hud-brand b { font-size: 12px; letter-spacing: .28em; color: #123A72; text-shadow: 0 1px 2px rgba(255,255,255,.85); }
     .hud-brand span { font-size: 9px; letter-spacing: .22em; color: var(--lab-muted); }
     .hud-pill {
         font-family: var(--lab-mono); font-size: 10px; letter-spacing: .12em;
@@ -214,9 +214,9 @@ _SHELL_CSS = """
         backdrop-filter: blur(2px);
     }
     .hud-pill .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
-    .hud-live .dot { background: var(--lab-danger); box-shadow: 0 0 6px rgba(255,112,134,.6); animation: labPulse 1.2s infinite; }
-    .hud-lock .dot { background: var(--lab-ok); box-shadow: 0 0 6px rgba(67,217,163,.5); }
-    .hud-search .dot { background: var(--lab-warn); box-shadow: 0 0 6px rgba(232,179,74,.5); animation: labPulse 1.2s infinite; }
+    .hud-live .dot { background: var(--lab-danger); box-shadow: 0 0 6px rgba(196,43,69,.5); animation: labPulse 1.2s infinite; }
+    .hud-lock .dot { background: var(--lab-ok); box-shadow: 0 0 6px rgba(18,128,92,.5); }
+    .hud-search .dot { background: var(--lab-warn); box-shadow: 0 0 6px rgba(154,107,0,.5); animation: labPulse 1.2s infinite; }
     @keyframes labPulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
 
     .lab-frame { font-family: var(--lab-mono); font-size: 11px; color: var(--lab-body); letter-spacing: .06em; }
@@ -225,19 +225,19 @@ _SHELL_CSS = """
     /* ---------- Current operation (hero line) ---------- */
     .lab-current {
         padding: 14px 20px 18px; border-top: 1px solid var(--lab-line);
-        background: linear-gradient(180deg, rgba(42,51,65,.55), rgba(42,51,65,0));
+        background: linear-gradient(180deg, rgba(18,58,114,.05), rgba(18,58,114,0));
     }
     .lab-current-kicker { font-size: 10px; letter-spacing: .24em; color: var(--lab-muted); font-weight: 700; }
-    .lab-current-title { font-size: 22px; font-weight: 800; margin: 4px 0 2px; color: #a9cdec; letter-spacing: .01em; }
+    .lab-current-title { font-size: 22px; font-weight: 800; margin: 4px 0 2px; color: #123A72; letter-spacing: .01em; }
     .lab-current-desc { color: var(--lab-muted); font-size: 13px; line-height: 1.5; }
 
     /* thin premium progress line */
     .lab-progress { padding: 0 20px 16px; }
     .lab-progress-track {
         position: relative; height: 3px; border-radius: 3px;
-        background: rgba(142,193,238,.2); overflow: hidden;
+        background: rgba(18,58,114,.10); overflow: hidden;
     }
-    .lab-progress-fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #8ec1ee, #63d4cf); width: 0%; transition: width .4s ease; }
+    .lab-progress-fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #123A72, #A67C00); width: 0%; transition: width .4s ease; }
     .lab-progress-legend { display: flex; justify-content: space-between; margin-top: 8px; font-family: var(--lab-mono); font-size: 10px; color: var(--lab-muted); letter-spacing: .1em; }
 
     /* ---------- RIGHT: live analysis panel ---------- */
@@ -259,9 +259,9 @@ _SHELL_CSS = """
     .lab-step.done .ic { color: var(--lab-ok); }
     .lab-step.done .tx { color: var(--lab-muted); }
     .lab-step.active .ic { color: var(--lab-teal); animation: labFade 1.4s infinite; }
-    .lab-step.active .tx { color: #9cc8ee; font-weight: 600; }
-    .lab-step.up .ic { color: rgba(126,139,157,.5); }
-    .lab-step.up .tx { color: rgba(126,139,157,.6); }
+    .lab-step.active .tx { color: #123A72; font-weight: 600; }
+    .lab-step.up .ic { color: rgba(108,120,137,.5); }
+    .lab-step.up .tx { color: rgba(108,120,137,.6); }
     @keyframes labFade { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
 
     /* ---------- metadata strip (below stage art / inside video area) ---------- */
@@ -273,15 +273,15 @@ _SHELL_CSS = """
     .lab-done, .lab-err { padding: 26px 24px; text-align: left; }
     .lab-done .ok-ring { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--lab-ok); display: inline-flex; align-items: center; justify-content: center; color: var(--lab-ok); margin-bottom: 10px; }
     .lab-err .ok-ring { border-color: var(--lab-danger); color: var(--lab-danger); }
-    .lab-done .tt, .lab-err .tt { font-size: 20px; font-weight: 800; color: #a9cdec; }
+    .lab-done .tt, .lab-err .tt { font-size: 20px; font-weight: 800; color: #123A72; }
     .lab-done .dd, .lab-err .dd { color: var(--lab-muted); font-size: 13px; margin-top: 4px; line-height: 1.5; }
     .lab-done .btn, .lab-err .btn {
         margin-top: 16px; display: inline-flex; align-items: center; gap: 8px;
-        padding: 10px 18px; border-radius: 8px; border: 1px solid rgba(67,217,163,.4);
-        background: linear-gradient(180deg, rgba(67,217,163,.16), rgba(67,217,163,.06));
+        padding: 10px 18px; border-radius: 8px; border: 1px solid rgba(18,128,92,.4);
+        background: linear-gradient(180deg, rgba(18,128,92,.12), rgba(18,128,92,.05));
         color: var(--lab-ok); font-weight: 700; cursor: pointer; font-family: var(--lab-font); font-size: 14px;
     }
-    .lab-err .btn { border-color: rgba(255,112,134,.4); color: var(--lab-danger); background: linear-gradient(180deg, rgba(255,112,134,.12), transparent); }
+    .lab-err .btn { border-color: rgba(196,43,69,.4); color: var(--lab-danger); background: linear-gradient(180deg, rgba(196,43,69,.10), transparent); }
 
     /* ---------- reduce motion ---------- */
     @media (prefers-reduced-motion: reduce) {
@@ -464,8 +464,8 @@ _ROSTER_COLORS = {
 _ROSTER_CSS = """
 <style>
     .paceai-roster {
-        background: var(--lab-panel, #2b3442);
-        border: 1px solid var(--lab-line, #3d4859);
+        background: var(--lab-panel, #F7F9FC);
+        border: 1px solid var(--lab-line, #D6DDE6);
         border-radius: 14px;
         padding: 18px 20px 14px;
         margin: 18px 0 6px;
@@ -477,10 +477,10 @@ _ROSTER_CSS = """
     }
     .paceai-roster-kicker {
         font-size: 11px; font-weight: 800; letter-spacing: .2em;
-        color: #63d4cf; text-transform: uppercase;
+        color: #A67C00; text-transform: uppercase;
     }
     .paceai-roster-note {
-        font-size: 11px; color: #7e8b9d;
+        font-size: 11px; color: #6C7889;
     }
     .paceai-roster-row {
         display: grid; grid-template-columns: 12px 150px 60px minmax(0,1fr) 56px;
@@ -488,31 +488,31 @@ _ROSTER_CSS = """
         padding: 7px 4px; border-radius: 8px;
         font-size: 13px;
     }
-    .paceai-roster-row + .paceai-roster-row { border-top: 1px solid rgba(61,72,89,.8); }
-    .paceai-roster-row.bowler-row { background: rgba(255,200,97,.14); }
+    .paceai-roster-row + .paceai-roster-row { border-top: 1px solid rgba(214,221,230,.9); }
+    .paceai-roster-row.bowler-row { background: rgba(255,200,97,.20); }
     .paceai-roster-dot {
         width: 10px; height: 10px; border-radius: 50%; display: inline-block;
         box-shadow: 0 0 6px currentColor; justify-self: center;
     }
-    .paceai-roster-role { font-weight: 800; color: #e9eef5; letter-spacing: .04em; }
+    .paceai-roster-role { font-weight: 800; color: #17233A; letter-spacing: .04em; }
     .paceai-roster-track {
         font-family: 'JetBrains Mono', 'Consolas', monospace;
-        font-size: 12px; color: #7e8b9d;
+        font-size: 12px; color: #6C7889;
     }
     .paceai-roster-bar {
-        height: 5px; border-radius: 3px; background: rgba(142,193,238,.18);
+        height: 5px; border-radius: 3px; background: rgba(18,58,114,.12);
         overflow: hidden;
     }
     .paceai-roster-bar i {
         display: block; height: 100%; border-radius: 3px;
-        background: linear-gradient(90deg, #8ec1ee, currentColor);
+        background: currentColor;
     }
     .paceai-roster-conf {
         font-family: 'JetBrains Mono', 'Consolas', monospace;
-        font-size: 12px; font-weight: 700; color: #9cc8ee; text-align: right;
+        font-size: 12px; font-weight: 700; color: #123A72; text-align: right;
     }
     .paceai-roster-empty {
-        padding: 14px 6px 10px; color: #7e8b9d; font-size: 13px; line-height: 1.5;
+        padding: 14px 6px 10px; color: #6C7889; font-size: 13px; line-height: 1.5;
     }
     @media (max-width: 640px) {
         .paceai-roster-row { grid-template-columns: 12px 1fr 56px; }

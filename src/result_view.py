@@ -48,16 +48,16 @@ from . import injury_knowledge_base as injury_kb
 # Theme tokens (Phase 10). Scoped under .pai-* so they cannot collide with the
 # existing .metric-card / .kin-* / .lab-* stylesheets in this app.
 # ---------------------------------------------------------------------------
-PAI_BG = "#070A0F"
-PAI_SURFACE = "#0D121A"
-PAI_RAISED = "#141B25"
-PAI_ACCENT = "#20D9FF"
-PAI_TEXT = "#F4F7FA"
-PAI_MUTED = "#7F8B99"
-PAI_OK = "#43D9a3"
-PAI_WARN = "#E8B34A"
-PAI_DANGER = "#FF7086"
-PAI_LINE = "#1E2733"
+PAI_BG = "#EDF0F5"
+PAI_SURFACE = "#F7F9FC"
+PAI_RAISED = "#FFFFFF"
+PAI_ACCENT = "#A67C00"
+PAI_TEXT = "#17233A"
+PAI_MUTED = "#6C7889"
+PAI_OK = "#12805C"
+PAI_WARN = "#9A6B00"
+PAI_DANGER = "#C42B45"
+PAI_LINE = "#D6DDE6"
 
 RESULT_CSS = f"""
 <style>
@@ -87,10 +87,10 @@ RESULT_CSS = f"""
       padding:4px 9px; border-radius:999px; border:1px solid var(--pai-line);
       color:var(--pai-muted); background:var(--pai-raised); white-space:nowrap;
   }}
-  .pai-chip.ok     {{ color:var(--pai-ok);     border-color:rgba(67,217,163,.45); }}
-  .pai-chip.warn   {{ color:var(--pai-warn);   border-color:rgba(232,179,74,.45); }}
-  .pai-chip.danger {{ color:var(--pai-danger); border-color:rgba(255,112,134,.45); }}
-  .pai-chip.accent {{ color:var(--pai-accent); border-color:rgba(32,217,255,.45); }}
+  .pai-chip.ok     {{ color:var(--pai-ok);     border-color:rgba(18,128,92,.45); }}
+  .pai-chip.warn   {{ color:var(--pai-warn);   border-color:rgba(154,107,0,.45); }}
+  .pai-chip.danger {{ color:var(--pai-danger); border-color:rgba(196,43,69,.45); }}
+  .pai-chip.accent {{ color:var(--pai-accent); border-color:rgba(166,124,0,.45); }}
 
   .pai-hero {{
       border:1px solid var(--pai-line); border-radius:14px; padding:24px 26px;
@@ -140,7 +140,7 @@ RESULT_CSS = f"""
       font-size:.63rem; letter-spacing:.13em; font-weight:800; text-transform:uppercase;
       color:var(--pai-muted); margin:0 0 8px; padding-bottom:6px; border-bottom:1px solid var(--pai-line);
   }}
-  .pai-metric {{ padding:7px 0; border-bottom:1px solid rgba(30,39,51,.6); }}
+  .pai-metric {{ padding:7px 0; border-bottom:1px solid var(--pai-line); }}
   .pai-metric:last-child {{ border-bottom:0; }}
   .pai-metric-top {{ display:flex; justify-content:space-between; gap:10px; align-items:baseline; }}
   .pai-metric-name {{ font-size:.83rem; color:var(--pai-text); }}
@@ -161,8 +161,8 @@ RESULT_CSS = f"""
       flex:0 0 auto; font-size:.63rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase;
       padding:3px 9px; border-radius:999px; border:1px solid var(--pai-line); color:var(--pai-muted);
   }}
-  .pai-plan-pri.p1 {{ color:var(--pai-danger); border-color:rgba(255,112,134,.5); }}
-  .pai-plan-pri.p2 {{ color:var(--pai-warn);   border-color:rgba(232,179,74,.5); }}
+  .pai-plan-pri.p1 {{ color:var(--pai-danger); border-color:rgba(196,43,69,.5); }}
+  .pai-plan-pri.p2 {{ color:var(--pai-warn);   border-color:rgba(154,107,0,.5); }}
   .pai-plan-title {{ flex:1 1 auto; font-size:.93rem; font-weight:700; color:var(--pai-text); }}
   .pai-plan-body {{ padding:12px 16px; background:var(--pai-surface); }}
 

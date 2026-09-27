@@ -95,14 +95,38 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
 
+    /* --- Design tokens (IPL-inspired light: deep navy + restrained gold) --- */
+    :root {
+        --ipl-bg: #EDF0F5;
+        --ipl-surface: #F7F9FC;
+        --ipl-raised: #FFFFFF;
+        --ipl-line: #D6DDE6;
+        --ipl-line-soft: #E6EAF0;
+        --ipl-border: #BCC7D4;
+        --ipl-navy: #123A72;
+        --ipl-navy-deep: #0B2545;
+        --ipl-blue: #2C6BB3;
+        --ipl-teal: #0F7B6C;
+        --ipl-gold: #A67C00;
+        --ipl-gold-edge: #E3C46A;
+        --ipl-gold-wash: #FBF3DE;
+        --ipl-body: #17233A;
+        --ipl-secondary: #465268;
+        --ipl-muted: #6C7889;
+        --ipl-ok: #12805C;
+        --ipl-warn: #9A6B00;
+        --ipl-danger: #C42B45;
+        --ipl-shadow: 0 4px 16px rgba(11, 37, 69, 0.09);
+    }
+
     /* --- Skip to content (visible on focus for keyboard nav) --- */
     .skip-link {
         position: absolute; left: -9999px; top: auto;
         width: 1px; height: 1px; overflow: hidden;
         z-index: 999999; padding: 12px 20px; margin: 8px;
-        background: #2b3442; color: #a9cdec; font-weight: 700;
+        background: var(--ipl-navy); color: #FFFFFF; font-weight: 700;
         border-radius: 8px; text-decoration: none; font-size: 0.95rem;
-        border: 1px solid #63d4cf;
+        border: 1px solid var(--ipl-gold-edge);
     }
     .skip-link:focus {
         position: fixed; left: 12px; top: 12px;
@@ -111,20 +135,20 @@ st.markdown("""
 
     /* Main background & headers */
     .stApp {
-        background-color: #212833;
-        color: #e9eef5;
+        background-color: var(--ipl-bg);
+        color: var(--ipl-body);
     }
 
     /* Card Containers */
     .metric-card {
-        background: linear-gradient(145deg, #2e3949 0%, #232b38 100%);
-        border: 1px solid #3d4859;
+        background: linear-gradient(145deg, var(--ipl-raised) 0%, var(--ipl-surface) 100%);
+        border: 1px solid var(--ipl-line);
         border-radius: 12px;
         padding: 20px;
         margin-bottom: 15px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+        box-shadow: var(--ipl-shadow);
     }
-    
+
     .status-badge {
         display: inline-block;
         padding: 4px 12px;
@@ -134,45 +158,47 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
-    .badge-low { background-color: rgba(67, 217, 163, 0.14); color: #5fe0b0; border: 1px solid #3cb98c; }
-    .badge-moderate { background-color: rgba(232, 179, 74, 0.14); color: #f0c169; border: 1px solid #c99c42; }
-    .badge-high { background-color: rgba(255, 112, 134, 0.14); color: #ff8699; border: 1px solid #e05a6f; }
-    .badge-legal { background-color: rgba(67, 217, 163, 0.16); color: #5fe0b0; border: 1px solid #3cb98c; }
-    .badge-illegal { background-color: rgba(255, 112, 134, 0.16); color: #ff8699; border: 1px solid #e05a6f; }
-    .badge-demo { background-color: rgba(232, 179, 74, 0.16); color: #f0c169; border: 1px solid #c99c42; }
-    .badge-video { background-color: rgba(142, 193, 238, 0.14); color: #9cc8ee; border: 1px solid #5f93c8; }
+    .badge-low { background-color: rgba(18, 128, 92, 0.10); color: var(--ipl-ok); border: 1px solid rgba(18, 128, 92, 0.45); }
+    .badge-moderate { background-color: rgba(154, 107, 0, 0.10); color: var(--ipl-warn); border: 1px solid rgba(154, 107, 0, 0.45); }
+    .badge-high { background-color: rgba(196, 43, 69, 0.10); color: var(--ipl-danger); border: 1px solid rgba(196, 43, 69, 0.45); }
+    .badge-legal { background-color: rgba(18, 128, 92, 0.12); color: var(--ipl-ok); border: 1px solid rgba(18, 128, 92, 0.5); }
+    .badge-illegal { background-color: rgba(196, 43, 69, 0.12); color: var(--ipl-danger); border: 1px solid rgba(196, 43, 69, 0.5); }
+    .badge-demo { background-color: rgba(154, 107, 0, 0.12); color: var(--ipl-warn); border: 1px solid rgba(154, 107, 0, 0.5); }
+    .badge-video { background-color: rgba(44, 107, 179, 0.10); color: var(--ipl-blue); border: 1px solid rgba(44, 107, 179, 0.45); }
 
     /* Custom Header Banner */
     .hero-banner {
-        background: linear-gradient(90deg, #2e394b 0%, #27313f 50%, #222c3a 100%);
+        background: linear-gradient(100deg, var(--ipl-raised) 0%, var(--ipl-surface) 55%, #F1F5FA 100%);
         border-radius: 14px;
         padding: 24px 30px;
         margin-bottom: 25px;
-        border: 1px solid #3d4859;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+        border: 1px solid var(--ipl-line);
+        border-left: 5px solid var(--ipl-navy);
+        box-shadow: var(--ipl-shadow);
     }
     .hero-title {
         font-size: 2rem;
         font-weight: 800;
-        color: #a9cdec;
+        color: var(--ipl-navy);
         margin: 0;
+        letter-spacing: -0.015em;
     }
     .hero-subtitle {
-        color: #aeb9c8;
+        color: var(--ipl-secondary);
         font-size: 0.95rem;
         margin-top: 6px;
     }
 
     /* Drill card */
     .drill-card {
-        border-left: 4px solid #63d4cf;
-        background: #2b3442;
+        border-left: 4px solid var(--ipl-gold);
+        background: var(--ipl-surface);
         padding: 14px 18px;
         border-radius: 0 8px 8px 0;
         margin-bottom: 10px;
-        border-top: 1px solid #3d4859;
-        border-right: 1px solid #3d4859;
-        border-bottom: 1px solid #3d4859;
+        border-top: 1px solid var(--ipl-line);
+        border-right: 1px solid var(--ipl-line);
+        border-bottom: 1px solid var(--ipl-line);
     }
 
     /* Feature guide tag chips */
@@ -180,9 +206,9 @@ st.markdown("""
         display: inline-block;
         padding: 2px 10px;
         border-radius: 10px;
-        background: rgba(142, 193, 238, 0.16);
-        border: 1px solid #4b586c;
-        color: #9cc8ee;
+        background: var(--ipl-gold-wash);
+        border: 1px solid var(--ipl-gold-edge);
+        color: var(--ipl-gold);
         font-size: 0.7rem;
         font-weight: 700;
         letter-spacing: 0.5px;
@@ -190,10 +216,95 @@ st.markdown("""
         vertical-align: middle;
     }
 
-    /* Sidebar adjustments */
+    /* ============ Sidebar: brand, grouped nav, status ============ */
     section[data-testid="stSidebar"] {
-        background-color: #232b38;
-        border-right: 1px solid #3d4859;
+        background-color: var(--ipl-surface);
+        border-right: 1px solid var(--ipl-line);
+    }
+    section[data-testid="stSidebar"] .block-container { padding-top: 1.1rem; }
+
+    .side-brand {
+        background: linear-gradient(135deg, var(--ipl-navy) 0%, var(--ipl-navy-deep) 100%);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 14px;
+        border: 1px solid var(--ipl-navy-deep);
+        box-shadow: 0 6px 18px rgba(11, 37, 69, 0.18);
+    }
+    .side-brand-top { display: flex; align-items: center; gap: 9px; }
+    .side-brand-mark {
+        width: 30px; height: 30px; flex: 0 0 30px; border-radius: 8px;
+        background: rgba(255, 255, 255, 0.10);
+        border: 1px solid var(--ipl-gold-edge);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 15px;
+    }
+    .side-brand-name {
+        color: #FFFFFF; font-size: 1.02rem; font-weight: 800;
+        letter-spacing: -0.01em; line-height: 1.15;
+    }
+    .side-brand-rule {
+        height: 2px; width: 34px; border-radius: 2px;
+        background: var(--ipl-gold-edge); margin: 7px 0 7px;
+    }
+    .side-brand-sub {
+        color: #C9D6E8; font-size: 0.66rem; line-height: 1.45;
+        letter-spacing: 0.02em; font-weight: 500;
+    }
+
+    .side-label {
+        font-size: 0.6rem; font-weight: 800; letter-spacing: 0.16em;
+        text-transform: uppercase; color: var(--ipl-muted);
+        margin: 16px 0 6px; display: flex; align-items: center; gap: 8px;
+    }
+    .side-label::after {
+        content: ""; flex: 1; height: 1px; background: var(--ipl-line);
+    }
+
+    /* Selected nav / mode option gets a navy pill */
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+        background: rgba(18, 58, 114, 0.07);
+        border: 1px solid rgba(18, 58, 114, 0.18);
+        border-radius: 8px;
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label {
+        padding: 5px 8px; border-radius: 8px; border: 1px solid transparent;
+        transition: background .15s ease, border-color .15s ease;
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        background: rgba(18, 58, 114, 0.04);
+    }
+    section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
+        font-weight: 700; color: var(--ipl-navy);
+    }
+
+    .side-status {
+        background: var(--ipl-raised);
+        border: 1px solid var(--ipl-line);
+        border-radius: 10px;
+        padding: 11px 13px;
+        margin-top: 6px;
+    }
+    .side-status-title {
+        font-size: 0.6rem; font-weight: 800; letter-spacing: 0.14em;
+        text-transform: uppercase; color: var(--ipl-muted); margin-bottom: 7px;
+    }
+    .side-status-row {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 8px; font-size: 0.72rem; padding: 2px 0; color: var(--ipl-secondary);
+    }
+    .side-status-row b { color: var(--ipl-body); font-weight: 700; }
+    .side-status-dot {
+        display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+        margin-right: 6px; vertical-align: 1px;
+    }
+    .dot-ok { background: var(--ipl-ok); }
+    .dot-warn { background: var(--ipl-warn); }
+    .dot-off { background: var(--ipl-border); }
+
+    .side-foot {
+        font-size: 0.62rem; color: var(--ipl-muted);
+        text-align: center; margin-top: 12px; letter-spacing: 0.04em;
     }
 
     /* --- Accessibility --- */
@@ -203,7 +314,7 @@ st.markdown("""
         clip: rect(0,0,0,0); white-space: nowrap; border: 0;
     }
     :focus-visible {
-        outline: 2px solid #63d4cf;
+        outline: 2px solid var(--ipl-navy);
         outline-offset: 2px;
     }
     /* Ensure focus is visible on Streamlit widgets */
@@ -213,16 +324,16 @@ st.markdown("""
     .stButton:focus-within,
     .stTextInput:focus-within,
     .stNumberInput:focus-within {
-        box-shadow: 0 0 0 2px rgba(142, 193, 238, 0.35);
+        box-shadow: 0 0 0 2px rgba(44, 107, 179, 0.22);
         border-radius: 6px;
     }
     /* Status badges include text labels alongside color for non-color-dependent info */
     .status-badge::before {
         content: none; /* text is already inside the badge element */
     }
-    /* Improved contrast for secondary text (WCAG AA: >=4.5:1 on #212833) */
+    /* Improved contrast for secondary text (WCAG AA: >=4.5:1 on #EDF0F5) */
     .hero-subtitle, .metric-card span[style*="8b949e"] {
-        color: #aeb9c8 !important;
+        color: var(--ipl-secondary) !important;
     }
 
     /* --- Responsive: Tablet (768px) --- */
@@ -247,23 +358,23 @@ st.markdown("""
 
     /* --- Premium Analysis Replay --- */
     .analysis-replay-shell {
-        background: linear-gradient(145deg, #2e3949 0%, #222b39 100%);
-        border: 1px solid #3d4859; border-bottom: 0;
+        background: linear-gradient(145deg, var(--ipl-raised) 0%, var(--ipl-surface) 100%);
+        border: 1px solid var(--ipl-line); border-bottom: 0;
         border-radius: 16px 16px 0 0; padding: 20px 22px 10px;
         margin-top: 20px;
     }
     .analysis-replay-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
-    .analysis-replay-head h2 { margin:4px 0 3px; font-size:1.65rem; color:#a9cdec; }
-    .analysis-replay-head p { margin:0; color:#7e8b9d; font-size:.9rem; }
-    .eyebrow,.priority-kicker { color:#63d4cf; font-size:.68rem; letter-spacing:.14em; font-weight:800; }
-    .replay-pill { border:1px solid rgba(142,193,238,.35); color:#9cc8ee; background:rgba(142,193,238,.12); border-radius:999px; padding:7px 10px; font-size:.68rem; font-weight:800; white-space:nowrap; }
-    .priority-card { margin:18px 0; padding:18px 20px; border:1px solid rgba(67,217,163,.35); background:linear-gradient(145deg, rgba(67,217,163,.08), #2b3442); border-radius:14px; }
-    .priority-title { font-size:1.15rem; font-weight:800; margin:4px 0 7px; color:#a9cdec; }
-    .priority-copy { color:#aeb9c8; line-height:1.55; }
-    .analysis-empty { margin:20px 0; padding:30px; border:1px dashed #4b586c; border-radius:16px; background:#2b3442; }
-    .analysis-empty-kicker { color:#7e8b9d; font-size:.7rem; letter-spacing:.14em; font-weight:800; }
-    .analysis-empty-title { font-size:1.3rem; font-weight:800; margin:5px 0; color:#a9cdec; }
-    .analysis-empty-copy { color:#7e8b9d; }
+    .analysis-replay-head h2 { margin:4px 0 3px; font-size:1.65rem; color:var(--ipl-navy); }
+    .analysis-replay-head p { margin:0; color:var(--ipl-muted); font-size:.9rem; }
+    .eyebrow,.priority-kicker { color:var(--ipl-gold); font-size:.68rem; letter-spacing:.14em; font-weight:800; }
+    .replay-pill { border:1px solid rgba(44,107,179,.35); color:var(--ipl-blue); background:rgba(44,107,179,.08); border-radius:999px; padding:7px 10px; font-size:.68rem; font-weight:800; white-space:nowrap; }
+    .priority-card { margin:18px 0; padding:18px 20px; border:1px solid rgba(18,128,92,.30); background:linear-gradient(145deg, rgba(18,128,92,.06), var(--ipl-surface)); border-radius:14px; }
+    .priority-title { font-size:1.15rem; font-weight:800; margin:4px 0 7px; color:var(--ipl-navy); }
+    .priority-copy { color:var(--ipl-secondary); line-height:1.55; }
+    .analysis-empty { margin:20px 0; padding:30px; border:1px dashed var(--ipl-border); border-radius:16px; background:var(--ipl-surface); }
+    .analysis-empty-kicker { color:var(--ipl-muted); font-size:.7rem; letter-spacing:.14em; font-weight:800; }
+    .analysis-empty-title { font-size:1.3rem; font-weight:800; margin:5px 0; color:var(--ipl-navy); }
+    .analysis-empty-copy { color:var(--ipl-muted); }
 
     /* --- Streamlit column stacking on narrow viewports --- */
     @media (max-width: 768px) {
@@ -297,34 +408,34 @@ _PRELOADER_CSS = """
     @keyframes paceaiSuccessGlow { 0% { opacity:0; transform:scale(.6); } 40% { opacity:1; transform:scale(1.15); } 100% { opacity:0; transform:scale(1.4); } }
     @keyframes paceaiDrawCheck { to { stroke-dashoffset:0; } }
 
-    .pace-preloader { position:fixed; inset:0; z-index:99999; background:#212833;
+    .pace-preloader { position:fixed; inset:0; z-index:99999; background:#EDF0F5;
         display:flex; align-items:center; justify-content:center; overflow:hidden;
         font-family:'Segoe UI',Arial,sans-serif;
         animation:paceaiFadeOut .6s ease 3.3s forwards; opacity:1; }
     .pace-preloader .glow { position:absolute; width:min(420px,80vw); height:min(420px,80vw); border-radius:50%;
-        background:radial-gradient(circle, rgba(142,193,238,.16) 0%, rgba(99,212,207,.10) 45%, rgba(0,0,0,0) 72%);
+        background:radial-gradient(circle, rgba(18,58,114,.10) 0%, rgba(227,196,106,.12) 45%, rgba(0,0,0,0) 72%);
         animation:paceaiPulse 4.5s ease-in-out infinite; }
     .pace-preloader .stage { position:relative; width:180px; height:180px; display:flex; align-items:center; justify-content:center; }
-    .pace-preloader .orbit-ring { position:absolute; width:132px; height:132px; border-radius:50%; border:1px solid rgba(142,193,238,.25); }
+    .pace-preloader .orbit-ring { position:absolute; width:132px; height:132px; border-radius:50%; border:1px solid rgba(18,58,114,.20); }
     .pace-preloader .orbit-spin { position:absolute; width:132px; height:132px; will-change:transform;
         animation:paceaiOrbit 2.6s linear infinite, paceaiHide .35s ease 2.5s forwards; }
     .pace-preloader .orbit-dot { position:absolute; top:-4px; left:50%; margin-left:-4px; width:8px; height:8px; border-radius:50%;
-        background:#8ec1ee; box-shadow:0 0 6px 2px rgba(142,193,238,.55), 0 0 16px 6px rgba(99,212,207,.25); }
+        background:#A67C00; box-shadow:0 0 6px 2px rgba(227,196,106,.55), 0 0 16px 6px rgba(18,58,114,.18); }
     .pace-preloader .logo-badge { position:relative; width:64px; height:64px; border-radius:50%;
-        background:linear-gradient(145deg,#2e3949 0%,#232b38 100%); border:1px solid #3d4859;
-        display:flex; align-items:center; justify-content:center; font-size:26px; box-shadow:0 4px 24px rgba(0,0,0,.35);
+        background:linear-gradient(145deg,#123A72 0%,#0B2545 100%); border:1px solid #E3C46A;
+        display:flex; align-items:center; justify-content:center; font-size:26px; box-shadow:0 4px 24px rgba(11,37,69,.20);
         animation:paceaiHide .35s ease 2.5s forwards; }
     .pace-preloader .loading-text { position:absolute; bottom:-64px; left:50%; transform:translateX(-50%);
-        color:#7e8b9d; font-size:13px; letter-spacing:1.5px; text-transform:uppercase;
+        color:#465268; font-size:13px; letter-spacing:1.5px; text-transform:uppercase;
         white-space:nowrap; text-align:center; max-width:80vw; }
     .pace-preloader .success { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
         opacity:0; visibility:hidden; animation:paceaiSuccessIn .35s ease 2.5s forwards; }
     .pace-preloader .success .sglow { position:absolute; width:110px; height:110px; border-radius:50%;
-        background:radial-gradient(circle, rgba(67,217,163,.30) 0%, rgba(67,217,163,0) 70%);
+        background:radial-gradient(circle, rgba(18,128,92,.22) 0%, rgba(18,128,92,0) 70%);
         animation:paceaiSuccessGlow .6s ease-out 2.5s both; }
     .pace-preloader .check-badge { width:64px; height:64px; border-radius:50%;
-        background:linear-gradient(145deg,#2e3949 0%,#232b38 100%); border:1px solid rgba(67,217,163,.6);
-        display:flex; align-items:center; justify-content:center; box-shadow:0 4px 24px rgba(0,0,0,.35); }
+        background:linear-gradient(145deg,#FFFFFF 0%,#F1F5FA 100%); border:1px solid rgba(18,128,92,.55);
+        display:flex; align-items:center; justify-content:center; box-shadow:0 4px 24px rgba(11,37,69,.14); }
     .pace-preloader .checkmark-path { stroke-dasharray:28; stroke-dashoffset:28; animation:paceaiDrawCheck .32s ease-out 2.56s forwards; }
 
     @media (prefers-reduced-motion: reduce) {
@@ -351,7 +462,7 @@ def _paceai_preloader(message: str) -> str:
             <div class="check-badge">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
                     <path class="checkmark-path" d="M4 12.5 L9.5 18 L20 5.5"
-                          stroke="#43d9a3" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                          stroke="#12805C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </div>
         </div>
@@ -612,32 +723,32 @@ PRESETS = {
 # ---------------- CHART BUILDERS ----------------
 def render_modern_gauge(value, title, subtitle="", max_val=100, is_risk=False):
     if is_risk:
-        bar_color = "#ff7086" if value >= 70 else "#e8b34a" if value >= 40 else "#43d9a3"
+        bar_color = "#C42B45" if value >= 70 else "#9A6B00" if value >= 40 else "#12805C"
     else:
-        bar_color = "#43d9a3" if value >= 70 else "#e8b34a" if value >= 50 else "#ff7086"
+        bar_color = "#12805C" if value >= 70 else "#9A6B00" if value >= 50 else "#C42B45"
 
     fig = go.Figure(go.Indicator(
         mode="gauge+number+delta",
         value=value,
-        title={"text": f"<b>{title}</b><br><span style='font-size:0.8em;color:#7e8b9d'>{subtitle}</span>"},
-        number={"font": {"size": 42, "color": "#8ec1ee"}, "suffix": "%" if is_risk else ""},
+        title={"text": f"<b>{title}</b><br><span style='font-size:0.8em;color:#6C7889'>{subtitle}</span>"},
+        number={"font": {"size": 42, "color": "#123A72"}, "suffix": "%" if is_risk else ""},
         gauge={
-            "axis": {"range": [0, max_val], "tickcolor": "#5f6d80", "tickfont": {"color": "#5f6d80"}},
+            "axis": {"range": [0, max_val], "tickcolor": "#8A96A6", "tickfont": {"color": "#6C7889"}},
             "bar": {"color": bar_color, "thickness": 0.3},
-            "bgcolor": "#2b3442",
+            "bgcolor": "#F7F9FC",
             "borderwidth": 1,
-            "bordercolor": "#3d4859",
+            "bordercolor": "#D6DDE6",
             "steps": [
-                {"range": [0, 40], "color": "rgba(67, 217, 163, 0.14)"},
-                {"range": [40, 70], "color": "rgba(232, 179, 74, 0.14)"},
-                {"range": [70, max_val], "color": "rgba(67, 217, 163, 0.18)" if not is_risk else "rgba(255, 112, 134, 0.18)"},
+                {"range": [0, 40], "color": "rgba(18, 128, 92, 0.10)"},
+                {"range": [40, 70], "color": "rgba(154, 107, 0, 0.10)"},
+                {"range": [70, max_val], "color": "rgba(18, 128, 92, 0.14)" if not is_risk else "rgba(196, 43, 69, 0.14)"},
             ],
         },
     ))
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font={"color": "#e9eef5"},
+        font={"color": "#17233A"},
         height=240,
         margin=dict(l=25, r=25, t=60, b=20)
     )
@@ -679,24 +790,24 @@ def render_radar_comparison(current_feats: dict):
     fig.add_trace(go.Scatterpolar(
         r=user_vals, theta=categories, fill='toself',
         name='Current Bowler',
-        line=dict(color='#43d9a3', width=2),
-        fillcolor='rgba(67, 217, 163, 0.18)'
+        line=dict(color='#123A72', width=2),
+        fillcolor='rgba(18, 58, 114, 0.14)'
     ))
     fig.add_trace(go.Scatterpolar(
         r=bench_vals, theta=categories, fill='toself',
         name='Elite Benchmark (145 km/h)',
-        line=dict(color='#8ec1ee', width=2, dash='dot'),
-        fillcolor='rgba(142, 193, 238, 0.14)'
+        line=dict(color='#A67C00', width=2, dash='dot'),
+        fillcolor='rgba(166, 124, 0, 0.12)'
     ))
 
     fig.update_layout(
         polar=dict(
-            radialaxis=dict(visible=True, range=[0, 100], color="#5f6d80", gridcolor="#35404f"),
-            angularaxis=dict(color="#aeb9c8", gridcolor="#35404f")
+            radialaxis=dict(visible=True, range=[0, 100], color="#6C7889", gridcolor="#E6EAF0"),
+            angularaxis=dict(color="#465268", gridcolor="#E6EAF0")
         ),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#e9eef5"),
+        font=dict(color="#17233A"),
         legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
         height=380,
         margin=dict(l=40, r=40, t=30, b=40)
@@ -709,19 +820,19 @@ def render_shap_bar(contributions: dict, title: str):
     items = sorted(items, key=lambda kv: kv[1])
     names = [FEATURE_LABELS.get(k, (k,))[0] for k, _ in items]
     values = [v for _, v in items]
-    colors = ["#ff7086" if v > 0 else "#8ec1ee" for v in values]
+    colors = ["#C42B45" if v > 0 else "#2C6BB3" for v in values]
 
     fig = go.Figure(go.Bar(
         x=values, y=names, orientation="h",
         marker=dict(color=colors, line=dict(width=0)),
     ))
     fig.update_layout(
-        title=dict(text=f"<b>{title}</b>", font=dict(color="#8ec1ee", size=14)),
+        title=dict(text=f"<b>{title}</b>", font=dict(color="#123A72", size=14)),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#aeb9c8"),
-        xaxis=dict(title="Relative Model Impact (SHAP value)", gridcolor="#35404f", zerolinecolor="#5f6d80"),
-        yaxis=dict(gridcolor="#2b3442"),
+        font=dict(color="#465268"),
+        xaxis=dict(title="Relative Model Impact (SHAP value)", gridcolor="#E6EAF0", zerolinecolor="#BCC7D4"),
+        yaxis=dict(gridcolor="#E6EAF0"),
         height=340,
         margin=dict(l=10, r=20, t=40, b=20)
     )
@@ -736,11 +847,11 @@ def render_timings(stage_times: dict):
     labels = [k.replace("_", " ").title() for k, _ in ordered]
     values = [v for _, v in ordered]
     fig = go.Figure(go.Bar(x=values, y=labels, orientation="h",
-                           marker_color=["#8ec1ee" if k != "total" else "#43d9a3"
+                           marker_color=["#123A72" if k != "total" else "#A67C00"
                                          for k, _ in ordered]))
     fig.update_layout(title="Stage timing", height=320,
                       paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                      font=dict(color="#aeb9c8"),
+                      font=dict(color="#465268"),
                       margin=dict(l=10, r=10, t=40, b=10), xaxis_title="Seconds")
     st.plotly_chart(fig, width='stretch')
     total = stage_times.get("total")
@@ -938,10 +1049,10 @@ def render_history_page():
                 mode="lines+markers+text",
                 text=[f"#{r['id']}" for r in chrono],
                 textposition="top center",
-                line=dict(color="#43d9a3", width=2),
+                line=dict(color="#123A72", width=2),
             ))
         fig.update_layout(height=350, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                          font=dict(color="#aeb9c8"), margin=dict(l=10, r=10, t=30, b=10),
+                          font=dict(color="#465268"), margin=dict(l=10, r=10, t=30, b=10),
                           xaxis_title="Date", yaxis_title="Performance score",
                           yaxis=dict(range=[0, 100]))
         st.plotly_chart(fig, width='stretch')
@@ -964,22 +1075,22 @@ def render_history_page():
         with c1:
             fig = go.Figure(go.Bar(
                 x=sel_names, y=[r.get("performance_score") for r in sel],
-                marker_color="#43d9a3", text=[f"{r.get('performance_score'):.0f}" if r.get('performance_score') is not None else "—" for r in sel],
+                marker_color="#123A72", text=[f"{r.get('performance_score'):.0f}" if r.get('performance_score') is not None else "—" for r in sel],
                 textposition="outside"))
             fig.update_layout(title="Performance score", height=320,
                               paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                              font=dict(color="#aeb9c8"), margin=dict(l=10, r=10, t=40, b=10),
+                              font=dict(color="#465268"), margin=dict(l=10, r=10, t=40, b=10),
                               yaxis=dict(range=[0, 100]))
             st.plotly_chart(fig, width='stretch')
         with c2:
             fig = go.Figure(go.Bar(
                 x=sel_names, y=[_risk_of(r) for r in sel],
-                marker_color=["#ff7086" if _risk_of(r) == "high" else "#e8b34a"
-                              if _risk_of(r) == "moderate" else "#43d9a3" for r in sel],
+                marker_color=["#C42B45" if _risk_of(r) == "high" else "#9A6B00"
+                              if _risk_of(r) == "moderate" else "#12805C" for r in sel],
                 text=[_risk_of(r).title() for r in sel], textposition="outside"))
             fig.update_layout(title="Biomechanical risk indicator", height=320,
                               paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                              font=dict(color="#aeb9c8"), margin=dict(l=10, r=10, t=40, b=10))
+                              font=dict(color="#465268"), margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig, width='stretch')
 
         st.markdown("**Feature-by-feature comparison**")
@@ -1002,7 +1113,7 @@ def render_history_page():
                 fig.add_trace(go.Bar(x=x, y=y, name=name))
             fig.update_layout(title="Feature values by session", barmode="group",
                               height=400, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                              font=dict(color="#aeb9c8"), margin=dict(l=10, r=10, t=40, b=10))
+                              font=dict(color="#465268"), margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig, width='stretch')
 
         # --- Detail view ---
@@ -1094,12 +1205,21 @@ def _confirm_clear_history():
 
 # ---------------- SIDEBAR CONTROLS ----------------
 with st.sidebar:
-    st.markdown("### 🏏 PaceAI Biomechanics")
-    st.caption("AI Motion Capture, Kinetics & Biomechanics Screening")
-    st.markdown("---")
+    st.markdown("""
+    <div class="side-brand">
+        <div class="side-brand-top">
+            <div class="side-brand-mark">&#9889;</div>
+            <div class="side-brand-name">PaceAI<br>Biomechanics</div>
+        </div>
+        <div class="side-brand-rule"></div>
+        <div class="side-brand-sub">Motion capture, kinetics &amp; biomechanical screening</div>
+    </div>
+    """, unsafe_allow_html=True)
 
+    st.markdown('<div class="side-label">Workspace</div>', unsafe_allow_html=True)
     page = st.radio("🧭 Navigation", ["⚡ Analyze", "📚 History & Compare"],
-                    help="Analyze: run a new delivery. History: browse saved results and compare.")
+                    help="Analyze: run a new delivery. History: browse saved results and compare.",
+                    label_visibility="collapsed")
 
     if page == "⚡ Analyze":
         input_mode = st.radio("Analysis Mode", ["Interactive Bio-Simulator", "\U0001f4f9 Video Motion Capture"], index=0,
@@ -1108,7 +1228,7 @@ with st.sidebar:
     else:
         input_mode = "Interactive Bio-Simulator"
 
-    st.markdown("#### Model & Bowling Setup")
+    st.markdown('<div class="side-label">Bowler &amp; Model</div>', unsafe_allow_html=True)
     bowling_arm = st.selectbox("Bowling Arm", ["Right-Arm", "Left-Arm"],
                                help="Which arm the bowler bowls with. Joints are mirrored automatically "
                                     "so left-handers aren't analyzed backwards.")
@@ -1172,13 +1292,32 @@ with st.sidebar:
 
 render_chat_widget()
 
-st.sidebar.markdown("---")
-st.sidebar.markdown("#### System Status")
-st.sidebar.caption(f"⚡ XGBoost: **{'Active' if ml_models.BACKEND_INFO['xgboost_available'] else 'Scikit Fallback'}**")
-st.sidebar.caption(f"CatBoost: **{'Active' if ml_models.BACKEND_INFO['catboost_available'] else 'Scikit Fallback'}**")
-st.sidebar.caption(f"🧠 PyTorch: **{'Active' if ml_models.BACKEND_INFO['torch_available'] else 'Disabled'}**")
-st.sidebar.caption(f"🔬 SHAP Engine: **{'Active' if explainability.SHAP_AVAILABLE else 'Finite Diff'}**")
-st.sidebar.caption(f"📚 History entries: **{history_db.count()}**")
+
+def _status_row(label: str, value: str, state: str) -> str:
+    return (f'<div class="side-status-row"><span>'
+            f'<span class="side-status-dot dot-{state}"></span>{label}</span><b>{value}</b></div>')
+
+
+_xgb = "Active" if ml_models.BACKEND_INFO["xgboost_available"] else "Scikit Fallback"
+_cat = "Active" if ml_models.BACKEND_INFO["catboost_available"] else "Scikit Fallback"
+_torch = "Active" if ml_models.BACKEND_INFO["torch_available"] else "Disabled"
+_shap = "Active" if explainability.SHAP_AVAILABLE else "Finite Diff"
+
+st.sidebar.markdown(
+    '<div class="side-status">'
+    '<div class="side-status-title">System Status</div>'
+    + _status_row("XGBoost", _xgb, "ok" if ml_models.BACKEND_INFO["xgboost_available"] else "warn")
+    + _status_row("CatBoost", _cat, "ok" if ml_models.BACKEND_INFO["catboost_available"] else "warn")
+    + _status_row("PyTorch", _torch, "ok" if ml_models.BACKEND_INFO["torch_available"] else "off")
+    + _status_row("SHAP Engine", _shap, "ok" if explainability.SHAP_AVAILABLE else "warn")
+    + _status_row("History entries", str(history_db.count()), "ok")
+    + '</div>',
+    unsafe_allow_html=True,
+)
+st.sidebar.markdown(
+    '<div class="side-foot">PaceAI &middot; Biomechanics Research Build</div>',
+    unsafe_allow_html=True,
+)
 
 # ---------------- PAGE DISPATCH ----------------
 if page == "📚 History & Compare":
@@ -1350,7 +1489,10 @@ def render_analysis_replay(hero_video, result, feature_vector, ball_stats):
     meta = dict(
         track=bowler_id,
         conf=bowler_conf,
-        role=getattr(result, "bowler_role", None) or "bowler",
+        # No "bowler" fallback: an absent role must stay absent so the identity
+        # card can be withheld instead of asserting a role nobody detected.
+        role=getattr(result, "bowler_role", None),
+        verified=getattr(result, "subject_verified", None),
         duration_s=duration_s,
         frames=total_frames,
         fps=fps,
@@ -1655,7 +1797,11 @@ if feature_vector:
         injury_bundle=injury_bundle,
         is_video=_is_video,
         replay_fn=render_analysis_replay if _is_video else None,
-        replay_path=_analysis_replay,
+        # A previous video run leaves analysis_replay_path in session_state.
+        # Passing it through here made the simulator take the replay branch on
+        # a stale path and print "Replay is unavailable" instead of the honest
+        # "No replay for this entry" empty state.
+        replay_path=_analysis_replay if _is_video else None,
         ball_stats=_ball_stats,
         advanced_renderers={
             "gauges_and_radar": _adv_gauges_and_radar,

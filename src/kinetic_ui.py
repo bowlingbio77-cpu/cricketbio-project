@@ -17,20 +17,20 @@ logic lives here -- callers supply already-computed values.
 import html as _html
 
 
-SURFACE = "#212833"
-PANEL = "#2b3442"
-LINE = "#3d4859"
-BORDER_STRONG = "#4b586c"
-NAVY = "#8ec1ee"
-TEAL = "#63d4cf"
-BODY = "#e9eef5"
-SECONDARY = "#aeb9c8"
-MUTED = "#7e8b9d"
-OUTLINE = "#5f6d80"
-ICE = "rgba(142, 193, 238, 0.16)"
-OK = "#43d9a3"
-WARN = "#e8b34a"
-DANGER = "#ff7086"
+SURFACE = "#F7F9FC"
+PANEL = "#FBFCFE"
+LINE = "#D6DDE6"
+BORDER_STRONG = "#BCC7D4"
+NAVY = "#123A72"
+TEAL = "#0F7B6C"
+BODY = "#17233A"
+SECONDARY = "#465268"
+MUTED = "#6C7889"
+OUTLINE = "#8A96A6"
+ICE = "rgba(18, 58, 114, 0.08)"
+OK = "#12805C"
+WARN = "#9A6B00"
+DANGER = "#C42B45"
 
 
 def esc(value) -> str:
@@ -81,9 +81,9 @@ KINETIC_CSS = """
         border: 1px solid var(--k-line); border-radius: 999px;
         padding: 4px 10px; text-transform: uppercase; white-space: nowrap;
     }
-    .kin-chip.kin-ok { color: var(--k-ok, %(OK)s); background: rgba(67,217,163,.14); border-color: rgba(67,217,163,.40); }
-    .kin-chip.kin-amber { color: %(WARN)s; background: rgba(232,179,74,.14); border-color: rgba(232,179,74,.40); }
-    .kin-chip.kin-red { color: %(DANGER)s; background: rgba(255,112,134,.14); border-color: rgba(255,112,134,.40); }
+    .kin-chip.kin-ok { color: var(--k-ok, %(OK)s); background: rgba(18,128,92,.10); border-color: rgba(18,128,92,.40); }
+    .kin-chip.kin-amber { color: %(WARN)s; background: rgba(154,107,0,.10); border-color: rgba(154,107,0,.40); }
+    .kin-chip.kin-red { color: %(DANGER)s; background: rgba(196,43,69,.10); border-color: rgba(196,43,69,.40); }
 
     /* ---------- video viewport chrome ---------- */
     .kin-viewport {
@@ -128,7 +128,7 @@ KINETIC_CSS = """
     .kin-load { display: flex; align-items: center; gap: 14px; }
     .kin-donut { --p: 0; --ring: %(OK)s;
         width: 68px; height: 68px; border-radius: 50%%; flex: 0 0 68px;
-        background: conic-gradient(var(--ring) calc(var(--p) * 1%%), rgba(142,193,238,.16) 0);
+        background: conic-gradient(var(--ring) calc(var(--p) * 1%%), rgba(18,58,114,.10) 0);
         display: flex; align-items: center; justify-content: center; position: relative; }
     .kin-donut::after { content: ""; position: absolute; inset: 8px; border-radius: 50%%; background: %(PANEL)s; }
     .kin-donut span { position: relative; z-index: 1; font-family: 'JetBrains Mono', 'Consolas', monospace;
@@ -141,12 +141,12 @@ KINETIC_CSS = """
     .kin-timeline { padding: 14px 20px 16px; border: 1px solid var(--k-line);
         border-radius: 10px; background: %(PANEL)s; }
     .kin-tl-track { position: relative; height: 6px; border-radius: 3px;
-        background: rgba(142,193,238,.16); margin: 0 10px; }
+        background: rgba(18,58,114,.10); margin: 0 10px; }
     .kin-tl-marker { position: absolute; top: -4px; width: 14px; height: 14px;
         border-radius: 50%%; background: %(PANEL)s; border: 3px solid var(--k-nav);
-        box-shadow: 0 0 0 3px rgba(142,193,238,.25); }
-    .kin-tl-marker.release { border-color: %(DANGER)s; box-shadow: 0 0 0 3px rgba(255,112,134,.25); }
-    .kin-tl-marker.impact { border-color: %(OK)s; box-shadow: 0 0 0 3px rgba(67,217,163,.25); }
+        box-shadow: 0 0 0 3px rgba(18,58,114,.18); }
+    .kin-tl-marker.release { border-color: %(DANGER)s; box-shadow: 0 0 0 3px rgba(196,43,69,.22); }
+    .kin-tl-marker.impact { border-color: %(OK)s; box-shadow: 0 0 0 3px rgba(18,128,92,.22); }
     .kin-phases { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 12px; }
     .kin-phase { text-align: center; padding: 8px 4px; border-radius: 8px;
         border: 1px solid var(--k-line); background: %(PANEL)s; }
@@ -300,20 +300,32 @@ def rail_html(meta: dict) -> str:
                 f'<div class="kin-kpi-val">{v}{unit_h}</div></div>')
 
     identity = ""
-    if meta.get("track") is not None or meta.get("role"):
-        sub = f"confidence {_fmt(meta.get('conf'), '', 2)}" if meta.get("conf") is not None else "identity locked"
-        role = str(meta.get("role") or "bowler").upper()
-        avatar = esc(role[:1])
+    if meta.get("track") is not None:
+        # Identity is only claimed when a track was actually locked. When the
+        # pipeline refused the subject (subject_verified is False) the track id
+        # is still shown, but no role and no confidence are asserted -- the
+        # result page withholds scoring in that state and this rail must agree.
+        verified = meta.get("verified")
+        role = str(meta.get("role") or "bowler")
+        if verified is False:
+            sub = "identity not confirmed"
+            chip = '<span class="kin-chip kin-amber">UNCONFIRMED</span>'
+            avatar = "?"
+        else:
+            sub = (f"confidence {_fmt(meta.get('conf'), '', 2)}"
+                   if meta.get("conf") is not None else "identity locked")
+            chip = f'<span class="kin-chip">{esc(role.upper())}</span>'
+            avatar = esc(role[:1])
         identity = f"""
         <div class="kin-card">
           <div class="kin-card-kicker">Bowler Identity</div>
           <div class="kin-identity">
             <div class="kin-avatar">{avatar}</div>
             <div>
-              <div class="kin-identity-name">Track #{esc(meta.get('track') or '\u2014')}</div>
+              <div class="kin-identity-name">Track #{esc(meta.get('track'))}</div>
               <div class="kin-identity-sub">{esc(sub)}</div>
             </div>
-            <span class="kin-chip">{esc(role)}</span>
+            {chip}
           </div>
         </div>"""
 
