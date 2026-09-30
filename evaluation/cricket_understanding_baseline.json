@@ -1,0 +1,691 @@
+{
+  "generated_by": "scripts/cricket/baseline.py",
+  "n_videos_registered": 72,
+  "n_videos_run": 8,
+  "observed": {
+    "n_videos_run": 8,
+    "bowler_confirmed": 1,
+    "bowler_confirmation_rate": 0.125,
+    "bowler_confirmation_ci": {
+      "lo": 0.0224,
+      "hi": 0.4709,
+      "method": "wilson"
+    },
+    "subject_verified": 1,
+    "subject_verification_rate": 0.125,
+    "videos_with_identity_switch": 8,
+    "identity_switch_rate": 1.0,
+    "mean_identity_switches": 1.125,
+    "confirm_reasons": {
+      "ambiguous_margin": 6,
+      "low_evidence": 1,
+      "(none recorded)": 1
+    },
+    "stage_backends": {
+      "tracking=bytetrack": 8,
+      "detection=bytetrack": 8
+    },
+    "wall_clock_sec": {
+      "mean": 21.81,
+      "min": 16.75,
+      "max": 25.96
+    },
+    "warning_histogram": {
+      "Analysis Replay generated: C:\\Users\\MOHAMM~1\\AppData\\Local\\Temp\\analys": 8,
+      "Identity check: the top bowler candidate switched 1x across the clip": 7,
+      "Scoring withheld \u2014 subject not verified: bowler not confirmed": 7,
+      "ML analysis skipped: scoring a skeleton that may not be the bowler wou": 7,
+      "BOWLER NOT CONFIRMED: the cricket-evidence score is ambiguous_margin. ": 6,
+      "Ball tracking: no clear bat/pad contact detected in this clip, so the ": 5,
+      "Player roles: #1: fielder": 5,
+      "Batting stances: #1: striker": 4,
+      "ML analysis skipped: the delivery window was unreliable": 4,
+      "Delivery quality: no front-foot stance detected -- clip may not contai": 4,
+      "Ball tracking: 4 detected + 0 predicted frames": 2,
+      "Detection/tracking: locked to bowler track #4": 2
+    }
+  },
+  "ground_truth": {
+    "n_annotated_videos": 0,
+    "n_videos_with_scorable_bowler": 0,
+    "n_deliveries": 0
+  },
+  "metrics": {
+    "bowler_top1_accuracy": {
+      "name": "bowler_top1_accuracy",
+      "value": null,
+      "status": "NOT MEASURED",
+      "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+      "n": 0,
+      "unit": "",
+      "higher_is_better": null,
+      "interval": null,
+      "extra": {}
+    },
+    "bowler_precision": {
+      "name": "bowler_precision",
+      "value": null,
+      "status": "NOT MEASURED",
+      "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+      "n": 0,
+      "unit": "",
+      "higher_is_better": null,
+      "interval": null,
+      "extra": {}
+    },
+    "bowler_recall": {
+      "name": "bowler_recall",
+      "value": null,
+      "status": "NOT MEASURED",
+      "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+      "n": 0,
+      "unit": "",
+      "higher_is_better": null,
+      "interval": null,
+      "extra": {}
+    },
+    "bowler_f1": {
+      "name": "bowler_f1",
+      "value": null,
+      "status": "NOT MEASURED",
+      "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+      "n": 0,
+      "unit": "",
+      "higher_is_better": null,
+      "interval": null,
+      "extra": {}
+    },
+    "false_selection_rate": {
+      "name": "false_selection_rate",
+      "value": null,
+      "status": "NOT MEASURED",
+      "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+      "n": 0,
+      "unit": "",
+      "higher_is_better": null,
+      "interval": null,
+      "extra": {}
+    },
+    "identity_switches": {
+      "name": "identity_switches",
+      "value": null,
+      "status": "NOT MEASURED",
+      "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+      "n": 0,
+      "unit": "",
+      "higher_is_better": null,
+      "interval": null,
+      "extra": {}
+    },
+    "track_continuity": {
+      "name": "track_continuity",
+      "value": null,
+      "status": "NOT MEASURED",
+      "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+      "n": 0,
+      "unit": "",
+      "higher_is_better": null,
+      "interval": null,
+      "extra": {}
+    },
+    "bowler_abstention_rate": {
+      "name": "bowler_abstention_rate",
+      "value": null,
+      "status": "NOT MEASURED",
+      "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+      "n": 0,
+      "unit": "",
+      "higher_is_better": null,
+      "interval": null,
+      "extra": {}
+    },
+    "delivery_detection_accuracy": {
+      "name": "delivery_detection_accuracy",
+      "value": null,
+      "status": "NOT MEASURED",
+      "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero",
+      "n": 0,
+      "unit": "",
+      "higher_is_better": null,
+      "interval": null,
+      "extra": {}
+    },
+    "release_frame_error_frames": {
+      "name": "release_frame_error_frames",
+      "value": null,
+      "status": "NOT MEASURED",
+      "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero",
+      "n": 0,
+      "unit": "",
+      "higher_is_better": null,
+      "interval": null,
+      "extra": {}
+    },
+    "phase_accuracy": {
+      "name": "phase_accuracy",
+      "value": null,
+      "status": "NOT MEASURED",
+      "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero",
+      "n": 0,
+      "unit": "",
+      "higher_is_better": null,
+      "interval": null,
+      "extra": {}
+    },
+    "phase_macro_f1": {
+      "name": "phase_macro_f1",
+      "value": null,
+      "status": "NOT MEASURED",
+      "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero",
+      "n": 0,
+      "unit": "",
+      "higher_is_better": null,
+      "interval": null,
+      "extra": {}
+    }
+  },
+  "n_measured_metrics": 0,
+  "n_not_measured_metrics": 12,
+  "runs": [
+    {
+      "video_id": "v_02a8e776ad75",
+      "filename": "off_right_00000002.mp4",
+      "camera_view_guess": "behind",
+      "predicted_bowler_track_id": 6,
+      "bowler_confirmed": false,
+      "bowler_confidence": 0.6054163648043532,
+      "bowler_confirm_reason": "low_evidence",
+      "identity_switch_count": 1,
+      "subject_verified": false,
+      "scoring_blocked_reason": "bowler not confirmed (cricket-evidence low_evidence); ML/coaching withheld until the bowler is confirmed in the UI.",
+      "n_bowler_candidates": 13,
+      "delivery_reliable": true,
+      "player_roles": {
+        "1": "fielder",
+        "2": "wicketkeeper",
+        "4": "batsman",
+        "5": "umpire",
+        "11": "batsman",
+        "12": "fielder",
+        "13": "fielder",
+        "14": "batsman",
+        "15": "batsman",
+        "16": "batsman"
+      },
+      "stage_backends": {
+        "tracking": "bytetrack",
+        "detection": "bytetrack"
+      },
+      "stage_times": {
+        "preprocess": 0.29786629999944125,
+        "cricket_precheck": 5.022613900000579,
+        "ball_tracking": 7.246861399999943,
+        "detection_tracking": 2.3914630999997826,
+        "pose_estimation": 2.5105671999999686,
+        "feature_engineering": 0.0036615999997593462,
+        "coaching": 3.3999995139311068e-06,
+        "total": 23.516283200000544
+      },
+      "landmark_source_summary": {
+        "world_3d_frames": 19,
+        "normalized_2d_frames": 0,
+        "raw_array_frames": 0,
+        "missing_frames": 0,
+        "total_frames": 19
+      },
+      "warnings": [
+        "Ball tracking: 4 detected + 0 predicted frames (10% of clip) -- annotated video below.",
+        "Ball tracking: no clear bat/pad contact detected in this clip, so the box follows the ball for the whole tracked segment.",
+        "Detection/tracking: locked to bowler track #6 (14 frames, confidence 0.61) before pose estimation.",
+        "BOWLER NOT CONFIRMED: the cricket-evidence score is low_evidence. ML/coaching are withheld until the bowler is confirmed in the UI.",
+        "Identity check: the top bowler candidate switched 1x across the clip (bowler <-> batsman churn observed).",
+        "Player roles: #1: fielder(0.53), #2: wicketkeeper(0.56), #4: batsman(0.61), #5: umpire(0.81), #11: batsman(0.66), #12: fielder(0.79), #13: fielder(0.74), #14: batsman(0.68), #15: batsman(0.61), #16: batsman(0.51)",
+        "Batting stances: #1: striker(1.00), #11: non_striker(1.00)",
+        "Scoring withheld \u2014 subject not verified: bowler not confirmed (cricket-evidence low_evidence); ML/coaching withheld until the bowler is confirmed in the UI.",
+        "Wrist proxy: 17 pre-release frames augmented from bowling-arm wrist landmark.",
+        "ML analysis skipped: scoring a skeleton that may not be the bowler would produce misleading numbers. Features are still shown, clearly marked as from an unverified subject.",
+        "Analysis Replay generated: C:\\Users\\MOHAMM~1\\AppData\\Local\\Temp\\analysis_replaya2vgd0iy.mp4"
+      ],
+      "coaching_notes": [
+        "Coaching withheld \u2014 pose subject could not be verified as the bowler."
+      ],
+      "wall_clock_sec": 23.52
+    },
+    {
+      "video_id": "v_06f39d06acef",
+      "filename": "off_left_0000001.mp4",
+      "camera_view_guess": "behind",
+      "predicted_bowler_track_id": 4,
+      "bowler_confirmed": false,
+      "bowler_confidence": 0.6816367964047139,
+      "bowler_confirm_reason": "ambiguous_margin",
+      "identity_switch_count": 1,
+      "subject_verified": false,
+      "scoring_blocked_reason": "bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI.",
+      "n_bowler_candidates": 8,
+      "delivery_reliable": false,
+      "player_roles": {
+        "1": "fielder",
+        "2": "fielder",
+        "3": "umpire",
+        "5": "batsman"
+      },
+      "stage_backends": {
+        "tracking": "bytetrack",
+        "detection": "bytetrack"
+      },
+      "stage_times": {
+        "preprocess": 0.31956929999978456,
+        "cricket_precheck": 6.261062999999922,
+        "ball_tracking": 4.455722100000457,
+        "detection_tracking": 2.514839000000393,
+        "pose_estimation": 4.412114499999916,
+        "feature_engineering": 0.011165099999743688,
+        "coaching": 2.4000000848900527e-06,
+        "total": 23.065063400000327
+      },
+      "landmark_source_summary": {
+        "world_3d_frames": 40,
+        "normalized_2d_frames": 0,
+        "raw_array_frames": 0,
+        "missing_frames": 0,
+        "total_frames": 40
+      },
+      "warnings": [
+        "Ball tracking: 4 detected + 0 predicted frames (10% of clip) -- annotated video below.",
+        "Ball tracking: box stops at frame 26 (detected bat/pad/ground contact) so it doesn't chase the ball after it hits the bat.",
+        "Detection/tracking: locked to bowler track #4 (40 frames, confidence 0.68) before pose estimation.",
+        "BOWLER NOT CONFIRMED: the cricket-evidence score is ambiguous_margin. ML/coaching are withheld until the bowler is confirmed in the UI.",
+        "Identity check: the top bowler candidate switched 1x across the clip (bowler <-> batsman churn observed).",
+        "Player roles: #1: fielder(0.55), #2: fielder(0.48), #3: umpire(0.55), #5: batsman(0.43)",
+        "Batting stances: #3: striker(1.00), #5: non_striker(1.00)",
+        "Scoring withheld \u2014 subject not verified: bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI.",
+        "Delivery quality: release frame at clip edge -- clip may not be trimmed to one delivery",
+        "Wrist proxy: 27 pre-release frames augmented from bowling-arm wrist landmark.",
+        "ML analysis skipped: scoring a skeleton that may not be the bowler would produce misleading numbers. Features are still shown, clearly marked as from an unverified subject.",
+        "ML analysis skipped: the delivery window was unreliable (no clear release detected) so the interpolated features would produce misleading predictions.",
+        "Analysis Replay generated: C:\\Users\\MOHAMM~1\\AppData\\Local\\Temp\\analysis_replayiks6ofcv.mp4"
+      ],
+      "coaching_notes": [
+        "Coaching withheld \u2014 pose subject could not be verified as the bowler."
+      ],
+      "wall_clock_sec": 23.07
+    },
+    {
+      "video_id": "v_07f24eaae5ba",
+      "filename": "leg_right_00000009.mp4",
+      "camera_view_guess": "behind",
+      "predicted_bowler_track_id": 4,
+      "bowler_confirmed": false,
+      "bowler_confidence": 0.6916105262103063,
+      "bowler_confirm_reason": "ambiguous_margin",
+      "identity_switch_count": 1,
+      "subject_verified": false,
+      "scoring_blocked_reason": "bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI.",
+      "n_bowler_candidates": 9,
+      "delivery_reliable": false,
+      "player_roles": {
+        "1": "fielder",
+        "2": "fielder",
+        "3": "umpire",
+        "7": "batsman",
+        "31": "batsman"
+      },
+      "stage_backends": {
+        "tracking": "bytetrack",
+        "detection": "bytetrack"
+      },
+      "stage_times": {
+        "preprocess": 0.30414360000031593,
+        "cricket_precheck": 5.211191299999882,
+        "ball_tracking": 5.0884111999994275,
+        "detection_tracking": 3.1374660000001313,
+        "pose_estimation": 5.23460040000009,
+        "feature_engineering": 0.013267600000290258,
+        "coaching": 1.99999976757681e-06,
+        "total": 25.95719139999983
+      },
+      "landmark_source_summary": {
+        "world_3d_frames": 48,
+        "normalized_2d_frames": 0,
+        "raw_array_frames": 0,
+        "missing_frames": 0,
+        "total_frames": 48
+      },
+      "warnings": [
+        "Ball tracking: 49 detected + 1 predicted frames (100% of clip) -- annotated video below.",
+        "Ball tracking: no clear bat/pad contact detected in this clip, so the box follows the ball for the whole tracked segment.",
+        "Detection/tracking: locked to bowler track #4 (39 frames, confidence 0.69) before pose estimation.",
+        "BOWLER NOT CONFIRMED: the cricket-evidence score is ambiguous_margin. ML/coaching are withheld until the bowler is confirmed in the UI.",
+        "Identity check: the top bowler candidate switched 1x across the clip (bowler <-> batsman churn observed).",
+        "Player roles: #1: fielder(0.49), #2: fielder(0.51), #3: umpire(0.61), #7: batsman(0.41), #31: batsman(0.72)",
+        "Batting stances: #1: striker(1.00), #7: non_striker(1.00)",
+        "Scoring withheld \u2014 subject not verified: bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI.",
+        "Delivery quality: no front-foot stance detected -- clip may not contain a full delivery",
+        "Wrist proxy: 32 pre-release frames augmented from bowling-arm wrist landmark.",
+        "ML analysis skipped: scoring a skeleton that may not be the bowler would produce misleading numbers. Features are still shown, clearly marked as from an unverified subject.",
+        "ML analysis skipped: the delivery window was unreliable (no clear release detected) so the interpolated features would produce misleading predictions.",
+        "Analysis Replay generated: C:\\Users\\MOHAMM~1\\AppData\\Local\\Temp\\analysis_replayyg52u1pe.mp4"
+      ],
+      "coaching_notes": [
+        "Coaching withheld \u2014 pose subject could not be verified as the bowler."
+      ],
+      "wall_clock_sec": 25.96
+    },
+    {
+      "video_id": "v_0a378bf5e72c",
+      "filename": "fast_right_00000009.avi",
+      "camera_view_guess": "behind",
+      "predicted_bowler_track_id": 3,
+      "bowler_confirmed": false,
+      "bowler_confidence": 0.6947581490957431,
+      "bowler_confirm_reason": "ambiguous_margin",
+      "identity_switch_count": 1,
+      "subject_verified": false,
+      "scoring_blocked_reason": "bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI.",
+      "n_bowler_candidates": 8,
+      "delivery_reliable": false,
+      "player_roles": {
+        "1": "fielder",
+        "2": "fielder",
+        "4": "umpire",
+        "5": "wicketkeeper",
+        "6": "batsman",
+        "7": "wicketkeeper"
+      },
+      "stage_backends": {
+        "tracking": "bytetrack",
+        "detection": "bytetrack"
+      },
+      "stage_times": {
+        "preprocess": 0.1879852000001847,
+        "cricket_precheck": 4.121239200000673,
+        "ball_tracking": 5.691915800000061,
+        "detection_tracking": 3.7876344999995126,
+        "pose_estimation": 3.9399217999998655,
+        "feature_engineering": 0.006616200000280514,
+        "coaching": 2.0000006770715117e-06,
+        "total": 24.45826500000021
+      },
+      "landmark_source_summary": {
+        "world_3d_frames": 33,
+        "normalized_2d_frames": 0,
+        "raw_array_frames": 0,
+        "missing_frames": 0,
+        "total_frames": 33
+      },
+      "warnings": [
+        "Ball tracking: 8 detected + 8 predicted frames (27% of clip) -- annotated video below.",
+        "Ball tracking: no clear bat/pad contact detected in this clip, so the box follows the ball for the whole tracked segment.",
+        "Detection/tracking: locked to bowler track #3 (33 frames, confidence 0.69) before pose estimation.",
+        "BOWLER NOT CONFIRMED: the cricket-evidence score is ambiguous_margin. ML/coaching are withheld until the bowler is confirmed in the UI.",
+        "Identity check: the top bowler candidate switched 1x across the clip (bowler <-> batsman churn observed).",
+        "Player roles: #1: fielder(0.51), #2: fielder(0.46), #4: umpire(0.54), #5: wicketkeeper(0.71), #6: batsman(0.66), #7: wicketkeeper(0.55)",
+        "Batting stances: #5: striker(1.00), #6: non_striker(1.00)",
+        "Scoring withheld \u2014 subject not verified: bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI.",
+        "Delivery quality: no front-foot stance detected -- clip may not contain a full delivery",
+        "Wrist proxy: 20 pre-release frames augmented from bowling-arm wrist landmark.",
+        "ML analysis skipped: scoring a skeleton that may not be the bowler would produce misleading numbers. Features are still shown, clearly marked as from an unverified subject.",
+        "ML analysis skipped: the delivery window was unreliable (no clear release detected) so the interpolated features would produce misleading predictions.",
+        "Analysis Replay generated: C:\\Users\\MOHAMM~1\\AppData\\Local\\Temp\\analysis_replay3allmg9y.mp4"
+      ],
+      "coaching_notes": [
+        "Coaching withheld \u2014 pose subject could not be verified as the bowler."
+      ],
+      "wall_clock_sec": 24.47
+    },
+    {
+      "video_id": "v_0a8571225a02",
+      "filename": "leg_left_00000007.mp4",
+      "camera_view_guess": "behind",
+      "predicted_bowler_track_id": 18,
+      "bowler_confirmed": false,
+      "bowler_confidence": 0.7481237989534242,
+      "bowler_confirm_reason": "ambiguous_margin",
+      "identity_switch_count": 2,
+      "subject_verified": false,
+      "scoring_blocked_reason": "bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI.",
+      "n_bowler_candidates": 17,
+      "delivery_reliable": true,
+      "player_roles": {
+        "1": "batsman",
+        "2": "fielder",
+        "3": "umpire",
+        "4": "fielder",
+        "5": "batsman",
+        "6": "wicketkeeper",
+        "7": "wicketkeeper",
+        "8": "fielder",
+        "14": "batsman",
+        "15": "wicketkeeper",
+        "16": "fielder",
+        "17": "wicketkeeper",
+        "19": "wicketkeeper",
+        "21": "batsman"
+      },
+      "stage_backends": {
+        "tracking": "bytetrack",
+        "detection": "bytetrack"
+      },
+      "stage_times": {
+        "preprocess": 0.311318900000515,
+        "cricket_precheck": 3.9770150000003923,
+        "ball_tracking": 4.501257799999621,
+        "detection_tracking": 2.493128699999943,
+        "pose_estimation": 2.0562294000001202,
+        "feature_engineering": 0.0028442000002542045,
+        "coaching": 3.499999365885742e-06,
+        "total": 18.353793699999187
+      },
+      "landmark_source_summary": {
+        "world_3d_frames": 12,
+        "normalized_2d_frames": 0,
+        "raw_array_frames": 0,
+        "missing_frames": 0,
+        "total_frames": 12
+      },
+      "warnings": [
+        "Ball tracking: 3 detected + 0 predicted frames (8% of clip) -- annotated video below.",
+        "Ball tracking: no clear bat/pad contact detected in this clip, so the box follows the ball for the whole tracked segment.",
+        "Detection/tracking: locked to bowler track #18 (28 frames, confidence 0.75) before pose estimation.",
+        "BOWLER NOT CONFIRMED: the cricket-evidence score is ambiguous_margin. ML/coaching are withheld until the bowler is confirmed in the UI.",
+        "Identity check: the top bowler candidate switched 2x across the clip (bowler <-> batsman churn observed).",
+        "Player roles: #1: batsman(0.71), #2: fielder(0.54), #3: umpire(0.62), #4: fielder(0.45), #5: batsman(0.52), #6: wicketkeeper(0.85), #7: wicketkeeper(0.55), #8: fielder(0.41), #14: batsman(0.41), #15: wicketkeeper(0.62), #16: fielder(0.47), #17: wicketkeeper(0.38), #19: wicketkeeper(0.31), #21: batsman(0.49)",
+        "Batting stances: #1: striker(1.00), #3: non_striker(1.00)",
+        "Scoring withheld \u2014 subject not verified: bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI.",
+        "ML analysis skipped: scoring a skeleton that may not be the bowler would produce misleading numbers. Features are still shown, clearly marked as from an unverified subject.",
+        "Analysis Replay generated: C:\\Users\\MOHAMM~1\\AppData\\Local\\Temp\\analysis_replayr99g4p63.mp4"
+      ],
+      "coaching_notes": [
+        "Coaching withheld \u2014 pose subject could not be verified as the bowler."
+      ],
+      "wall_clock_sec": 18.36
+    },
+    {
+      "video_id": "v_0a8674143088",
+      "filename": "off_right_00000008.mp4",
+      "camera_view_guess": "behind",
+      "predicted_bowler_track_id": 8,
+      "bowler_confirmed": false,
+      "bowler_confidence": 0.7547913256720954,
+      "bowler_confirm_reason": "ambiguous_margin",
+      "identity_switch_count": 1,
+      "subject_verified": false,
+      "scoring_blocked_reason": "bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI.",
+      "n_bowler_candidates": 15,
+      "delivery_reliable": false,
+      "player_roles": {
+        "1": "umpire",
+        "2": "fielder",
+        "3": "wicketkeeper",
+        "4": "wicketkeeper",
+        "5": "fielder",
+        "6": "wicketkeeper",
+        "7": "fielder",
+        "12": "wicketkeeper",
+        "20": "wicketkeeper"
+      },
+      "stage_backends": {
+        "tracking": "bytetrack",
+        "detection": "bytetrack"
+      },
+      "stage_times": {
+        "preprocess": 0.16941720000068017,
+        "cricket_precheck": 4.4140818999994735,
+        "ball_tracking": 1.8802040999999008,
+        "detection_tracking": 1.8497505000004821,
+        "pose_estimation": 2.5703487999999197,
+        "feature_engineering": 0.003025800000614254,
+        "coaching": 2.499999936844688e-06,
+        "total": 16.746689000000515
+      },
+      "landmark_source_summary": {
+        "world_3d_frames": 15,
+        "normalized_2d_frames": 0,
+        "raw_array_frames": 0,
+        "missing_frames": 0,
+        "total_frames": 15
+      },
+      "warnings": [
+        "Ball tracking: ball not detected reliably in this clip (no annotated video produced).",
+        "Detection/tracking: locked to bowler track #8 (19 frames, confidence 0.75) before pose estimation.",
+        "BOWLER NOT CONFIRMED: the cricket-evidence score is ambiguous_margin. ML/coaching are withheld until the bowler is confirmed in the UI.",
+        "Identity check: the top bowler candidate switched 1x across the clip (bowler <-> batsman churn observed).",
+        "Player roles: #1: umpire(0.58), #2: fielder(0.52), #3: wicketkeeper(0.60), #4: wicketkeeper(0.59), #5: fielder(0.53), #6: wicketkeeper(0.62), #7: fielder(0.39), #12: wicketkeeper(0.63), #20: wicketkeeper(0.65)",
+        "Batting stances: #4: striker(1.00), #5: non_striker(1.00)",
+        "Scoring withheld \u2014 subject not verified: bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI.",
+        "Delivery quality: no front-foot stance detected -- clip may not contain a full delivery",
+        "Wrist proxy: 1 pre-release frames augmented from bowling-arm wrist landmark.",
+        "Ball not detected reliably; showing pose-skeleton overlay video.",
+        "ML analysis skipped: scoring a skeleton that may not be the bowler would produce misleading numbers. Features are still shown, clearly marked as from an unverified subject.",
+        "ML analysis skipped: the delivery window was unreliable (no clear release detected) so the interpolated features would produce misleading predictions.",
+        "Analysis Replay generated: C:\\Users\\MOHAMM~1\\AppData\\Local\\Temp\\analysis_replayldhmytsy.mp4"
+      ],
+      "coaching_notes": [
+        "Coaching withheld \u2014 pose subject could not be verified as the bowler."
+      ],
+      "wall_clock_sec": 16.75
+    },
+    {
+      "video_id": "v_0d92e9520236",
+      "filename": "fast_left_00000005.avi",
+      "camera_view_guess": "behind",
+      "predicted_bowler_track_id": 44,
+      "bowler_confirmed": true,
+      "bowler_confidence": 0.8272307617997783,
+      "bowler_confirm_reason": null,
+      "identity_switch_count": 1,
+      "subject_verified": true,
+      "scoring_blocked_reason": "",
+      "n_bowler_candidates": 11,
+      "delivery_reliable": false,
+      "player_roles": {
+        "1": "fielder",
+        "2": "fielder",
+        "3": "umpire",
+        "4": "fielder",
+        "5": "batsman",
+        "7": "batsman",
+        "13": "batsman",
+        "18": "batsman",
+        "22": "batsman"
+      },
+      "stage_backends": {
+        "tracking": "bytetrack",
+        "detection": "bytetrack"
+      },
+      "stage_times": {
+        "preprocess": 0.14115619999938644,
+        "cricket_precheck": 6.150691100000586,
+        "ball_tracking": 6.521069100000204,
+        "detection_tracking": 3.124464800000169,
+        "pose_estimation": 1.2306013000006715,
+        "feature_engineering": 0.0017550000002302113,
+        "coaching": 7.050000021990854e-05,
+        "total": 21.631835899999714
+      },
+      "landmark_source_summary": {
+        "world_3d_frames": 6,
+        "normalized_2d_frames": 0,
+        "raw_array_frames": 0,
+        "missing_frames": 0,
+        "total_frames": 6
+      },
+      "warnings": [
+        "Ball tracking: 2 detected + 1 predicted frames (7% of clip) -- annotated video below.",
+        "Ball tracking: box stops at frame 25 (detected bat/pad/ground contact) so it doesn't chase the ball after it hits the bat.",
+        "Detection/tracking: locked to bowler track #44 (6 frames, confidence 0.83) before pose estimation.",
+        "Identity check: the top bowler candidate switched 1x across the clip (bowler <-> batsman churn observed).",
+        "Player roles: #1: fielder(0.51), #2: fielder(0.51), #3: umpire(0.51), #4: fielder(0.43), #5: batsman(0.69), #7: batsman(0.48), #13: batsman(0.69), #18: batsman(0.62), #22: batsman(0.64)",
+        "Batting stances: #1: striker(1.00), #5: non_striker(1.00)",
+        "Delivery quality: no front-foot stance detected -- clip may not contain a full delivery",
+        "Few pose frames after cropping -- consider tighter framing.",
+        "Analysis Replay generated: C:\\Users\\MOHAMM~1\\AppData\\Local\\Temp\\analysis_replayn1csno1d.mp4"
+      ],
+      "coaching_notes": [
+        "Elbow extension at release exceeds the 15.0\u00b0 ICC screening reference -- screening indicator only (not an official ICC measurement). Work on a straighter arm path through release.",
+        "High front-knee flexion at bracing (a 'bent knee' technique) increases vertical ground reaction force and knee-joint loading. A more braced, extended front leg reduces impact stress.",
+        "Short stride length relative to height -- a longer, more aggressive final stride typically improves momentum transfer into the delivery."
+      ],
+      "wall_clock_sec": 21.64
+    },
+    {
+      "video_id": "v_0fe78bb9dce5",
+      "filename": "off_right_00000001.mp4",
+      "camera_view_guess": "behind",
+      "predicted_bowler_track_id": 7,
+      "bowler_confirmed": false,
+      "bowler_confidence": 0.659119233335254,
+      "bowler_confirm_reason": "ambiguous_margin",
+      "identity_switch_count": 1,
+      "subject_verified": false,
+      "scoring_blocked_reason": "bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI.",
+      "n_bowler_candidates": 7,
+      "delivery_reliable": true,
+      "player_roles": {
+        "1": "batsman",
+        "2": "wicketkeeper",
+        "4": "wicketkeeper",
+        "8": "wicketkeeper",
+        "9": "wicketkeeper"
+      },
+      "stage_backends": {
+        "tracking": "bytetrack",
+        "detection": "bytetrack"
+      },
+      "stage_times": {
+        "preprocess": 0.2991589000002932,
+        "cricket_precheck": 5.44461869999941,
+        "ball_tracking": 4.424758399999519,
+        "detection_tracking": 2.4797582999999577,
+        "pose_estimation": 3.2013692000000447,
+        "feature_engineering": 0.006517800000438001,
+        "coaching": 2.899999344663229e-06,
+        "total": 20.702992300000005
+      },
+      "landmark_source_summary": {
+        "world_3d_frames": 27,
+        "normalized_2d_frames": 0,
+        "raw_array_frames": 0,
+        "missing_frames": 0,
+        "total_frames": 27
+      },
+      "warnings": [
+        "Ball tracking: 3 detected + 10 predicted frames (32% of clip) -- annotated video below.",
+        "Ball tracking: no clear bat/pad contact detected in this clip, so the box follows the ball for the whole tracked segment.",
+        "Detection/tracking: locked to bowler track #7 (27 frames, confidence 0.66) before pose estimation.",
+        "BOWLER NOT CONFIRMED: the cricket-evidence score is ambiguous_margin. ML/coaching are withheld until the bowler is confirmed in the UI.",
+        "Identity check: the top bowler candidate switched 1x across the clip (bowler <-> batsman churn observed).",
+        "Player roles: #1: batsman(0.49), #2: wicketkeeper(0.56), #4: wicketkeeper(0.47), #8: wicketkeeper(0.54), #9: wicketkeeper(0.45)",
+        "Batting stances: #2: striker(1.00), #1: non_striker(1.00)",
+        "Scoring withheld \u2014 subject not verified: bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI.",
+        "ML analysis skipped: scoring a skeleton that may not be the bowler would produce misleading numbers. Features are still shown, clearly marked as from an unverified subject.",
+        "Analysis Replay generated: C:\\Users\\MOHAMM~1\\AppData\\Local\\Temp\\analysis_replayv567v4c5.mp4"
+      ],
+      "coaching_notes": [
+        "Coaching withheld \u2014 pose subject could not be verified as the bowler."
+      ],
+      "wall_clock_sec": 20.71
+    }
+  ]
+}
