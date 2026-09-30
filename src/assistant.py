@@ -129,6 +129,25 @@ def _fmt_probabilities(probs) -> str:
     return ", ".join(f"class {i}: {v:.3f}" for i, v in enumerate(probs))
 
 
+def _no_score_reason(result) -> str:
+    """Why is there no ML score? The two causes need different fixes from the
+    reader, so they must not be reported as the same thing.
+
+    ``withheld`` means the pipeline loaded its bundles and then *deliberately*
+    refused to run them because the subject was not verified as the bowler. The
+    fix is a human confirming the bowler, not installing anything. ``not
+    supplied`` means no bundle was loaded at all. Reporting the second when the
+    first happened sends the reader hunting for a missing file that is present on
+    disk and already in memory.
+    """
+    if result.scoring_blocked_reason:
+        return f"withheld - {result.scoring_blocked_reason}"
+    if result.subject_verified is False:
+        return ("withheld - the measured skeleton could not be verified as the "
+                "bowler, so the features describe an unknown person")
+    return "not supplied - no ML bundle was loaded for this run"
+
+
 def assistant_report(result, include_timings: bool = True) -> str:
     """Render an :class:`AnalysisResult` as a structured markdown report."""
     parts = ["# Delivery Biomechanics Analysis Report", ""]
@@ -159,7 +178,7 @@ def assistant_report(result, include_timings: bool = True) -> str:
         parts.append("")
     else:
         parts.append("## Performance indicator model (demo)")
-        parts.append("- **Score**: n/a (ML bundles not supplied)")
+        parts.append(f"- **Score**: n/a ({_no_score_reason(result)})")
         parts.append("")
 
     if result.injury_risk:
@@ -175,7 +194,7 @@ def assistant_report(result, include_timings: bool = True) -> str:
         parts.append("")
     else:
         parts.append("## Biomechanical risk-indicator model")
-        parts.append("- **Level**: n/a (ML bundles not supplied)")
+        parts.append(f"- **Level**: n/a ({_no_score_reason(result)})")
         parts.append("")
 
     ball_stats = result.ball_stats or {}
@@ -287,11 +306,21 @@ def cohort_report(labeled_results, include_timings: bool = False) -> str:
         parts.append("")
 
     parts.append("## Cohort summary (machine-generated)")
+    # Say out loud how many deliveries were withheld and why. Without this, a
+    # cohort mean over n=2 of 4 looks like a complete result, and the reader has
+    # no way to tell that half the cohort was refused rather than measured.
+    withheld = [(label or os.path.basename(r.video_path or "clip"), r)
+                for label, r in results if r.performance_score is None]
+    if withheld:
+        parts.append(f"- **Scoring withheld on {len(withheld)} of {len(results)} "
+                     f"deliveries** (no score, no risk indicator):")
+        for name, r in withheld:
+            parts.append(f"  - {name}: {_no_score_reason(r)}")
     if performance_scores:
         mean_p = sum(performance_scores) / len(performance_scores)
         parts.append(f"- **Mean performance**: {mean_p:.1f} / 100 "
                      f"(range {min(performance_scores):.1f}-{max(performance_scores):.1f}, "
-                     f"n={len(performance_scores)})")
+                     f"n={len(performance_scores)} of {len(results)} deliveries)")
     if risk_counts:
         parts.append("- **Biomechanical risk-indicator distribution**: "
                      + ", ".join(f"{k}: {v}" for k, v in sorted(risk_counts.items())))
