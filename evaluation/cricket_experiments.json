@@ -1,0 +1,1174 @@
+{
+  "arms": {
+    "A": {
+      "arm": "A",
+      "description": "Current PaceAI selection logic (src/tracking.py select_bowler_track_with_meta)",
+      "blocked_by": null,
+      "requires_task": null,
+      "runnable": true,
+      "notes": "Always runnable: it is the code as it already exists. It needs no training and no new weights."
+    },
+    "B": {
+      "arm": "B",
+      "description": "A + lower-half spatial prior",
+      "blocked_by": null,
+      "requires_task": null,
+      "runnable": true,
+      "notes": "Always runnable: the prior is a declared constant, so no training and no held-out data are needed to *execute* it. Scoring it still needs a human-labelled holdout."
+    },
+    "C": {
+      "arm": "C",
+      "description": "B + cricket role model (Model B)",
+      "blocked_by": "model_B",
+      "requires_task": "B",
+      "runnable": false,
+      "notes": "Blocked until Model B passes every readiness guard."
+    },
+    "D": {
+      "arm": "D",
+      "description": "C + temporal bowling-action model (Model C)",
+      "blocked_by": "model_C",
+      "requires_task": "C",
+      "runnable": false,
+      "notes": "Blocked until Model C passes every readiness guard."
+    }
+  },
+  "metrics": {
+    "A": {
+      "bowler_top1_accuracy": {
+        "name": "bowler_top1_accuracy",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "bowler_precision": {
+        "name": "bowler_precision",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "bowler_recall": {
+        "name": "bowler_recall",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "bowler_f1": {
+        "name": "bowler_f1",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "false_selection_rate": {
+        "name": "false_selection_rate",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "identity_switches": {
+        "name": "identity_switches",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "track_continuity": {
+        "name": "track_continuity",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "bowler_abstention_rate": {
+        "name": "bowler_abstention_rate",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "delivery_detection_accuracy": {
+        "name": "delivery_detection_accuracy",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "release_frame_error_frames": {
+        "name": "release_frame_error_frames",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "phase_accuracy": {
+        "name": "phase_accuracy",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "phase_macro_f1": {
+        "name": "phase_macro_f1",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      }
+    },
+    "B": {
+      "bowler_top1_accuracy": {
+        "name": "bowler_top1_accuracy",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "bowler_precision": {
+        "name": "bowler_precision",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "bowler_recall": {
+        "name": "bowler_recall",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "bowler_f1": {
+        "name": "bowler_f1",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "false_selection_rate": {
+        "name": "false_selection_rate",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "identity_switches": {
+        "name": "identity_switches",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "track_continuity": {
+        "name": "track_continuity",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "bowler_abstention_rate": {
+        "name": "bowler_abstention_rate",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "delivery_detection_accuracy": {
+        "name": "delivery_detection_accuracy",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "release_frame_error_frames": {
+        "name": "release_frame_error_frames",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "phase_accuracy": {
+        "name": "phase_accuracy",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "phase_macro_f1": {
+        "name": "phase_macro_f1",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero",
+        "n": 8,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      }
+    },
+    "C": {
+      "bowler_top1_accuracy": {
+        "name": "bowler_top1_accuracy",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "bowler_precision": {
+        "name": "bowler_precision",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "bowler_recall": {
+        "name": "bowler_recall",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "bowler_f1": {
+        "name": "bowler_f1",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "false_selection_rate": {
+        "name": "false_selection_rate",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "identity_switches": {
+        "name": "identity_switches",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "track_continuity": {
+        "name": "track_continuity",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "bowler_abstention_rate": {
+        "name": "bowler_abstention_rate",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "delivery_detection_accuracy": {
+        "name": "delivery_detection_accuracy",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "release_frame_error_frames": {
+        "name": "release_frame_error_frames",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "phase_accuracy": {
+        "name": "phase_accuracy",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "phase_macro_f1": {
+        "name": "phase_macro_f1",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      }
+    },
+    "D": {
+      "bowler_top1_accuracy": {
+        "name": "bowler_top1_accuracy",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "bowler_precision": {
+        "name": "bowler_precision",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "bowler_recall": {
+        "name": "bowler_recall",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "bowler_f1": {
+        "name": "bowler_f1",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "false_selection_rate": {
+        "name": "false_selection_rate",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "identity_switches": {
+        "name": "identity_switches",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "track_continuity": {
+        "name": "track_continuity",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "bowler_abstention_rate": {
+        "name": "bowler_abstention_rate",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "delivery_detection_accuracy": {
+        "name": "delivery_detection_accuracy",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "release_frame_error_frames": {
+        "name": "release_frame_error_frames",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "phase_accuracy": {
+        "name": "phase_accuracy",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      },
+      "phase_macro_f1": {
+        "name": "phase_macro_f1",
+        "value": null,
+        "status": "NOT MEASURED",
+        "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero",
+        "n": 0,
+        "unit": "",
+        "higher_is_better": null,
+        "interval": null,
+        "extra": {}
+      }
+    }
+  },
+  "comparison": {
+    "arms": {
+      "A": "Current PaceAI selection logic (src/tracking.py select_bowler_track_with_meta)",
+      "B": "A + lower-half spatial prior",
+      "C": "B + cricket role model (Model B)",
+      "D": "C + temporal bowling-action model (Model C)"
+    },
+    "metrics": {
+      "bowler_abstention_rate": {
+        "A": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "B": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "C": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "D": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "comparable_arms": [],
+        "comparable": false,
+        "verdict": "NOT COMPARABLE - fewer than two arms have this metric measured"
+      },
+      "bowler_f1": {
+        "A": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "B": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "C": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "D": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "comparable_arms": [],
+        "comparable": false,
+        "verdict": "NOT COMPARABLE - fewer than two arms have this metric measured"
+      },
+      "bowler_precision": {
+        "A": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "B": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "C": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "D": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "comparable_arms": [],
+        "comparable": false,
+        "verdict": "NOT COMPARABLE - fewer than two arms have this metric measured"
+      },
+      "bowler_recall": {
+        "A": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "B": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "C": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "D": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "comparable_arms": [],
+        "comparable": false,
+        "verdict": "NOT COMPARABLE - fewer than two arms have this metric measured"
+      },
+      "bowler_top1_accuracy": {
+        "A": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "B": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "C": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "D": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "comparable_arms": [],
+        "comparable": false,
+        "verdict": "NOT COMPARABLE - fewer than two arms have this metric measured"
+      },
+      "delivery_detection_accuracy": {
+        "A": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero"
+        },
+        "B": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero"
+        },
+        "C": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero"
+        },
+        "D": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero"
+        },
+        "comparable_arms": [],
+        "comparable": false,
+        "verdict": "NOT COMPARABLE - fewer than two arms have this metric measured"
+      },
+      "false_selection_rate": {
+        "A": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "B": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "C": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "D": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "comparable_arms": [],
+        "comparable": false,
+        "verdict": "NOT COMPARABLE - fewer than two arms have this metric measured"
+      },
+      "identity_switches": {
+        "A": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "B": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "C": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "D": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "comparable_arms": [],
+        "comparable": false,
+        "verdict": "NOT COMPARABLE - fewer than two arms have this metric measured"
+      },
+      "phase_accuracy": {
+        "A": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero"
+        },
+        "B": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero"
+        },
+        "C": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero"
+        },
+        "D": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero"
+        },
+        "comparable_arms": [],
+        "comparable": false,
+        "verdict": "NOT COMPARABLE - fewer than two arms have this metric measured"
+      },
+      "phase_macro_f1": {
+        "A": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero"
+        },
+        "B": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero"
+        },
+        "C": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero"
+        },
+        "D": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human bowling-phase annotation exists, so phase accuracy cannot be scored; it is not zero"
+        },
+        "comparable_arms": [],
+        "comparable": false,
+        "verdict": "NOT COMPARABLE - fewer than two arms have this metric measured"
+      },
+      "release_frame_error_frames": {
+        "A": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero"
+        },
+        "B": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero"
+        },
+        "C": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero"
+        },
+        "D": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human delivery annotation exists, so delivery detection cannot be scored; it is not zero"
+        },
+        "comparable_arms": [],
+        "comparable": false,
+        "verdict": "NOT COMPARABLE - fewer than two arms have this metric measured"
+      },
+      "track_continuity": {
+        "A": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "B": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "C": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "D": {
+          "value": null,
+          "status": "NOT MEASURED",
+          "reason": "no human cricket annotation exists for this clip, so the metric cannot be computed; it is not zero"
+        },
+        "comparable_arms": [],
+        "comparable": false,
+        "verdict": "NOT COMPARABLE - fewer than two arms have this metric measured"
+      }
+    },
+    "paired_A_B": {
+      "delta": null,
+      "n_pairs": 0,
+      "interval": null,
+      "method": "none",
+      "verdict": "NOT MEASURED - only 0 paired clip(s); at least 5 are needed for an interval"
+    }
+  },
+  "ground_truth": {
+    "n_videos_with_scorable_bowler": 0
+  },
+  "arm_results": {
+    "A": [
+      {
+        "arm": "A",
+        "video_id": "v_02a8e776ad75",
+        "predicted_bowler_track_id": 6,
+        "bowler_confirmed": false,
+        "bowler_confirm_reason": "low_evidence",
+        "bowler_confidence": 0.6054163648043532,
+        "identity_switch_count": 1,
+        "score": 0.3099747193782949,
+        "score_without_prior": null,
+        "spatial_prior_bonus": null
+      },
+      {
+        "arm": "A",
+        "video_id": "v_06f39d06acef",
+        "predicted_bowler_track_id": 4,
+        "bowler_confirmed": false,
+        "bowler_confirm_reason": "ambiguous_margin",
+        "bowler_confidence": 0.6816367964047139,
+        "identity_switch_count": 1,
+        "score": 0.3815207994293207,
+        "score_without_prior": null,
+        "spatial_prior_bonus": null
+      },
+      {
+        "arm": "A",
+        "video_id": "v_07f24eaae5ba",
+        "predicted_bowler_track_id": 4,
+        "bowler_confirmed": false,
+        "bowler_confirm_reason": "ambiguous_margin",
+        "bowler_confidence": 0.6916105262103063,
+        "identity_switch_count": 1,
+        "score": 0.39213058985203053,
+        "score_without_prior": null,
+        "spatial_prior_bonus": null
+      },
+      {
+        "arm": "A",
+        "video_id": "v_0a378bf5e72c",
+        "predicted_bowler_track_id": 3,
+        "bowler_confirmed": false,
+        "bowler_confirm_reason": "ambiguous_margin",
+        "bowler_confidence": 0.6947581490957431,
+        "identity_switch_count": 1,
+        "score": 0.3955502876040101,
+        "score_without_prior": null,
+        "spatial_prior_bonus": null
+      },
+      {
+        "arm": "A",
+        "video_id": "v_0a8571225a02",
+        "predicted_bowler_track_id": 18,
+        "bowler_confirmed": false,
+        "bowler_confirm_reason": "ambiguous_margin",
+        "bowler_confidence": 0.7481237989534242,
+        "identity_switch_count": 2,
+        "score": 0.45960585928980957,
+        "score_without_prior": null,
+        "spatial_prior_bonus": null
+      },
+      {
+        "arm": "A",
+        "video_id": "v_0a8674143088",
+        "predicted_bowler_track_id": 8,
+        "bowler_confirmed": false,
+        "bowler_confirm_reason": "ambiguous_margin",
+        "bowler_confidence": 0.7547913256720954,
+        "identity_switch_count": 1,
+        "score": 0.46854856633486863,
+        "score_without_prior": null,
+        "spatial_prior_bonus": null
+      },
+      {
+        "arm": "A",
+        "video_id": "v_0d92e9520236",
+        "predicted_bowler_track_id": 44,
+        "bowler_confirmed": true,
+        "bowler_confirm_reason": "confirmed",
+        "bowler_confidence": 0.8272307617997783,
+        "identity_switch_count": 1,
+        "score": 0.5852661527114027,
+        "score_without_prior": null,
+        "spatial_prior_bonus": null
+      },
+      {
+        "arm": "A",
+        "video_id": "v_0fe78bb9dce5",
+        "predicted_bowler_track_id": 7,
+        "bowler_confirmed": false,
+        "bowler_confirm_reason": "ambiguous_margin",
+        "bowler_confidence": 0.659119233335254,
+        "identity_switch_count": 1,
+        "score": 0.35874084023927794,
+        "score_without_prior": null,
+        "spatial_prior_bonus": null
+      }
+    ],
+    "B": [
+      {
+        "arm": "B",
+        "video_id": "v_02a8e776ad75",
+        "predicted_bowler_track_id": 1,
+        "bowler_confirmed": true,
+        "bowler_confirm_reason": "confirmed",
+        "bowler_confidence": 0.49033033422025174,
+        "identity_switch_count": 2,
+        "score": 0.7246641590928533,
+        "score_without_prior": 0.22466415909285334,
+        "spatial_prior_bonus": 0.5
+      },
+      {
+        "arm": "B",
+        "video_id": "v_06f39d06acef",
+        "predicted_bowler_track_id": 3,
+        "bowler_confirmed": true,
+        "bowler_confirm_reason": "confirmed",
+        "bowler_confidence": 0.624845715006058,
+        "identity_switch_count": 2,
+        "score": 0.8268059703246506,
+        "score_without_prior": 0.3268059703246506,
+        "spatial_prior_bonus": 0.5
+      },
+      {
+        "arm": "B",
+        "video_id": "v_07f24eaae5ba",
+        "predicted_bowler_track_id": 2,
+        "bowler_confirmed": false,
+        "bowler_confirm_reason": "ambiguous_margin",
+        "bowler_confidence": 0.5662856273781889,
+        "identity_switch_count": 1,
+        "score": 0.7784563630474267,
+        "score_without_prior": 0.2784563630474267,
+        "spatial_prior_bonus": 0.5
+      },
+      {
+        "arm": "B",
+        "video_id": "v_0a378bf5e72c",
+        "predicted_bowler_track_id": 1,
+        "bowler_confirmed": false,
+        "bowler_confirm_reason": "ambiguous_margin",
+        "bowler_confidence": 0.6449571705215194,
+        "identity_switch_count": 1,
+        "score": 0.6618389501218865,
+        "score_without_prior": 0.3451722834552199,
+        "spatial_prior_bonus": 0.31666666666666665
+      },
+      {
+        "arm": "B",
+        "video_id": "v_0a8571225a02",
+        "predicted_bowler_track_id": 4,
+        "bowler_confirmed": true,
+        "bowler_confirm_reason": "confirmed",
+        "bowler_confidence": 0.6497605571246038,
+        "identity_switch_count": 1,
+        "score": 0.8497127453008901,
+        "score_without_prior": 0.3497127453008901,
+        "spatial_prior_bonus": 0.5
+      },
+      {
+        "arm": "B",
+        "video_id": "v_0a8674143088",
+        "predicted_bowler_track_id": 7,
+        "bowler_confirmed": false,
+        "bowler_confirm_reason": "ambiguous_margin",
+        "bowler_confidence": 0.704953457387119,
+        "identity_switch_count": 1,
+        "score": 0.6568740545059513,
+        "score_without_prior": 0.4068740545059513,
+        "spatial_prior_bonus": 0.25
+      },
+      {
+        "arm": "B",
+        "video_id": "v_0d92e9520236",
+        "predicted_bowler_track_id": 4,
+        "bowler_confirmed": true,
+        "bowler_confirm_reason": "confirmed",
+        "bowler_confidence": 0.7163826113691727,
+        "identity_switch_count": 1,
+        "score": 0.8700430574242672,
+        "score_without_prior": 0.4200430574242673,
+        "spatial_prior_bonus": 0.45
+      },
+      {
+        "arm": "B",
+        "video_id": "v_0fe78bb9dce5",
+        "predicted_bowler_track_id": 2,
+        "bowler_confirmed": false,
+        "bowler_confirm_reason": "ambiguous_margin",
+        "bowler_confidence": 0.6212187652720844,
+        "identity_switch_count": 1,
+        "score": 0.8235988192101203,
+        "score_without_prior": 0.32359881921012035,
+        "spatial_prior_bonus": 0.5
+      }
+    ]
+  },
+  "product_reference": [
+    {
+      "arm": "A",
+      "video_id": "v_02a8e776ad75",
+      "predicted_bowler_track_id": 6,
+      "bowler_confirmed": false,
+      "bowler_confidence": 0.6054163648043532,
+      "bowler_confirm_reason": "low_evidence",
+      "identity_switch_count": 1,
+      "scoring_blocked_reason": "bowler not confirmed (cricket-evidence low_evidence); ML/coaching withheld until the bowler is confirmed in the UI."
+    },
+    {
+      "arm": "A",
+      "video_id": "v_06f39d06acef",
+      "predicted_bowler_track_id": 4,
+      "bowler_confirmed": false,
+      "bowler_confidence": 0.6816367964047139,
+      "bowler_confirm_reason": "ambiguous_margin",
+      "identity_switch_count": 1,
+      "scoring_blocked_reason": "bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI."
+    },
+    {
+      "arm": "A",
+      "video_id": "v_07f24eaae5ba",
+      "predicted_bowler_track_id": 4,
+      "bowler_confirmed": false,
+      "bowler_confidence": 0.6916105262103063,
+      "bowler_confirm_reason": "ambiguous_margin",
+      "identity_switch_count": 1,
+      "scoring_blocked_reason": "bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI."
+    },
+    {
+      "arm": "A",
+      "video_id": "v_0a378bf5e72c",
+      "predicted_bowler_track_id": 3,
+      "bowler_confirmed": false,
+      "bowler_confidence": 0.6947581490957431,
+      "bowler_confirm_reason": "ambiguous_margin",
+      "identity_switch_count": 1,
+      "scoring_blocked_reason": "bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI."
+    },
+    {
+      "arm": "A",
+      "video_id": "v_0a8571225a02",
+      "predicted_bowler_track_id": 18,
+      "bowler_confirmed": false,
+      "bowler_confidence": 0.7481237989534242,
+      "bowler_confirm_reason": "ambiguous_margin",
+      "identity_switch_count": 2,
+      "scoring_blocked_reason": "bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI."
+    },
+    {
+      "arm": "A",
+      "video_id": "v_0a8674143088",
+      "predicted_bowler_track_id": 8,
+      "bowler_confirmed": false,
+      "bowler_confidence": 0.7547913256720954,
+      "bowler_confirm_reason": "ambiguous_margin",
+      "identity_switch_count": 1,
+      "scoring_blocked_reason": "bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI."
+    },
+    {
+      "arm": "A",
+      "video_id": "v_0d92e9520236",
+      "predicted_bowler_track_id": 44,
+      "bowler_confirmed": true,
+      "bowler_confidence": 0.8272307617997783,
+      "bowler_confirm_reason": null,
+      "identity_switch_count": 1,
+      "scoring_blocked_reason": ""
+    },
+    {
+      "arm": "A",
+      "video_id": "v_0fe78bb9dce5",
+      "predicted_bowler_track_id": 7,
+      "bowler_confirmed": false,
+      "bowler_confidence": 0.659119233335254,
+      "bowler_confirm_reason": "ambiguous_margin",
+      "identity_switch_count": 1,
+      "scoring_blocked_reason": "bowler not confirmed (cricket-evidence ambiguous_margin); ML/coaching withheld until the bowler is confirmed in the UI."
+    }
+  ]
+}

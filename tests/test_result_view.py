@@ -24,6 +24,7 @@ VIDEO_ONLY_FIELDS = (
     "bowler_confirmed", "bowler_confirm_reason", "bowler_candidates",
     "identity_switch_count", "batting_stances", "striker_track_id",
     "non_striker_track_id", "original_frame_dims", "player_roles",
+    "role_engine",
     "ball_stats", "video_path", "pose_video_path", "reels_video_path",
     "analysis_replay_path", "bowling_arm", "camera_view", "warnings",
     "subject_verified", "delivery_reliable", "scoring_blocked_reason",
@@ -442,3 +443,152 @@ class TestVideoFieldMerge:
                         found = tuple(ast.literal_eval(node.value))
         assert found is not None, "app.py no longer defines _VIDEO_ONLY_FIELDS"
         assert set(found) == set(VIDEO_ONLY_FIELDS)
+
+
+# --------------------------------------------------------------------------
+# 05 -- the measurements shown beside the finding
+# --------------------------------------------------------------------------
+
+class TestIdentityTrustGate:
+    """Regression: the trust gate must read the identity fields it already had.
+
+    docs/RESULT_REDESIGN.md requires `bowler_confirmed` and
+    `identity_switch_count` on the top trust rung, but the gate previously read
+    `subject_verified` alone, so a run whose bowler the pipeline had explicitly
+    rejected still rendered as trusted.
+    """
+
+    def test_unconfirmed_bowler_is_unreliable_even_if_subject_verified(self):
+        s = status_for(make_result(
+            subject_verified=True, bowler_confirmed=False,
+            performance_score=None, injury_risk={}))
+        assert s.state == "UNRELIABLE"
+        assert "not confirmed" in s.headline.lower()
+
+    def test_identity_switching_is_unreliable(self):
+        s = status_for(make_result(
+            subject_verified=True, bowler_confirmed=True,
+            identity_switch_count=3,
+            performance_score=None, injury_risk={}))
+        assert s.state == "UNRELIABLE"
+        assert "not stable" in s.headline.lower()
+
+    def test_role_engine_withholding_is_unreliable(self):
+        s = status_for(make_result(
+            subject_verified=True, bowler_confirmed=True,
+            role_engine={"analysis_withheld": True,
+                         "withholding_reason": "insufficient pose coverage"},
+            performance_score=None, injury_risk={}))
+        assert s.state == "UNRELIABLE"
+        assert "not confirmed" in s.headline.lower()
+
+    def test_confirmed_stable_identity_stays_trusted(self):
+        s = status_for(make_result(
+            subject_verified=True, bowler_confirmed=True,
+            identity_switch_count=0,
+            role_engine={"analysis_withheld": False}), is_video=True)
+        assert s.state == "NORMAL"
+
+    def test_absent_identity_fields_do_not_break_legacy_results(self):
+        """Results predating the identity fields must still assess normally."""
+        s = status_for(make_result(), is_video=True)
+        assert s.state == "NORMAL"
+
+
+class TestSupportingMeasurements:
+    """Section 05 is specified as "only the measurements relevant to the
+    finding", so it must not degenerate into the first N table rows."""
+
+    def _strip(self, result):
+        rows = result_view.build_measurements(result, is_video=True)
+        findings = result_view.build_findings(result, result_view.assess_delivery(result))
+        return result_view.build_supporting_measurements(rows, findings), findings
+
+    def test_strip_is_capped_at_four(self):
+        result = make_result(feature_vector=dict(FLAGGED_FEATURES),
+                             feature_provenance=dict(PROV_3D))
+        strip, _ = self._strip(result)
+        assert 0 < len(strip) <= 4
+
+    def test_strip_never_carries_an_absent_value_first(self):
+        """An absent reading cannot support a claim, so a valued row must win."""
+        result = make_result(feature_vector={"elbow_flexion_deg": 8.0},
+                             feature_provenance=dict(PROV_3D))
+        strip = result_view.build_supporting_measurements(
+            result_view.build_measurements(result, is_video=True), [])
+        assert any(m.value is not None for m in strip)
+
+    def test_the_findings_own_feature_leads_the_strip(self):
+        result = make_result(feature_vector=dict(FLAGGED_FEATURES),
+                             feature_provenance=dict(PROV_3D))
+        strip, findings = self._strip(result)
+        cited = [f.feature for f in findings if f.feature]
+        if cited and strip:
+            assert strip[0].feature == cited[0]
+
+    def test_strip_is_deterministic(self):
+        result = make_result(feature_vector=dict(FLAGGED_FEATURES),
+                             feature_provenance=dict(PROV_3D))
+        assert ([m.feature for m in self._strip(result)[0]]
+                == [m.feature for m in self._strip(result)[0]])
+
+    def test_everything_dropped_from_the_strip_survives_in_advanced(self):
+        """Progressive disclosure, not deletion: the full table is still built."""
+        result = make_result(feature_vector=dict(FLAGGED_FEATURES),
+                             feature_provenance=dict(PROV_3D))
+        rows = result_view.build_measurements(result, is_video=True)
+        strip = result_view.build_supporting_measurements(rows, [])
+        assert len(rows) == len(ALL_MEASURED)
+        assert len(strip) < len(rows)
+
+
+class TestDeliverySummary:
+    """Section 02 summarises the delivery; section 03 states the finding. They
+    must not collapse into saying the same thing twice."""
+
+    def test_clean_delivery_says_nothing_crossed_a_band(self):
+        result = make_result()
+        s = result_view.assess_delivery(result, is_video=True)
+        rows = result_view.build_measurements(result, is_video=True)
+        findings = result_view.build_findings(result, s)
+        line = result_view.summarise_delivery(s, findings, rows)
+        assert "inside the screening bands" in line
+
+    def test_withheld_delivery_gets_no_summary(self):
+        """01 already explains a refusal; 02 must not restate it."""
+        result = make_result(subject_verified=False, performance_score=None,
+                             injury_risk={})
+        s = result_view.assess_delivery(result)
+        rows = result_view.build_measurements(result)
+        assert result_view.summarise_delivery(s, [], rows) == ""
+
+    def test_summary_counts_only_measured_values(self):
+        result = make_result(feature_vector={"elbow_flexion_deg": 8.0},
+                             feature_provenance=dict(PROV_3D))
+        s = result_view.assess_delivery(result, is_video=True)
+        rows = result_view.build_measurements(result, is_video=True)
+        line = result_view.summarise_delivery(s, [], rows)
+        assert line.startswith("All 1 measured value ")
+
+    def test_a_positive_confirmation_is_not_counted_as_a_crossed_band(self):
+        """build_findings never returns empty -- a clean delivery gets a
+        positive-severity confirmation. Counting it would claim a threshold was
+        crossed when none was."""
+        result = make_result()
+        s = result_view.assess_delivery(result, is_video=True)
+        rows = result_view.build_measurements(result, is_video=True)
+        findings = result_view.build_findings(result, s)
+        assert findings and findings[0].severity == "positive"
+        line = result_view.summarise_delivery(s, findings, rows)
+        assert "inside the screening bands" in line
+        assert "fell outside" not in line
+
+    def test_summary_never_repeats_the_finding_title(self):
+        result = make_result(feature_vector=dict(FLAGGED_FEATURES),
+                             feature_provenance={})
+        s = result_view.assess_delivery(result)
+        rows = result_view.build_measurements(result)
+        findings = result_view.build_findings(result, s)
+        line = result_view.summarise_delivery(s, findings, rows)
+        assert findings
+        assert findings[0].title.lower() not in line.lower()

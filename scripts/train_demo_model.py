@@ -87,6 +87,9 @@ def validate_dataset(df: pd.DataFrame) -> pd.DataFrame:
 def print_report(bundle):
     cv = getattr(bundle, "cv_metrics", None) or {}
     base = getattr(bundle, "baseline_metrics", None) or {}
+    if not cv.get("folds"):
+        print("    Dataset too small to cross-validate; no CV metrics.")
+        return
 
     if bundle.task == "performance":
         cv_r2 = cv.get("r2_mean", 0.0)
@@ -142,7 +145,7 @@ def train_single_model(model_name: str, X: np.ndarray, y_perf: np.ndarray,
         "training_time_sec": round(time.time() - t0, 2)
     }
     with open(meta_path, "w") as f:
-        json.dump(metadata, f, indent=2)
+        json.dump(metadata, f, indent=2, allow_nan=False)
 
     print(f"\n✅ Artifacts saved successfully:\n   • {perf_path}\n   • {injury_path}\n   • {meta_path}")
 

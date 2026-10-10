@@ -77,26 +77,26 @@ def _is_3d(landmarks: np.ndarray) -> bool:
 def _resolve_source(frame) -> str:
     """Classify the coordinate space a feature was computed from.
 
-    Returns one of:
-      - "mediapipe_world_3d"  PoseFrame with metric world landmarks (33, 3)
-      - "2d_normalized"       PoseFrame with only (33, 4) normalized landmarks
-      - "3d_array" / "2d_array"  raw ndarray inputs (unit-test / synthetic feeds)
-      - "missing"             no landmark data on the frame(s) used
+    Returns one of the canonical ``config.PROV_*`` tags:
+      - PROV_WORLD_3D       PoseFrame with metric world landmarks (33, 3)
+      - PROV_NORMALIZED_2D  PoseFrame with only (33, 4) normalized landmarks
+      - PROV_3D_ARRAY / PROV_2D_ARRAY  raw ndarray inputs (unit-test / synthetic)
+      - PROV_MISSING        no landmark data on the frame(s) used
     """
     if frame is None:
-        return "missing"
+        return config.PROV_MISSING
     if isinstance(frame, np.ndarray):
         arr = np.asarray(frame, dtype=float)
         if arr.ndim < 2 or arr.shape[0] < 33:
-            return "missing"
-        return "3d_array" if arr.shape[1] >= 3 else "2d_array"
+            return config.PROV_MISSING
+        return config.PROV_3D_ARRAY if arr.shape[1] >= 3 else config.PROV_2D_ARRAY
     world = getattr(frame, "world_landmarks", None)
     if world is not None and len(world) == 33:
-        return "mediapipe_world_3d"
+        return config.PROV_WORLD_3D
     lm = getattr(frame, "landmarks", None)
     if lm is not None:
-        return "2d_normalized"
-    return "missing"
+        return config.PROV_NORMALIZED_2D
+    return config.PROV_MISSING
 
 
 def _mean_landmark_visibility(frame, names) -> Optional[float]:
@@ -610,9 +610,10 @@ def analyze_delivery(pose_sequence: Sequence, bowling_arm: str = "right",
     the caller can warn when the clip was not a clean single delivery.
 
     diagnostics["feature_provenance"] records, per feature, which coordinate
-    space it was computed from (mediapipe_world_3d / 2d_normalized / *_array /
-    missing) plus an UNCALIBRATED visibility-based confidence proxy -- so a
-    downstream report can state exactly what each number is (or is not) based on.
+    space it was computed from (config.PROV_WORLD_3D / PROV_NORMALIZED_2D /
+    PROV_*_ARRAY / PROV_MISSING) plus an UNCALIBRATED visibility-based confidence
+    proxy -- so a downstream report can state exactly what each number is (or is
+    not) based on.
     """
     phases = analyze_delivery_phases(pose_sequence, bowling_arm)
     release_idx = phases["release_frame_idx"]
@@ -673,10 +674,10 @@ def analyze_delivery(pose_sequence: Sequence, bowling_arm: str = "right",
         f"frame window around release (n={max(1, len(frame_feats))})")
 
     _visibility_summary = {
-        "world_3d_frames": sum(1 for pf in pose_sequence if _resolve_source(pf) == "mediapipe_world_3d"),
-        "normalized_2d_frames": sum(1 for pf in pose_sequence if _resolve_source(pf) == "2d_normalized"),
-        "raw_array_frames": sum(1 for pf in pose_sequence if _resolve_source(pf) in ("3d_array", "2d_array")),
-        "missing_frames": sum(1 for pf in pose_sequence if _resolve_source(pf) == "missing"),
+        "world_3d_frames": sum(1 for pf in pose_sequence if _resolve_source(pf) == config.PROV_WORLD_3D),
+        "normalized_2d_frames": sum(1 for pf in pose_sequence if _resolve_source(pf) == config.PROV_NORMALIZED_2D),
+        "raw_array_frames": sum(1 for pf in pose_sequence if _resolve_source(pf) in (config.PROV_3D_ARRAY, config.PROV_2D_ARRAY)),
+        "missing_frames": sum(1 for pf in pose_sequence if _resolve_source(pf) == config.PROV_MISSING),
         "total_frames": len(pose_sequence),
     }
 

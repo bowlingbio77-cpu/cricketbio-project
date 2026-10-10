@@ -118,10 +118,13 @@ def _vis(frame: PoseFrame, name: str) -> float:
 def check_human_pose(pose_sequence: List[PoseFrame],
                      min_frames: int = 3,
                      min_visibility: float = 0.4) -> CheckResult:
-    """A valid bowling frame must contain a human with key joints visible.
+    """A valid bowling clip must contain a detectable human torso.
 
-    Requires shoulders and hips (the torso) plus an arm/wrist on at least a few
-    frames -- a bare torso-only detection (e.g. a mannequin) is insufficient.
+    The torso (shoulders + hips) is the required signal. Arm landmarks and
+    upright posture are recorded as soft diagnostics and can independently
+    rescue a clip, but neither is required: at 640x360 a broadcast bowler is
+    often too small for wrists to clear the visibility threshold, and a clip
+    trimmed to the delivery is non-upright for most of its length.
     """
     torso_ok = 0
     arms_ok = 0
@@ -136,13 +139,18 @@ def check_human_pose(pose_sequence: List[PoseFrame],
         if min(_vis(pf, "left_wrist"), _vis(pf, "right_wrist"),
                _vis(pf, "left_elbow"), _vis(pf, "right_elbow")) >= min_visibility:
             arms_ok += 1
-        # Torso roughly upright: shoulders above hips in image coords.
+        # Torso orientation, not a fixed vertical offset. What we want to know is
+        # whether the body is upright-ish rather than lying flat: shoulders-above-
+        # hips within 45 degrees of the image vertical. Requiring a fixed 5%-of-
+        # frame vertical drop instead rejected genuine deliveries, where the
+        # bowler leans progressively forward and is near-horizontal at release.
         sh = _lm(pf, ["left_shoulder", "right_shoulder"])
         hp = _lm(pf, ["left_hip", "right_hip"])
         if sh is not None and hp is not None:
-            shoulder_y = float(np.mean(sh[:, 1]))
-            hip_y = float(np.mean(hp[:, 1]))
-            if hip_y > shoulder_y + 0.05:   # hips below shoulders (y-down)
+            sx, sy = float(np.mean(sh[:, 0])), float(np.mean(sh[:, 1]))
+            hx, hy = float(np.mean(hp[:, 0])), float(np.mean(hp[:, 1]))
+            dx, dy = abs(hx - sx), hy - sy          # y is down: hips below = positive
+            if dy > 0.02 and dy >= dx and float(np.hypot(dx, dy)) >= 0.08:
                 posture_ok += 1
 
     n = len(pose_sequence)
@@ -156,25 +164,37 @@ def check_human_pose(pose_sequence: List[PoseFrame],
     score = 3 * min(torso_frac, 1.0) + 2 * min(arm_frac, 1.0) + 1 * min(posture_frac, 1.0)
     score = min(score / 6.0, 1.0)
 
-    # A clear, upright human torso is enough to treat the clip as containing a
-    # person. Arms are a *soft* signal: a small/far-away bowler (or an
-    # occlusion) often yields undetectable wrist/elbow landmarks even though a
-    # person is plainly present, so arms must NOT be a hard requirement here.
-    # We only fall back to requiring arms when the posture is too ambiguous
-    # (neither clearly upright nor clearly prone) to call it a bowler on its own.
+    # A clear human torso is enough to treat the clip as containing a person.
+    # Arms are a *soft* signal: a small/far-away bowler (or an occlusion) often
+    # yields undetectable wrist/elbow landmarks even though a person is plainly
+    # present, so arms must NOT be a hard requirement here.
     #
-    # Cricket bowlers frequently lean forward during delivery, so the posture
-    # threshold is intentionally lenient (0.35 not 0.5) — a bowler at 40%
-    # "upright" is still clearly a bowler, not a bystander.
+    # Posture is also soft, and was the reason genuine clips were being rejected.
+    # A clip cut tight around the delivery is *mostly* non-upright by
+    # construction, and at 640x360 the wrists frequently never clear the
+    # visibility threshold at all -- so a real broadcast bowler could arrive with
+    # 100% torso, ~8% arms and ~28% upright and still be a false rejection.
+    #
+    # So torso strength is allowed to stand on its own. The softer signals only
+    # decide the genuinely ambiguous case, where a torso is present but weak.
     posture_good = posture_frac >= 0.35
     arms_good = arm_frac >= 0.2
+    torso_strong = torso_frac >= 0.5
     ok = (torso_ok >= min_frames and
-          (posture_good or arms_good))
-    reason = (f"Human pose detected on {torso_ok}/{n} frames "
-              f"(torso {torso_frac:.0%}, arms {arm_frac:.0%}).") if ok else \
-             (f"Only {torso_ok}/{n} frames with a clear human torso "
-              f"(arms {arm_frac:.0%}, upright {posture_frac:.0%}); not a "
-              f"plausible bowler clip.")
+          (posture_good or arms_good or torso_strong))
+    if ok:
+        reason = (f"Human pose detected on {torso_ok}/{n} frames "
+                  f"(torso {torso_frac:.0%}, arms {arm_frac:.0%}, "
+                  f"upright {posture_frac:.0%}).")
+    elif torso_ok < min_frames:
+        # Distinguish "no usable person" from the case above, otherwise the
+        # message reads as a contradiction ("only 25/25 frames ... but bad").
+        reason = (f"Only {torso_ok}/{n} frames contain a detectable human torso "
+                  f"(need {min_frames}); no person is visible enough to analyse.")
+    else:
+        reason = (f"A human torso is present on {torso_ok}/{n} frames but the "
+                  f"detection is too weak to analyse (torso {torso_frac:.0%}, "
+                  f"arms {arm_frac:.0%}, upright {posture_frac:.0%}).")
     return CheckResult("human_pose", ok, score, reason)
 
 

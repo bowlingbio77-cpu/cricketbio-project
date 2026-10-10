@@ -16,6 +16,7 @@ from typing import Optional
 import numpy as np
 
 from . import config, preprocessing, tracking, pose_estimation
+from . import cricket_roles
 from . import ball_tracking_v2 as ball_tracking
 from . import feature_engineering as feateng
 from . import ml_models, explainability, coaching
@@ -58,6 +59,10 @@ class AnalysisResult:
     bowler_confirm_reason: Optional[str] = None  # "low_evidence" | "ambiguous_margin" | None
     bowler_candidates: list = field(default_factory=list)  # ranked candidate evidence for the UI picker
     identity_switch_count: int = 0  # half-clip windows where the top bowler candidate churned
+    # Authoritative role-engine output (src/cricket_roles.py). This is the single
+    # source of truth for identity; every downstream consumer should read
+    # bowler_track_id and the role map from here rather than re-deriving identity.
+    role_engine: Optional[dict] = None  # RoleAssignment.summary()
     # Clean main-pipeline picture: BOWLER / STRIKER / NON-STRIKER (everything else ignored).
     batting_stances: Optional[dict] = None  # track_id -> {role: "striker"|"non_striker", confidence}
     striker_track_id: Optional[int] = None
@@ -67,9 +72,15 @@ class AnalysisResult:
         return asdict(self)
 
 
-def _crop_to_bbox(frame, bbox, pad_frac: float = 0.3) -> Optional[np.ndarray]:
-    """Crop a frame to an expanded bounding box (best-effort; None if too small)."""
-    h, w = frame.shape[:2]
+def _crop_rect(bbox, frame_shape, pad_frac: float = 0.3):
+    """Single source of truth for the padded crop rectangle.
+
+    Returns ``(x1, y1, x2, y2)`` clamped to the frame, or ``None`` if the result
+    is too small to be a usable crop. Both :func:`_crop_to_bbox` and the
+    per-frame subject-region mapping derive from this, so the region handed to
+    pose estimation can never drift from the region actually cropped.
+    """
+    h, w = frame_shape[:2]
     x1, y1, x2, y2 = bbox
     bw, bh = max(1.0, x2 - x1), max(1.0, y2 - y1)
     pad_x, pad_y = pad_frac * bw, pad_frac * bh
@@ -79,7 +90,15 @@ def _crop_to_bbox(frame, bbox, pad_frac: float = 0.3) -> Optional[np.ndarray]:
     ny2 = min(h, int(y2 + pad_y))
     if nx2 - nx1 < 16 or ny2 - ny1 < 16:
         return None
-    return frame[ny1:ny2, nx1:nx2]
+    return (nx1, ny1, nx2, ny2)
+
+
+def _crop_to_bbox(frame, bbox, pad_frac: float = 0.3) -> Optional[np.ndarray]:
+    """Crop a frame to an expanded bounding box (best-effort; None if too small)."""
+    rect = _crop_rect(bbox, frame.shape, pad_frac)
+    if rect is None:
+        return None
+    return frame[rect[1]:rect[3], rect[0]:rect[2]]
 
 
 BOWLER_CARRY_GAP_FRAMES = 5  # frames a bowler bbox may be carried over a brief
@@ -87,27 +106,43 @@ BOWLER_CARRY_GAP_FRAMES = 5  # frames a bowler bbox may be carried over a brief
                              # no crop, no substitute (identity is not swapped).
 
 
-def _crop_frames_to_bowler(frames, tracks, bowler, gap_frames: int = BOWLER_CARRY_GAP_FRAMES) -> list:
+def _crop_frames_to_bowler(frames, tracks, bowler,
+                           gap_frames: int = BOWLER_CARRY_GAP_FRAMES,
+                           subject_boxes_out: Optional[dict] = None) -> list:
     """Return a new frame list cropped to the bowler's track bbox, carrying the
     previous bbox forward only over brief (<= gap_frames) gaps. Bboxes must be in
     frame coordinates. Frames after the bowler is lost are kept uncropped -- and
     pose estimation later runs only on the bowler-bound frames, so a missing
-    bowler never silently becomes a batsman."""
+    bowler never silently becomes a batsman.
+
+    When ``subject_boxes_out`` is supplied it is populated with the bowler's bbox
+    **translated into each cropped frame's own coordinates**. Pose estimation
+    needs the identity region in the same space as the frame it is given; without
+    this the constraint would be computed against the wrong coordinate space and
+    the lock would silently degrade back to a whole-frame search.
+    """
     bbox_by_frame = dict(zip(bowler.frames, bowler.bboxes))
     last_bbox, last_seen = None, -10 ** 9
     cropped = []
     for idx, ts, frame in frames:
         bbox = bbox_by_frame.get(idx)
+        carried = False
+        if bbox is None and last_bbox is not None and idx - last_seen <= gap_frames:
+            bbox = last_bbox
+            carried = True
         if bbox is not None:
-            last_bbox, last_seen = bbox, idx
-            cut = _crop_to_bbox(frame, bbox)
-            if cut is not None:
+            if not carried:
+                last_bbox, last_seen = bbox, idx
+            rect = _crop_rect(bbox, frame.shape)
+            if rect is not None:
+                cut = frame[rect[1]:rect[3], rect[0]:rect[2]]
                 cropped.append((idx, ts, cut))
-                continue
-        elif last_bbox is not None and idx - last_seen <= gap_frames:
-            cut = _crop_to_bbox(frame, last_bbox)
-            if cut is not None:
-                cropped.append((idx, ts, cut))
+                if subject_boxes_out is not None:
+                    ox1, oy1, ox2, oy2 = rect
+                    subject_boxes_out[idx] = (
+                        float(bbox[0] - ox1), float(bbox[1] - oy1),
+                        float(bbox[2] - ox1), float(bbox[3] - oy1),
+                    )
                 continue
         cropped.append((idx, ts, frame))
     return cropped
@@ -473,30 +508,89 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
                 return None
             return fr
 
-        if bowler_track_override is not None and bowler_track_override in tracks:
-            # User-confirmed lock (Phase 19): analyse the chosen track directly.
-            bowler = tracks[bowler_track_override]
+        # Identity regions, populated only when a bowler was locked. Both are
+        # empty otherwise, which makes pose selection report "largest_area" and
+        # keeps the subject unverified rather than guessing.
+        subject_boxes_crop = {}
+        subject_boxes_full = {}
+
+        # Authoritative role decision. The engine is the single source of truth for
+        # who the bowler is; the legacy geometry scorer is consulted only when the
+        # engine declines to decide, and that case is reported rather than hidden.
+        role_assignment = None
+        role_engine_bowler = None
+        manual_override = (
+            bowler_track_override is not None
+            and bowler_track_override in tracks
+        )
+        try:
+            _obs = cricket_roles.observations_from_tracks(
+                tracks, total_frames=len(frames))
+            _engine = cricket_roles.CricketRoleEngine()
+            _engine.extend(o for group in _obs.values() for o in group)
+            if manual_override:
+                # Route the human decision through the engine too, so the
+                # reported state and the analysed track can never disagree.
+                _engine.set_manual_bowler(
+                    bowler_track_override, operator="ui_confirmation",
+                    reason="user confirmed this track in the UI")
+            role_assignment = _engine.assign(frame_count=len(frames))
+        except Exception as exc:  # never let identity break the whole run
+            warnings.append(f"Role engine error ({type(exc).__name__}: {exc}).")
+
+        if role_assignment is not None and role_assignment.bowler_track_id in tracks:
+            # Engine decision wins -- this is the one identity authority, for both
+            # the automatic and the operator-confirmed case.
+            role_engine_bowler = tracks[role_assignment.bowler_track_id]
+            _top = role_assignment.candidates[0] if role_assignment.candidates else None
+            bowler = role_engine_bowler
             bowler_meta = {
-                "track_id": bowler.track_id,
-                "score": None,
-                "confidence": None,
-                "confirmed": True,
-                "confirm_reason": "user_override",
-                "candidates": [],
-                "identity_switch_count": 0,
+                "track_id": role_engine_bowler.track_id,
+                "score": _top.score if _top else None,
+                "confidence": role_assignment.identity_confidence,
+                "confirmed": role_assignment.bowler_confirmed,
+                "confirm_reason": "; ".join(role_assignment.reasons) or None,
+                "candidates": [c.track_id for c in role_assignment.candidates],
+                "identity_switch_count": role_assignment.identity_switch_count,
             }
-            warnings.append(
-                f"Bowler track #{bowler_track_override} locked by user confirmation."
-            )
+            if manual_override:
+                warnings.append(
+                    f"Bowler track #{bowler_track_override} locked by user "
+                    f"confirmation (manual; recorded as an operator decision)."
+                )
+            else:
+                warnings.append(
+                    f"Role engine: bowler = track #{role_engine_bowler.track_id} "
+                    f"(state {role_assignment.state.value}, identity "
+                    f"{role_assignment.identity_confidence:.2f}, action "
+                    f"{role_assignment.action_confidence:.2f}; pose not yet assessed)."
+                )
         else:
             bowler, bowler_meta = tracking.select_bowler_track_with_meta(
                 tracks, frame_dims=(h, w), total_frames=len(frames),
                 frame_provider=_frame_provider)
+            if bowler is not None:
+                warnings.append(
+                    "Role engine did not identify a bowler; fell back to the "
+                    "legacy geometry scorer. Treat this identity as unverified."
+                )
         if bowler is not None and len(bowler) >= 3:
             bowler_bboxes = _padded_bowler_bboxes(
                 bowler, len(frames), h, w,
                 gap_frames=BOWLER_CARRY_GAP_FRAMES)
-            frames = _crop_frames_to_bowler(frames, tracks, bowler)
+            # Identity region in each CROPPED frame's coordinates, so pose
+            # extraction is bound to the locked bowler rather than re-deciding.
+            subject_boxes_crop = {}
+            frames = _crop_frames_to_bowler(
+                frames, tracks, bowler, subject_boxes_out=subject_boxes_crop)
+            # Identity region in FULL-frame coordinates, for the fallback that
+            # runs on uncropped frames. Without this the fallback would search the
+            # whole broadcast scene and pick the largest person -- historically
+            # the batsman -- which is the second identity decision this replaces.
+            subject_boxes_full = {
+                int(f): (float(b[0]), float(b[1]), float(b[2]), float(b[3]))
+                for f, b in zip(bowler.frames, bowler.bboxes)
+            }
             crop_stats = {"track_id": bowler.track_id, "frames_tracked": len(bowler)}
             bowler_track_id = bowler_meta["track_id"] if bowler_meta else bowler.track_id
             bowler_confidence = bowler_meta.get("confidence") if bowler_meta else None
@@ -526,6 +620,19 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
             # Classify remaining tracks into cricket roles (batsman, keeper, umpire)
             player_roles = tracking.classify_player_roles(
                 tracks, bowler.track_id, frame_dims=(h, w), total_frames=len(frames))
+            # The role engine is authoritative: where it has an opinion on a
+            # track, it overrides the heuristic classifier for that track.
+            if role_assignment is not None and role_assignment.roles:
+                merged = dict(player_roles or {})
+                for tid, role in role_assignment.roles.items():
+                    if role is cricket_roles.Role.BOWLER:
+                        continue
+                    entry = dict(merged.get(tid) or {})
+                    entry["role"] = role.value
+                    entry["confidence"] = 1.0
+                    entry["source"] = "role_engine"
+                    merged[tid] = entry
+                player_roles = merged
             if player_roles:
                 role_summary = ", ".join(
                     f"#{tid}: {r['role']}({r['confidence']:.2f})"
@@ -574,16 +681,18 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     attempts = []
     if bowler_bboxes:
         attempts.append(("bowler_crops", [
-            (idx, ts, fr) for idx, ts, fr in frames if idx in bowler_bboxes]))
-    attempts.append(("all_frames", list(frames)))
+            (idx, ts, fr) for idx, ts, fr in frames if idx in bowler_bboxes],
+            subject_boxes_crop))
+    attempts.append(("all_frames", list(frames), subject_boxes_crop))
     if frames_full is not None:
-        attempts.append(("full_frames", list(frames_full)))
+        attempts.append(("full_frames", list(frames_full), subject_boxes_full))
     pose_source = None
     pose_sequence = []
-    for name, src in attempts:
+    for name, src, subject_boxes in attempts:
         t0 = time.perf_counter()
         with pose_estimation.PoseEstimator() as estimator:
-            pose_sequence = estimator.process_video_frames(iter(src))
+            pose_sequence = estimator.process_video_frames(
+                iter(src), subject_box_by_frame=subject_boxes)
         if name == "bowler_crops":
             timings["pose_estimation"] = time.perf_counter() - t0
         else:
@@ -596,7 +705,7 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
     if pose_source is None:
         # No usable person pose in ANY coordinate space: genuinely not a usable
         # bowling video (blurry, cut mid-run-up, framed too wide, no person).
-        counts = ", ".join(f"{n}: {len(s)}" for n, s in attempts)
+        counts = ", ".join(f"{n}: {len(s)}" for n, s, _ in attempts)
         raise RuntimeError(
             "No usable pose found in this clip "
             f"(pose frames per fallback level -> {counts}). The video may be "
@@ -645,6 +754,38 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
             "Subject check: pose ran on bowler-cropped frames (media extracted "
             "before the missing identity-check step)."
         )
+
+    # Subject-binding check: how often did pose extraction actually honour the
+    # locked region? A frame where no detected pose overlapped the bowler's box
+    # was decided by the legacy largest-area heuristic, i.e. identity was
+    # re-derived. Those frames must not be presented as bowler-bound.
+    if bowler_track_id is not None and pose_sequence:
+        unbound = sum(
+            1 for pf in pose_sequence
+            if pf.subject_selection == "largest_area_fallback"
+        )
+        unconstrained = sum(
+            1 for pf in pose_sequence
+            if pf.subject_selection == "largest_area"
+        )
+        if unbound or unconstrained:
+            subject_verified = False
+            if unconstrained:
+                scoring_blocked_reason = (
+                    f"pose ran without a subject region on {unconstrained}/"
+                    f"{len(pose_sequence)} frames; the analysed person was chosen "
+                    "by size, not by the bowler lock"
+                )
+            else:
+                scoring_blocked_reason = (
+                    f"no detected pose overlapped the locked bowler region on "
+                    f"{unbound}/{len(pose_sequence)} frames; those frames were "
+                    "resolved by size, not by identity"
+                )
+            warnings.append(
+                f"Subject binding: {unbound + unconstrained}/{len(pose_sequence)} "
+                "pose frames were not bound to the locked bowler region."
+            )
     if scoring_blocked_reason is not None:
         warnings.append(
             "Scoring withheld — subject not verified: "
@@ -893,6 +1034,9 @@ def analyze_video(video_path: str, bowling_arm: str = "right",
         bowler_confirm_reason=bowler_confirm_reason,
         bowler_candidates=bowler_candidates,
         identity_switch_count=identity_switch_count,
+        role_engine=(
+            role_assignment.summary() if role_assignment is not None else None
+        ),
         batting_stances=batting_stances,
         striker_track_id=striker_track_id,
         non_striker_track_id=non_striker_track_id,

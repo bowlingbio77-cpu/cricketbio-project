@@ -37,7 +37,7 @@ def run(mode: str = "sim", sliders=None):
     at.run()
     if at.exception:
         raise AssertionError(f"boot failed: {at.exception[0].value}")
-    at.radio[0].set_value("\u26a1 Analyze").run()
+    at.radio[0].set_value("Analyze").run()
     at.radio[1].set_value(mode).run()
     if sliders:
         for label, value in sliders.items():
@@ -106,7 +106,7 @@ def main():
         print("   findings section populated")
 
     print("=== 3. video mode with no clip (must not fabricate) ===")
-    at = run("\U0001f4f9 Video Motion Capture")
+    at = run("Video Motion Capture")
     found, hits, body = check(at, "video-empty")
     if hits:
         ok = False

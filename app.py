@@ -19,8 +19,8 @@ import json
 import tempfile
 import time
 import html as _html_mod
+import copy
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -51,6 +51,7 @@ from src import config, history_db, injury_knowledge_base as injury_kb
 from src import analysis_ui
 from src import kinetic_ui
 from src import result_view
+from src import ui_design
 from src.synthetic_data import generate_clinical_synthetic_dataset
 
 # Heavy modules loaded lazily (only on first use), see _LazyModule above.
@@ -95,14 +96,63 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
 
-    /* --- Skip to content (visible on focus for keyboard nav) --- */
+    /* ---- Design tokens. The fallbacks below are used when no saved design
+           exists; the injected Customize UI block re-defines the --app-* values
+           on :root and every rule here re-evaluates them automatically. ----
+           Derived tokens (--app-panel, --app-panel-alt) keep the depth of the
+           hero/cards even when a user changes the flat palette colours. */
+    :root {
+        --app-bg: #212833;
+        --app-surface: #232b38;
+        --app-panel: color-mix(in srgb, var(--app-surface) 82%, var(--app-accent) 18%);
+        --app-panel-alt: color-mix(in srgb, var(--app-surface) 94%, var(--app-accent) 6%);
+        --app-line: #3d4859;
+        --app-accent: #20D9FF;
+        --app-accent-text: #7FE3FF;
+        --app-text: #e9eef5;
+        --app-muted: #aeb9c8;
+        --app-dim: #7e8b9d;
+        --app-ok: #43D9a3;
+        --app-warn: #E8B34A;
+        --app-danger: #FF7086;
+        --app-radius: 12px;
+    }
+
+    /* ---- Clear page heading block (eyebrow + title) ---- */
+    .pai-sec-head { margin: 0 0 10px; }
+    .pai-sec-head .eyebrow {
+        color: var(--app-accent);
+        font-size: 0.62rem; letter-spacing: 0.18em; font-weight: 800;
+        text-transform: uppercase; margin: 0 0 4px;
+    }
+    .pai-sec-head h2 {
+        font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em;
+        color: var(--app-text); margin: 0;
+    }
+
+    /* ---- Masthead (wordmark above the body) ---- */
+    .pai-masthead {
+        display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+        padding: 0 0 14px; margin: 6px 0 18px;
+        border-bottom: 1px solid var(--app-line);
+    }
+    .pai-masthead-brand {
+        font-size: 1.5rem; font-weight: 800; letter-spacing: 0.16em;
+        color: var(--app-text);
+    }
+    .pai-masthead-sub {
+        font-size: 0.7rem; font-weight: 600; letter-spacing: 0.13em;
+        text-transform: uppercase; color: var(--app-dim);
+    }
+
+    /* ---- Skip to content (visible on focus for keyboard nav) --- */
     .skip-link {
         position: absolute; left: -9999px; top: auto;
         width: 1px; height: 1px; overflow: hidden;
         z-index: 999999; padding: 12px 20px; margin: 8px;
-        background: #2b3442; color: #a9cdec; font-weight: 700;
+        background: var(--app-surface); color: var(--app-accent-text); font-weight: 700;
         border-radius: 8px; text-decoration: none; font-size: 0.95rem;
-        border: 1px solid #63d4cf;
+        border: 1px solid var(--app-accent);
     }
     .skip-link:focus {
         position: fixed; left: 12px; top: 12px;
@@ -111,20 +161,20 @@ st.markdown("""
 
     /* Main background & headers */
     .stApp {
-        background-color: #212833;
-        color: #e9eef5;
+        background-color: var(--app-bg);
+        color: var(--app-text);
     }
 
     /* Card Containers */
     .metric-card {
-        background: linear-gradient(145deg, #2e3949 0%, #232b38 100%);
-        border: 1px solid #3d4859;
-        border-radius: 12px;
+        background: linear-gradient(145deg, var(--app-panel) 0%, var(--app-surface) 100%);
+        border: 1px solid var(--app-line);
+        border-radius: var(--app-radius);
         padding: 20px;
         margin-bottom: 15px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
     }
-    
+
     .status-badge {
         display: inline-block;
         padding: 4px 12px;
@@ -140,39 +190,39 @@ st.markdown("""
     .badge-legal { background-color: rgba(67, 217, 163, 0.16); color: #5fe0b0; border: 1px solid #3cb98c; }
     .badge-illegal { background-color: rgba(255, 112, 134, 0.16); color: #ff8699; border: 1px solid #e05a6f; }
     .badge-demo { background-color: rgba(232, 179, 74, 0.16); color: #f0c169; border: 1px solid #c99c42; }
-    .badge-video { background-color: rgba(142, 193, 238, 0.14); color: #9cc8ee; border: 1px solid #5f93c8; }
+    .badge-video { background-color: rgba(32, 217, 255, 0.14); color: var(--app-accent-text); border: 1px solid var(--app-accent); }
 
     /* Custom Header Banner */
     .hero-banner {
-        background: linear-gradient(90deg, #2e394b 0%, #27313f 50%, #222c3a 100%);
+        background: linear-gradient(90deg, var(--app-panel) 0%, var(--app-surface) 50%, var(--app-panel-alt) 100%);
         border-radius: 14px;
         padding: 24px 30px;
         margin-bottom: 25px;
-        border: 1px solid #3d4859;
+        border: 1px solid var(--app-line);
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
     }
     .hero-title {
         font-size: 2rem;
         font-weight: 800;
-        color: #a9cdec;
+        color: var(--app-accent-text);
         margin: 0;
     }
     .hero-subtitle {
-        color: #aeb9c8;
+        color: var(--app-muted);
         font-size: 0.95rem;
         margin-top: 6px;
     }
 
     /* Drill card */
     .drill-card {
-        border-left: 4px solid #63d4cf;
-        background: #2b3442;
+        border-left: 3px solid var(--app-accent);
+        background: var(--app-surface);
         padding: 14px 18px;
         border-radius: 0 8px 8px 0;
         margin-bottom: 10px;
-        border-top: 1px solid #3d4859;
-        border-right: 1px solid #3d4859;
-        border-bottom: 1px solid #3d4859;
+        border-top: 1px solid var(--app-line);
+        border-right: 1px solid var(--app-line);
+        border-bottom: 1px solid var(--app-line);
     }
 
     /* Feature guide tag chips */
@@ -180,9 +230,9 @@ st.markdown("""
         display: inline-block;
         padding: 2px 10px;
         border-radius: 10px;
-        background: rgba(142, 193, 238, 0.16);
-        border: 1px solid #4b586c;
-        color: #9cc8ee;
+        background: rgba(32, 217, 255, 0.16);
+        border: 1px solid var(--app-line);
+        color: var(--app-accent-text);
         font-size: 0.7rem;
         font-weight: 700;
         letter-spacing: 0.5px;
@@ -190,10 +240,10 @@ st.markdown("""
         vertical-align: middle;
     }
 
-    /* Sidebar adjustments */
+    /* Compact sidebar */
     section[data-testid="stSidebar"] {
-        background-color: #232b38;
-        border-right: 1px solid #3d4859;
+        background-color: var(--app-surface);
+        border-right: 1px solid var(--app-line);
     }
 
     /* --- Accessibility --- */
@@ -203,7 +253,7 @@ st.markdown("""
         clip: rect(0,0,0,0); white-space: nowrap; border: 0;
     }
     :focus-visible {
-        outline: 2px solid #63d4cf;
+        outline: 2px solid var(--app-accent);
         outline-offset: 2px;
     }
     /* Ensure focus is visible on Streamlit widgets */
@@ -213,16 +263,66 @@ st.markdown("""
     .stButton:focus-within,
     .stTextInput:focus-within,
     .stNumberInput:focus-within {
-        box-shadow: 0 0 0 2px rgba(142, 193, 238, 0.35);
+        box-shadow: 0 0 0 2px rgba(32, 217, 255, 0.35);
         border-radius: 6px;
     }
     /* Status badges include text labels alongside color for non-color-dependent info */
     .status-badge::before {
         content: none; /* text is already inside the badge element */
     }
-    /* Improved contrast for secondary text (WCAG AA: >=4.5:1 on #212833) */
+    /* Improved contrast for secondary text (WCAG AA: >=4.5:1 on the page bg) */
     .hero-subtitle, .metric-card span[style*="8b949e"] {
-        color: #aeb9c8 !important;
+        color: var(--app-muted) !important;
+    }
+
+    /* --- Streamlit chrome: nav + controls styled as part of the app --- */
+    [data-testid="stRadio"] [role="radiogroup"] {
+        gap: 6px;
+    }
+    [data-testid="stRadio"] [role="radiogroup"] > label {
+        padding: 7px 18px;
+        border-radius: 10px;
+        border: 1px solid var(--app-line);
+        background: var(--app-surface);
+        transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+    }
+    [data-testid="stRadio"] [role="radiogroup"] > label:hover { border-color: var(--app-accent); }
+    [data-testid="stRadio"] [role="radiogroup"] > label p { color: var(--app-muted); }
+    [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) {
+        border-color: var(--app-accent);
+        background: rgba(32, 217, 255, 0.08);
+    }
+    [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) p { color: var(--app-accent-text); }
+
+    /* Expanders read as soft panels, not default boxes */
+    [data-testid="stExpander"] {
+        border: 1px solid var(--app-line);
+        border-radius: var(--app-radius);
+        background: linear-gradient(145deg, rgba(46, 57, 73, 0.35), rgba(35, 43, 56, 0.2));
+        overflow: hidden;
+    }
+    [data-testid="stExpander"] summary { padding: 8px 16px; }
+    [data-testid="stExpanderDetails"] { padding: 0 16px 12px; }
+
+    /* Bordered containers (input/video step cards) share the card rhythm */
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        border: 1px solid var(--app-line);
+        border-radius: 14px;
+        background: linear-gradient(145deg, var(--app-panel) 0%, var(--app-surface) 100%);
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+    }
+
+    /* Buttons: rounded, primary gets a quiet glow */
+    .stButton > button,
+    .stDownloadButton > button,
+    .stFormSubmitButton > button {
+        border-radius: 10px;
+        border: 1px solid var(--app-line);
+    }
+    .stButton > button[kind="primary"],
+    .stDownloadButton > button[kind="primary"],
+    .stFormSubmitButton > button[kind="primary"] {
+        box-shadow: 0 2px 14px rgba(32, 217, 255, 0.18);
     }
 
     /* --- Responsive: Tablet (768px) --- */
@@ -247,23 +347,23 @@ st.markdown("""
 
     /* --- Premium Analysis Replay --- */
     .analysis-replay-shell {
-        background: linear-gradient(145deg, #2e3949 0%, #222b39 100%);
-        border: 1px solid #3d4859; border-bottom: 0;
+        background: linear-gradient(145deg, var(--app-panel) 0%, var(--app-surface) 100%);
+        border: 1px solid var(--app-line); border-bottom: 0;
         border-radius: 16px 16px 0 0; padding: 20px 22px 10px;
         margin-top: 20px;
     }
     .analysis-replay-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
-    .analysis-replay-head h2 { margin:4px 0 3px; font-size:1.65rem; color:#a9cdec; }
-    .analysis-replay-head p { margin:0; color:#7e8b9d; font-size:.9rem; }
-    .eyebrow,.priority-kicker { color:#63d4cf; font-size:.68rem; letter-spacing:.14em; font-weight:800; }
-    .replay-pill { border:1px solid rgba(142,193,238,.35); color:#9cc8ee; background:rgba(142,193,238,.12); border-radius:999px; padding:7px 10px; font-size:.68rem; font-weight:800; white-space:nowrap; }
-    .priority-card { margin:18px 0; padding:18px 20px; border:1px solid rgba(67,217,163,.35); background:linear-gradient(145deg, rgba(67,217,163,.08), #2b3442); border-radius:14px; }
-    .priority-title { font-size:1.15rem; font-weight:800; margin:4px 0 7px; color:#a9cdec; }
-    .priority-copy { color:#aeb9c8; line-height:1.55; }
-    .analysis-empty { margin:20px 0; padding:30px; border:1px dashed #4b586c; border-radius:16px; background:#2b3442; }
-    .analysis-empty-kicker { color:#7e8b9d; font-size:.7rem; letter-spacing:.14em; font-weight:800; }
-    .analysis-empty-title { font-size:1.3rem; font-weight:800; margin:5px 0; color:#a9cdec; }
-    .analysis-empty-copy { color:#7e8b9d; }
+    .analysis-replay-head h2 { margin:4px 0 3px; font-size:1.65rem; color:var(--app-accent-text); }
+    .analysis-replay-head p { margin:0; color:var(--app-dim); font-size:.9rem; }
+    .eyebrow,.priority-kicker { color:var(--app-accent); font-size:.68rem; letter-spacing:.14em; font-weight:800; }
+    .replay-pill { border:1px solid rgba(32,217,255,.35); color:var(--app-accent-text); background:rgba(32,217,255,.12); border-radius:999px; padding:7px 10px; font-size:.68rem; font-weight:800; white-space:nowrap; }
+    .priority-card { margin:18px 0; padding:18px 20px; border:1px solid rgba(67,217,163,.35); background:linear-gradient(145deg, rgba(67,217,163,.08), var(--app-surface)); border-radius:14px; }
+    .priority-title { font-size:1.15rem; font-weight:800; margin:4px 0 7px; color:var(--app-accent-text); }
+    .priority-copy { color:var(--app-muted); line-height:1.55; }
+    .analysis-empty { margin:20px 0; padding:30px; border:1px dashed #4b586c; border-radius:16px; background:var(--app-surface); }
+    .analysis-empty-kicker { color:var(--app-dim); font-size:.7rem; letter-spacing:.14em; font-weight:800; }
+    .analysis-empty-title { font-size:1.3rem; font-weight:800; margin:5px 0; color:var(--app-accent-text); }
+    .analysis-empty-copy { color:var(--app-dim); }
 
     /* --- Streamlit column stacking on narrow viewports --- */
     @media (max-width: 768px) {
@@ -275,6 +375,11 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+# ---------------- CUSTOMIZE UI (persisted presentation config) ----------------
+# Loaded once per run; the Customize UI page Save writes the file and reruns so
+# the next run picks it up. Config is validated on load (see src/ui_design).
+DESIGN = ui_design.load()
 
 # --- Accessibility: skip-to-content link + lang attribute ---
 st.markdown(
@@ -302,14 +407,14 @@ _PRELOADER_CSS = """
         font-family:'Segoe UI',Arial,sans-serif;
         animation:paceaiFadeOut .6s ease 3.3s forwards; opacity:1; }
     .pace-preloader .glow { position:absolute; width:min(420px,80vw); height:min(420px,80vw); border-radius:50%;
-        background:radial-gradient(circle, rgba(142,193,238,.16) 0%, rgba(99,212,207,.10) 45%, rgba(0,0,0,0) 72%);
+        background:radial-gradient(circle, rgba(32,217,255,.16) 0%, rgba(32,217,255,.10) 45%, rgba(0,0,0,0) 72%);
         animation:paceaiPulse 4.5s ease-in-out infinite; }
     .pace-preloader .stage { position:relative; width:180px; height:180px; display:flex; align-items:center; justify-content:center; }
-    .pace-preloader .orbit-ring { position:absolute; width:132px; height:132px; border-radius:50%; border:1px solid rgba(142,193,238,.25); }
+    .pace-preloader .orbit-ring { position:absolute; width:132px; height:132px; border-radius:50%; border:1px solid rgba(32,217,255,.25); }
     .pace-preloader .orbit-spin { position:absolute; width:132px; height:132px; will-change:transform;
         animation:paceaiOrbit 2.6s linear infinite, paceaiHide .35s ease 2.5s forwards; }
     .pace-preloader .orbit-dot { position:absolute; top:-4px; left:50%; margin-left:-4px; width:8px; height:8px; border-radius:50%;
-        background:#8ec1ee; box-shadow:0 0 6px 2px rgba(142,193,238,.55), 0 0 16px 6px rgba(99,212,207,.25); }
+        background:#20D9FF; box-shadow:0 0 6px 2px rgba(32,217,255,.55), 0 0 16px 6px rgba(32,217,255,.25); }
     .pace-preloader .logo-badge { position:relative; width:64px; height:64px; border-radius:50%;
         background:linear-gradient(145deg,#2e3949 0%,#232b38 100%); border:1px solid #3d4859;
         display:flex; align-items:center; justify-content:center; font-size:26px; box-shadow:0 4px 24px rgba(0,0,0,.35);
@@ -362,12 +467,12 @@ def _paceai_preloader(message: str) -> str:
 
 def render_loader(message: str = "Loading PaceAI..."):
     """Inline PaceAI preloader (used while models train on first run)."""
-    components.html(_PRELOADER_CSS + _paceai_preloader(message), height=560, scrolling=False)
+    st.iframe(_PRELOADER_CSS + _paceai_preloader(message), height=560)
 
 
 def render_fullscreen_splash(message: str = "Loading PaceAI..."):
     """Full-viewport PaceAI preloader shown during app/model startup (self-fading)."""
-    components.html(_PRELOADER_CSS + _paceai_preloader(message), height=560, scrolling=False)
+    st.iframe(_PRELOADER_CSS + _paceai_preloader(message), height=560)
 
 
 # ---------------- HELPERS ----------------
@@ -531,7 +636,7 @@ def load_or_train_models(model_name: str = "random_forest"):
         return ml_models.load_bundle(perf_path), ml_models.load_bundle(injury_path)
 
     st.info(f"No saved '{model_name}' models found -- training on synthetic demo data now "
-            f"(run `python train_demo_model.py` once to cache this).")
+            f"(run `python scripts/train_demo_model.py` once to cache this).")
     render_loader(message=f"Training {model_name} models on synthetic demo data...")
     df = generate_clinical_synthetic_dataset()
     X = df[config.FEATURE_NAMES].values
@@ -620,7 +725,7 @@ def render_modern_gauge(value, title, subtitle="", max_val=100, is_risk=False):
         mode="gauge+number+delta",
         value=value,
         title={"text": f"<b>{title}</b><br><span style='font-size:0.8em;color:#7e8b9d'>{subtitle}</span>"},
-        number={"font": {"size": 42, "color": "#8ec1ee"}, "suffix": "%" if is_risk else ""},
+        number={"font": {"size": 42, "color": "#20D9FF"}, "suffix": "%" if is_risk else ""},
         gauge={
             "axis": {"range": [0, max_val], "tickcolor": "#5f6d80", "tickfont": {"color": "#5f6d80"}},
             "bar": {"color": bar_color, "thickness": 0.3},
@@ -685,8 +790,8 @@ def render_radar_comparison(current_feats: dict):
     fig.add_trace(go.Scatterpolar(
         r=bench_vals, theta=categories, fill='toself',
         name='Elite Benchmark (145 km/h)',
-        line=dict(color='#8ec1ee', width=2, dash='dot'),
-        fillcolor='rgba(142, 193, 238, 0.14)'
+        line=dict(color='#20D9FF', width=2, dash='dot'),
+        fillcolor='rgba(32, 217, 255, 0.14)'
     ))
 
     fig.update_layout(
@@ -709,14 +814,14 @@ def render_shap_bar(contributions: dict, title: str):
     items = sorted(items, key=lambda kv: kv[1])
     names = [FEATURE_LABELS.get(k, (k,))[0] for k, _ in items]
     values = [v for _, v in items]
-    colors = ["#ff7086" if v > 0 else "#8ec1ee" for v in values]
+    colors = ["#ff7086" if v > 0 else "#20D9FF" for v in values]
 
     fig = go.Figure(go.Bar(
         x=values, y=names, orientation="h",
         marker=dict(color=colors, line=dict(width=0)),
     ))
     fig.update_layout(
-        title=dict(text=f"<b>{title}</b>", font=dict(color="#8ec1ee", size=14)),
+        title=dict(text=f"<b>{title}</b>", font=dict(color="#20D9FF", size=14)),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(color="#aeb9c8"),
@@ -736,7 +841,7 @@ def render_timings(stage_times: dict):
     labels = [k.replace("_", " ").title() for k, _ in ordered]
     values = [v for _, v in ordered]
     fig = go.Figure(go.Bar(x=values, y=labels, orientation="h",
-                           marker_color=["#8ec1ee" if k != "total" else "#43d9a3"
+                           marker_color=["#20D9FF" if k != "total" else "#43d9a3"
                                          for k, _ in ordered]))
     fig.update_layout(title="Stage timing", height=320,
                       paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
@@ -765,7 +870,7 @@ def render_model_quality_expander(perf_bundle, injury_bundle):
                 "the features themselves (src/synthetic_data.py). Near-perfect metrics below are "
                 "expected -- the model is effectively re-learning the generator's formula and they "
                 "say **nothing** about real-world accuracy. Retrain on real labeled data "
-                "(`python train_demo_model.py --data your_data.csv`) before using for coaching "
+                "(`python scripts/train_demo_model.py --data your_data.csv`) before using for coaching "
                 "or medical decisions.")
         elif src == "real":
             st.info("Trained on a real labeled dataset -- but still validate on a fresh holdout "
@@ -833,7 +938,7 @@ FEATURES_GUIDE = [
 
 def render_features_guide():
     """Plain-English, tag-labeled explanation of every feature in the app."""
-    st.markdown("#### \U0001f5c2\ufe0f Every feature explained")
+    st.markdown(_section_header("Guide", "Every feature explained"), unsafe_allow_html=True)
     for tag, title, desc in FEATURES_GUIDE:
         st.markdown(
             f"<span class='guide-tag' aria-hidden='true'>{_esc(tag)}</span> &nbsp; <strong>{_esc(title)}</strong> &mdash; {_esc(desc)}",
@@ -1020,7 +1125,7 @@ def render_history_page():
             risk = detail.get("injury_risk")
             if isinstance(risk, dict) and risk.get("probabilities"):
                 probs = risk["probabilities"]
-                risk_num = {"low": 25, "moderate": 60, "high": 90}[risk.get("risk_level", "low")]
+                risk_num = {"low": 25, "moderate": 60, "high": 90}.get(str(risk.get("risk_level", "low")).lower(), 60)
                 st.plotly_chart(render_modern_gauge(risk_num, f"Biomechanical Risk: {risk['risk_level'].upper()}",
                                                     is_risk=True), width='stretch')
                 if len(probs) >= 3:
@@ -1092,28 +1197,173 @@ def _confirm_clear_history():
             st.rerun()
 
 
+# ---------------- CUSTOMIZE UI page ----------------
+
+def _masthead_html(brand: dict) -> str:
+    return f"""
+<div class="pai-masthead">
+  <span class="pai-masthead-brand">{_esc(brand['name'])}</span>
+  <span class="pai-masthead-sub">{_esc(brand['subtitle'])}</span>
+</div>
+"""
+
+
+def _section_header(eyebrow: str, title: str) -> str:
+    """Eyebrow + title heading block (matches the result page's type language)."""
+    return (f'<div class="pai-sec-head"><p class="eyebrow">{_esc(eyebrow)}</p>'
+            f'<h2>{_esc(title)}</h2></div>')
+
+
+def _hero_html(cfg: dict) -> str:
+    hero = cfg["hero"]
+    if not hero["enabled"]:
+        # Keep the skip-link target present even while the banner is hidden.
+        return '<a id="main-content" style="display:block;height:1px;" aria-hidden="true"></a>'
+    return f"""
+<div class="hero-banner" role="banner" id="main-content">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+        <div>
+            <h1 class="hero-title">{_esc(hero['headline'])}</h1>
+            <p class="hero-subtitle">{_esc(hero['subtitle'])}</p>
+        </div>
+        <div>
+            <span class="status-badge badge-legal" style="margin-right: 8px;">AI Engine Ready</span>
+            <span class="status-badge badge-low">YOLOv11 + MediaPipe</span>
+        </div>
+    </div>
+</div>
+"""
+
+
+def render_customize_ui():
+    """'Customize UI' page: edit presentation-only values, preview them live with
+    the real renderers + CSS, then Save (atomic + validated) or Reset/Export/Import."""
+    saved = DESIGN
+    draft = st.session_state.get("ui_draft")
+    if not draft:
+        draft = copy.deepcopy(saved)
+        st.session_state["ui_draft"] = draft
+
+    st.markdown("### Customize UI")
+    st.caption("Edit copy, colours and spacing. Colours apply live as you edit; "
+               "**Save design** persists them across reruns and restarts. Analysis "
+               "logic, models and measurements are never affected.")
+
+    # Live draft CSS (last-in wins), then a preview built from the same renderers
+    # the real pages use.
+    st.markdown(ui_design.css_overrides(draft), unsafe_allow_html=True)
+    st.markdown(_masthead_html(draft["brand"]), unsafe_allow_html=True)
+    st.markdown(_hero_html(draft), unsafe_allow_html=True)
+
+    st.markdown("### Brand copy")
+    brand = draft["brand"]
+    brand["name"] = st.text_input("Product name", brand["name"], max_chars=24)
+    brand["subtitle"] = st.text_input("Tagline", brand["subtitle"], max_chars=60)
+
+    st.markdown("### Hero banner")
+    hero = draft["hero"]
+    hero["enabled"] = st.checkbox("Show hero banner", hero["enabled"])
+    if hero["enabled"]:
+        hero["headline"] = st.text_input("Headline", hero["headline"], max_chars=80)
+        hero["subtitle"] = st.text_input("Subtitle", hero["subtitle"], max_chars=160)
+
+    st.markdown("### Theme colours")
+    theme = draft["theme"]
+    cols = st.columns(5)
+    for col, key in zip(cols, ("accent", "background", "surface", "muted", "line")):
+        with col:
+            theme[key] = st.color_picker(key.capitalize(), theme[key])
+    draft["section_gap_px"] = st.slider(
+        "Section spacing (px)", 0, 160, draft["section_gap_px"],
+        help="Vertical gap between sections on the analysis result page.")
+
+    dirty = ui_design.fingerprint(draft) != ui_design.fingerprint(saved)
+    if dirty:
+        st.info("You have unsaved changes.")
+    else:
+        st.caption("Design matches the saved dashboard.")
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        if st.button("Save design", type="primary", use_container_width=True):
+            ok, err = ui_design.save(draft)
+            if ok:
+                st.session_state["ui_draft"] = None
+                st.toast("Design saved.")
+                st.rerun()
+            else:
+                st.error(err)
+    with c2:
+        if st.button("Discard edits", use_container_width=True):
+            st.session_state["ui_draft"] = None
+            st.rerun()
+    with c3:
+        st.download_button(
+            "Export design", ui_design.export(draft), use_container_width=True,
+            file_name="paceai_ui_design.json", mime="application/json")
+    with c4:
+        confirm = st.checkbox("Confirm reset to default")
+        if st.button("Reset to default", use_container_width=True, disabled=not confirm):
+            ui_design.reset_to_default()
+            st.session_state["ui_draft"] = None
+            st.toast("Design reset to defaults.")
+            st.rerun()
+
+    st.markdown("### Import a design")
+    uploaded = st.file_uploader("Import design JSON (overwrites current design)", type=["json"])
+    if uploaded is not None:
+        cfg, err = ui_design.import_config(uploaded.getvalue().decode("utf-8", errors="replace"))
+        if err:
+            st.error(err)
+        else:
+            ok, save_err = ui_design.save(cfg)
+            if ok:
+                st.session_state["ui_draft"] = None
+                st.toast("Imported design saved.")
+                st.rerun()
+            else:
+                st.error(save_err)
+
+
+# ---------------- PRIMARY NAVIGATION ----------------
+# Two destinations, because two exist. Compare lives inside the history page
+# (it needs the same saved-session selection), so it is not a fake third tab.
+PAGE_ANALYZE = "Analyze"
+PAGE_HISTORY = "History & Compare"
+PAGE_CUSTOMIZE = "Customize UI"
+
+# Mode labels carry no emoji and no prefix. Logic branches on MODE_VIDEO, never
+# on the shape of a display string -- see the fix in a19c5a8, where every video
+# gate silently checked input_mode.startswith("the video emoji") and the entire
+# replay, stage timings and video badges were dead code.
+MODE_SIM = "Interactive Bio-Simulator"
+MODE_VIDEO = "Video Motion Capture"
+
+st.markdown(_masthead_html(DESIGN["brand"]), unsafe_allow_html=True)
+
+page = st.radio(
+    "Section", [PAGE_ANALYZE, PAGE_HISTORY, PAGE_CUSTOMIZE], horizontal=True,
+    label_visibility="collapsed", key="primary_nav",
+    help="Analyze: run a new delivery. History: browse saved deliveries and "
+         "compare sessions. Customize UI: restyle the dashboard.")
+
 # ---------------- SIDEBAR CONTROLS ----------------
 with st.sidebar:
-    st.markdown("### 🏏 PaceAI Biomechanics")
-    st.caption("AI Motion Capture, Kinetics & Biomechanics Screening")
-    st.markdown("---")
+    st.markdown("### Delivery setup")
+    st.caption("Everything below changes how the next delivery is measured.")
 
-    page = st.radio("🧭 Navigation", ["⚡ Analyze", "📚 History & Compare"],
-                    help="Analyze: run a new delivery. History: browse saved results and compare.")
-
-    if page == "⚡ Analyze":
-        input_mode = st.radio("Analysis Mode", ["Interactive Bio-Simulator", "\U0001f4f9 Video Motion Capture"], index=0,
+    if page == PAGE_ANALYZE:
+        input_mode = st.radio("Analysis Mode", [MODE_SIM, MODE_VIDEO], index=0,
                               help="Simulator: adjust the biomechanics with sliders — no video needed. "
                                    "Video: upload a clip and the app measures the delivery automatically.")
     else:
-        input_mode = "Interactive Bio-Simulator"
+        input_mode = MODE_SIM
 
-    st.markdown("#### Model & Bowling Setup")
     bowling_arm = st.selectbox("Bowling Arm", ["Right-Arm", "Left-Arm"],
                                help="Which arm the bowler bowls with. Joints are mirrored automatically "
                                     "so left-handers aren't analyzed backwards.")
     model_choice = st.selectbox(
-        "AI Prediction Backbone",
+        "Prediction model",
         ["random_forest", "xgboost", "catboost", "cnn_lstm", "transformer"],
         help="Selects the ML architecture for kinetic scoring. XGBoost/CatBoost/CNN-LSTM/Transformer "
              "fall back to a scikit-learn equivalent automatically if their library isn't installed."
@@ -1172,36 +1422,30 @@ with st.sidebar:
 
 render_chat_widget()
 
-st.sidebar.markdown("---")
-st.sidebar.markdown("#### System Status")
-st.sidebar.caption(f"⚡ XGBoost: **{'Active' if ml_models.BACKEND_INFO['xgboost_available'] else 'Scikit Fallback'}**")
-st.sidebar.caption(f"CatBoost: **{'Active' if ml_models.BACKEND_INFO['catboost_available'] else 'Scikit Fallback'}**")
-st.sidebar.caption(f"🧠 PyTorch: **{'Active' if ml_models.BACKEND_INFO['torch_available'] else 'Disabled'}**")
-st.sidebar.caption(f"🔬 SHAP Engine: **{'Active' if explainability.SHAP_AVAILABLE else 'Finite Diff'}**")
-st.sidebar.caption(f"📚 History entries: **{history_db.count()}**")
+# Which ML backends are installed is implementation detail, not analysis. It
+# belongs behind a disclosure so it stays inspectable without competing with
+# the delivery controls (and without implying a number is model-dependent when
+# it is not).
+with st.sidebar.expander("System status", expanded=False):
+    st.caption(f"XGBoost: {'Active' if ml_models.BACKEND_INFO['xgboost_available'] else 'Scikit Fallback'}")
+    st.caption(f"CatBoost: {'Active' if ml_models.BACKEND_INFO['catboost_available'] else 'Scikit Fallback'}")
+    st.caption(f"PyTorch: {'Active' if ml_models.BACKEND_INFO['torch_available'] else 'Disabled'}")
+    st.caption(f"SHAP engine: {'Active' if explainability.SHAP_AVAILABLE else 'Finite Diff'}")
+    st.caption(f"Saved deliveries: {history_db.count()}")
 
 # ---------------- PAGE DISPATCH ----------------
-if page == "📚 History & Compare":
+if page == PAGE_HISTORY:
     render_history_page()
+    st.stop()
+
+if page == PAGE_CUSTOMIZE:
+    render_customize_ui()
     st.stop()
 
 perf_bundle, injury_bundle = load_or_train_models(model_choice)
 
 # ---------------- HERO BANNER ----------------
-st.markdown("""
-<div class="hero-banner" role="banner" id="main-content">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-        <div>
-            <h1 class="hero-title">Fast-Bowling Biomechanics AI</h1>
-            <p class="hero-subtitle">Kinematic Chain Profiling - ICC Elbow Screening - Literature-Informed Biomechanical Risk</p>
-        </div>
-        <div>
-            <span class="status-badge badge-legal" style="margin-right: 8px;">AI Engine Ready</span>
-            <span class="status-badge badge-low">YOLOv11 + MediaPipe</span>
-        </div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(_hero_html(DESIGN), unsafe_allow_html=True)
 
 
 feature_vector = {}
@@ -1212,28 +1456,30 @@ with st.expander("New here? Every feature explained in plain English", expanded=
     render_features_guide()
 
 # ---------------- INPUT SECTION ----------------
-if input_mode == "Interactive Bio-Simulator":
-    st.markdown("### 1. Delivery Kinematic Parameters")
-    
-    # Preset Selector
-    selected_preset = st.selectbox("⚡ Quick Load Action Preset:", list(PRESETS.keys()))
-    preset_data = PRESETS[selected_preset]
+if input_mode == MODE_SIM:
+    with st.container(border=True):
+        st.markdown(_section_header("Step 1 of 2", "Delivery Kinematic Parameters"))
 
-    with st.expander("Fine-Tune Biomechanical Sliders (Release & Impact Points)", expanded=True):
-        cols = st.columns(2)
-        for i, (feat, (label, unit, lo, hi, default_val)) in enumerate(FEATURE_LABELS.items()):
-            active_val = preset_data[feat] if preset_data else default_val
-            with cols[i % 2]:
-                feature_vector[feat] = st.slider(
-                    f"{label} ({unit})",
-                    float(lo), float(hi), float(active_val),
-                    help=f"Acceptable range: {lo} - {hi} {unit}"
-                )
+        # Preset Selector
+        selected_preset = st.selectbox("⚡ Quick Load Action Preset:", list(PRESETS.keys()))
+        preset_data = PRESETS[selected_preset]
+
+        with st.expander("Fine-Tune Biomechanical Sliders (Release & Impact Points)", expanded=True):
+            cols = st.columns(2)
+            for i, (feat, (label, unit, lo, hi, default_val)) in enumerate(FEATURE_LABELS.items()):
+                active_val = preset_data[feat] if preset_data else default_val
+                with cols[i % 2]:
+                    feature_vector[feat] = st.slider(
+                        f"{label} ({unit})",
+                        float(lo), float(hi), float(active_val),
+                        help=f"Acceptable range: {lo} - {hi} {unit}"
+                    )
 
 else:
-    st.markdown("### 1. Upload Bowling Video")
-    st.info("Runs Computer Vision pipeline: Detection (YOLOv11) ➔ Multi-object tracking (ByteTrack) ➔ 3D Pose (MediaPipe) ➔ Biomechanical extraction.")
-    uploaded = st.file_uploader("Upload bowling delivery video clip", type=["mp4", "mov", "avi"])
+    with st.container(border=True):
+        st.markdown(_section_header("Step 1 of 2", "Upload Bowling Video"))
+        st.info("Runs Computer Vision pipeline: Detection (YOLOv11) ➔ Multi-object tracking (ByteTrack) ➔ 3D Pose (MediaPipe) ➔ Biomechanical extraction.")
+        uploaded = st.file_uploader("Upload bowling delivery video clip", type=["mp4", "mov", "avi"])
 
     if uploaded is not None:
         processed = st.session_state.get("video_processed_file_id")
@@ -1350,7 +1596,11 @@ def render_analysis_replay(hero_video, result, feature_vector, ball_stats):
     meta = dict(
         track=bowler_id,
         conf=bowler_conf,
-        role=getattr(result, "bowler_role", None) or "bowler",
+        role=getattr(result, "bowler_role", None),
+        # The rail must be able to withhold a role claim. A bare "bowler"
+        # default would make the identity card unfalsifiable, and the result
+        # page already withholds scoring when subject_verified is False.
+        verified=getattr(result, "subject_verified", None),
         duration_s=duration_s,
         frames=total_frames,
         fps=fps,
@@ -1441,6 +1691,7 @@ _VIDEO_ONLY_FIELDS = (
     "bowler_confirmed", "bowler_confirm_reason", "bowler_candidates",
     "identity_switch_count", "batting_stances", "striker_track_id",
     "non_striker_track_id", "original_frame_dims", "player_roles",
+    "role_engine",
     "ball_stats", "video_path", "pose_video_path", "reels_video_path",
     "analysis_replay_path", "bowling_arm", "camera_view", "warnings",
     "subject_verified", "delivery_reliable", "scoring_blocked_reason",
@@ -1474,15 +1725,15 @@ def _merge_video_result(result, video_result):
 if feature_vector:
     video_subject_verified = (
         st.session_state.get("video_subject_verified")
-        if input_mode.startswith("📹") else None)
+        if input_mode == MODE_VIDEO else None)
     video_delivery_reliable = (
         st.session_state.get("video_delivery_reliable")
-        if input_mode.startswith("📹") else None)
+        if input_mode == MODE_VIDEO else None)
     result = pipeline.analyze_feature_vector(
         feature_vector, perf_bundle, injury_bundle,
         subject_verified=video_subject_verified,
         reliable=video_delivery_reliable)
-    if input_mode.startswith("📹"):
+    if input_mode == MODE_VIDEO:
         result = _merge_video_result(result, st.session_state.get("video_result"))
 
     # Make the latest analysis available to the sidebar chat assistant.
@@ -1498,7 +1749,7 @@ if feature_vector:
     # Merge video pipeline timings (if this run came from a video). The ML-only
     # `total` from the second call is ADDED to the CV pipeline's total, not
     # dropped over it -- otherwise "Total pipeline time" shows only ML time.
-    if input_mode.startswith("📹") and st.session_state.get("video_stage_times"):
+    if input_mode == MODE_VIDEO and st.session_state.get("video_stage_times"):
         stage_times = dict(st.session_state["video_stage_times"])
         ml_times = dict(result.stage_times or {})
         for k, v in ml_times.items():
@@ -1512,7 +1763,7 @@ if feature_vector:
     else:
         stage_times = dict(result.stage_times or {})
 
-    _is_video = input_mode.startswith("📹")
+    _is_video = input_mode == MODE_VIDEO
     _ball_stats = dict(st.session_state.get("ball_stats") or {})
 
     # ---------------- REPORT / EXPORT (built once, reused by §10 and §11) ----
@@ -1669,8 +1920,8 @@ if feature_vector:
     )
 
     if _is_video and st.session_state.pop("scroll_to_replay", False):
-        st.components.v1.html(
-            '<script>document.getElementById("paceai-analysis-replay")'
+        st.iframe(
+            '<script>window.parent.document.getElementById("paceai-analysis-replay")'
             "?.scrollIntoView({behavior:'smooth'});</script>",
             height=1,
         )
@@ -1681,7 +1932,10 @@ else:
 st.markdown("---")
 st.caption(
     "⚡ **PaceAI Biomechanics Engine** • Demo models are trained on synthetic data "
-    "(src/synthetic_data.py) -- retrain on real labeled data (`python train_demo_model.py "
+    "(src/synthetic_data.py) -- retrain on real labeled data (`python scripts/train_demo_model.py "
     "--data your_dataset.csv`) before using for real coaching/medical decisions. "
     "Designed for elite high-performance cricket centers, coaches, and sports physiotherapists."
 )
+
+# Injected last so the saved Customize UI design wins over the page's own CSS.
+st.markdown(ui_design.css_overrides(DESIGN), unsafe_allow_html=True)

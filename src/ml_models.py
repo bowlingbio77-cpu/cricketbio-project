@@ -29,7 +29,8 @@ from sklearn.ensemble import (
     GradientBoostingRegressor, GradientBoostingClassifier,
 )
 from sklearn.neural_network import MLPRegressor, MLPClassifier
-from sklearn.model_selection import KFold, StratifiedKFold, StratifiedGroupKFold, train_test_split
+from sklearn.model_selection import (KFold, GroupKFold, StratifiedKFold,
+                                     StratifiedGroupKFold, train_test_split)
 from sklearn.metrics import (
     mean_absolute_error, r2_score, accuracy_score, f1_score,
     recall_score, precision_score, roc_auc_score, classification_report,
@@ -118,6 +119,7 @@ class TrainedBundle:
     feature_ranges: Optional[dict] = None  # {feature: {"min": .., "max": ..}} for OOD checks
     cv_metrics: Optional[dict] = None       # honest K-fold cross-validation metrics
     baseline_metrics: Optional[dict] = None  # trivial-baseline metrics for comparison
+    imputer: Optional[SimpleImputer] = None  # fitted on training folds; re-applied at predict
 
 
 def _feature_ranges(X: np.ndarray, feature_names: list) -> dict:
@@ -164,8 +166,10 @@ def cross_validate(task: str, X: np.ndarray, y: np.ndarray,
         if groups is not None:
             groups = np.asarray(groups)
             n_groups = len(np.unique(groups))
+            if n_groups < 2:
+                return None
             if n_groups < n_folds:
-                n_folds = max(2, n_groups)
+                n_folds = n_groups
             splitter = StratifiedGroupKFold(n_splits=n_folds, shuffle=True,
                                             random_state=config.RANDOM_STATE)
         else:
@@ -173,8 +177,14 @@ def cross_validate(task: str, X: np.ndarray, y: np.ndarray,
                                        random_state=config.RANDOM_STATE)
     else:
         n_folds = _n_folds_for(n, None, n_folds)
-        splitter = KFold(n_splits=n_folds, shuffle=True,
-                         random_state=config.RANDOM_STATE)
+        if groups is not None:
+            groups = np.asarray(groups)
+            if len(np.unique(groups)) < 2:
+                return None
+            splitter = GroupKFold(n_splits=n_folds)
+        else:
+            splitter = KFold(n_splits=n_folds, shuffle=True,
+                             random_state=config.RANDOM_STATE)
 
     scores = {"mae": [], "r2": [], "rmse": [], "accuracy": [], "f1": [],
               "precision": [], "recall": [], "roc_auc": []}
@@ -201,9 +211,14 @@ def cross_validate(task: str, X: np.ndarray, y: np.ndarray,
             fit_kwargs = {}
             # RandomForest already applies "balanced" class_weight in its
             # constructor -- skip the extra sample weights to avoid double-counting.
-            if class_weight and getattr(m, "class_weight", None) != "balanced":
-                sw = np.array([class_weight.get(int(v), 1.0) for v in y_tr])
-                fit_kwargs["sample_weight"] = sw
+            # Weights are computed from each training fold only (no leakage from
+            # the whole dataset).
+            if getattr(m, "class_weight", None) != "balanced":
+                counts = np.bincount(y_tr)
+                inv = 1.0 / np.maximum(counts, 1)
+                fold_weight = {int(i): float(inv[i] / inv.max())
+                               for i in range(len(counts)) if counts[i] > 0}
+                fit_kwargs["sample_weight"] = [fold_weight.get(int(v), 1.0) for v in y_tr]
             m.fit(Xtr, y_tr, **fit_kwargs)
             preds = np.asarray(m.predict(Xte)).ravel()
             oof[te_idx] = preds
@@ -211,7 +226,7 @@ def cross_validate(task: str, X: np.ndarray, y: np.ndarray,
             scores["f1"].append(f1_score(y_te, preds, average="macro", zero_division=0))
             scores["precision"].append(precision_score(y_te, preds, average="macro", zero_division=0))
             scores["recall"].append(recall_score(y_te, preds, average="macro", zero_division=0))
-            if hasattr(m, "predict_proba"):
+            if hasattr(m, "predict_proba") and len(np.unique(y_te)) >= 2:
                 proba = m.predict_proba(Xte)
                 try:
                     if len(np.unique(y)) == 2:
@@ -275,23 +290,28 @@ def train_performance_model(X: np.ndarray, y: np.ndarray, model_name: ModelName 
     feature_names = feature_names or config.FEATURE_NAMES
     X = np.asarray(X, dtype=float)
     y = np.asarray(y, dtype=float)
+    if imputer is not None:
+        X = imputer.fit_transform(X)
     scaler = StandardScaler().fit(X)
     model = _make_regressor(model_name)
     model.fit(scaler.transform(X), y)
 
     cv_metrics = cross_validate("performance", X, y, model_name,
-                                groups=groups, imputer=imputer) or {}
-    baseline = baseline_performance(y)
+                                groups=groups, imputer=imputer)
+    if not cv_metrics:
+        print("    Dataset too small to cross-validate; no CV metrics.")
+        cv_metrics = {}
     metrics = {
-        "mae": cv_metrics.get("mae_mean", 0.0),
-        "r2": cv_metrics.get("r2_mean", 0.0),
-        "rmse": cv_metrics.get("rmse_mean", 0.0),
+        "mae": cv_metrics.get("mae_mean"),
+        "r2": cv_metrics.get("r2_mean"),
+        "rmse": cv_metrics.get("rmse_mean"),
         "folds": cv_metrics.get("folds", 0),
         "n_test": int(len(X)),
     }
     return TrainedBundle(
         model_name, "performance", model, scaler, feature_names, metrics,
         None, data_source, _feature_ranges(X, feature_names), cv_metrics, baseline,
+        imputer,
     )
 
 
@@ -301,9 +321,11 @@ def train_injury_model(X: np.ndarray, y: np.ndarray, model_name: ModelName = "ra
                         groups=None, imputer=None,
                         class_weight: Optional[dict] = None) -> TrainedBundle:
     feature_names = feature_names or config.FEATURE_NAMES
-    label_map = label_map or {0: "no injury", 1: "injury"}
+    label_map = label_map or {int(c): str(c) for c in np.unique(y)}
     X = np.asarray(X, dtype=float)
     y = np.asarray(y).astype(int)
+    if imputer is not None:
+        X = imputer.fit_transform(X)
     if class_weight is None:
         counts = np.bincount(y)
         inv = 1.0 / np.maximum(counts, 1)
@@ -317,23 +339,28 @@ def train_injury_model(X: np.ndarray, y: np.ndarray, model_name: ModelName = "ra
     model.fit(scaler.transform(X), y, **fit_kwargs)
 
     cv_metrics = cross_validate("injury", X, y, model_name, label_map,
-                                groups=groups, imputer=imputer,
-                                class_weight=class_weight) or {}
+                                groups=groups, imputer=imputer)
+    if not cv_metrics:
+        print("    Dataset too small to cross-validate; no CV metrics.")
+        cv_metrics = {}
     baseline = baseline_injury(y)
     metrics = {
-        "accuracy": cv_metrics.get("accuracy_mean", 0.0),
-        "f1_macro": cv_metrics.get("f1_mean", 0.0),
+        "accuracy": cv_metrics.get("accuracy_mean"),
+        "f1_macro": cv_metrics.get("f1_mean"),
         "folds": cv_metrics.get("folds", 0),
         "n_test": int(len(X)),
     }
     return TrainedBundle(
         model_name, "injury", model, scaler, feature_names, metrics,
         label_map, data_source, _feature_ranges(X, feature_names), cv_metrics, baseline,
+        imputer,
     )
 
 
 def predict(bundle: TrainedBundle, feature_vector: dict):
     x = np.array([[feature_vector[f] for f in bundle.feature_names]])
+    if getattr(bundle, "imputer", None) is not None:
+        x = bundle.imputer.transform(x)
     xs = bundle.scaler.transform(x)
     raw = np.asarray(bundle.model.predict(xs)).ravel()
     if bundle.task == "performance":
@@ -377,6 +404,8 @@ def prediction_interval_performance(bundle: TrainedBundle, feature_vector: dict,
     if not hasattr(model, "estimators_") or not getattr(model, "estimators_", None):
         return None
     x = np.array([[feature_vector[f] for f in bundle.feature_names]])
+    if getattr(bundle, "imputer", None) is not None:
+        x = bundle.imputer.transform(x)
     xs = bundle.scaler.transform(x)
     preds = np.array([est.predict(xs)[0] for est in model.estimators_])
     lo, hi = np.percentile(preds, percentile)
@@ -597,7 +626,9 @@ def cross_validate_sequences(X_seq: np.ndarray, y: np.ndarray, groups: np.ndarra
     y = np.asarray(y).astype(int)
     groups = np.asarray(groups)
     n_folds = _n_folds_for(len(y), y, n_folds)
-    n_folds = min(n_folds, max(2, len(np.unique(groups))))
+    if len(np.unique(groups)) < 2:
+        return {}
+    n_folds = min(n_folds, len(np.unique(groups)))
     splitter = StratifiedGroupKFold(n_splits=n_folds, shuffle=True,
                                     random_state=random_state)
     scores = {"accuracy": [], "f1": [], "precision": [], "recall": [], "roc_auc": []}
@@ -613,6 +644,8 @@ def cross_validate_sequences(X_seq: np.ndarray, y: np.ndarray, groups: np.ndarra
         scores["f1"].append(f1_score(y[te_idx], preds, average="macro", zero_division=0))
         scores["precision"].append(precision_score(y[te_idx], preds, average="macro", zero_division=0))
         scores["recall"].append(recall_score(y[te_idx], preds, average="macro", zero_division=0))
+        if len(np.unique(y[te_idx])) < 2:
+            continue
         proba = m.predict_proba(X_seq[te_idx])
         if len(np.unique(y)) == 2:
             scores["roc_auc"].append(roc_auc_score(y[te_idx], proba[:, 1]))

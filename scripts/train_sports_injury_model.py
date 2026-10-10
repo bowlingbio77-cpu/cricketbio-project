@@ -116,7 +116,7 @@ def save_artifacts(bundle, stem: str):
         "baseline_metrics": bundle.baseline_metrics,
     }
     with open(meta_path, "w") as f:
-        json.dump(metadata, f, indent=2)
+        json.dump(metadata, f, indent=2, allow_nan=False)
     print(f"    ✅ Saved {model_path}")
     return model_path
 

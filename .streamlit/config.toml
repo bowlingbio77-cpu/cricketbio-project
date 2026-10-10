@@ -1,0 +1,20 @@
+# Streamlit theme -- DARK.
+#
+# This must stay aligned with the active tokens in src/design_system.py
+# ("DUSK / Kinetic Biomechanics"). The app injects dark CSS for .stApp and the
+# sidebar, but Streamlit's own widget layer (buttons, inputs, sliders,
+# expanders, metrics, file uploader) is themed by this file. With base="light"
+# those native widgets rendered light-on-dark. Keep the two in sync.
+[theme]
+base = "dark"
+primaryColor = "#20D9FF"          # ACCENT / TEXT_ACCENT
+backgroundColor = "#212833"        # BG_APP
+secondaryBackgroundColor = "#2B3442"  # BG_PRIMARY (cards, sidebar widgets)
+textColor = "#E9EEF5"              # TEXT_PRIMARY
+borderColor = "#3D4859"            # BORDER_DEFAULT
+linkColor = "#7FE3FF"              # accent tint for links
+codeBackgroundColor = "#232B38"    # lower card gradient stop
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false

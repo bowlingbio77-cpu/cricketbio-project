@@ -7,14 +7,8 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
-# Downloaded model weights (committed so Video Motion Capture works on
-# Streamlit Cloud without a runtime download step). The YOLO weights live in
-# models/ (see src/config.py: YOLO_WEIGHTS = models/yolo11n.pt).
-!models/pose_landmarker_heavy.task
-!models/yolo11n.pt
-
-# Trained model bundles ARE committed (retrain with scripts/train_demo_model.py)
-!models/*.joblib
+# Trained model weights are committed (see src/config.py) so no `models/`
+# ignore is needed here.
 
 # User-local runtime data (history DB regenerated automatically -- not committed)
 data/*
@@ -23,6 +17,13 @@ data/*
 !data/cricket_injury_recovery_benchmarks.csv
 !data/multimodal_sports_injury_dataset.csv
 !data/cricket_injury_dataset.csv
+
+# Environment / local secrets
+.env
+.streamlit/secrets.toml
+
+# Divergent nested copy of this app (kept out of git; delete when it's surplus)
+cricket_biomech_ai/
 
 # OS / editor
 .DS_Store

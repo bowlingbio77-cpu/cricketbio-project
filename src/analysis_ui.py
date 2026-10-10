@@ -133,7 +133,7 @@ _SHELL_CSS = """
         --lab-line: #3d4859;
         --lab-muted: #7e8b9d;
         --lab-body: #e9eef5;
-        --lab-teal: #63d4cf;
+        --lab-teal: #20D9FF;
         --lab-ok: #43d9a3;
         --lab-warn: #e8b34a;
         --lab-danger: #ff7086;
@@ -162,8 +162,8 @@ _SHELL_CSS = """
     .lab-stage-bg {
         position: absolute; inset: 0;
         background:
-            radial-gradient(120% 120% at 20% 0%, rgba(142,193,238,.12), transparent 55%),
-            radial-gradient(100% 100% at 100% 100%, rgba(99,212,207,.08), transparent 55%),
+            radial-gradient(120% 120% at 20% 0%, rgba(32,217,255,.12), transparent 55%),
+            radial-gradient(100% 100% at 100% 100%, rgba(32,217,255,.08), transparent 55%),
             linear-gradient(160deg, #2a3341 0%, #212a37 100%);
     }
 
@@ -171,19 +171,19 @@ _SHELL_CSS = """
     .lab-stage-art { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
     .lab-art-field {
         position: relative; width: 60%; max-width: 520px; height: 200px;
-        border: 1px solid rgba(142,193,238,.30); border-radius: 12px;
-        background: repeating-linear-gradient(90deg, rgba(142,193,238,.08) 0 2px, transparent 2px calc(100%/10)),
+        border: 1px solid rgba(32,217,255,.30); border-radius: 12px;
+        background: repeating-linear-gradient(90deg, rgba(32,217,255,.08) 0 2px, transparent 2px calc(100%/10)),
                     linear-gradient(rgba(67,217,163,.06), transparent);
     }
     .lab-art-field::after { /* horizon / pitch line */
         content: ""; position: absolute; left: 8%; right: 8%; top: 78%;
-        height: 1px; background: linear-gradient(90deg, transparent, rgba(99,212,207,.4), transparent);
+        height: 1px; background: linear-gradient(90deg, transparent, rgba(32,217,255,.4), transparent);
     }
     .lab-art-bowler {
         position: absolute; left: 16%; bottom: 20%; width: 46px; height: 96px;
         border-radius: 46px 46px 0 0;
-        background: linear-gradient(90deg, rgba(142,193,238,.28), rgba(142,193,238,.10));
-        border: 1px solid rgba(142,193,238,.5);
+        background: linear-gradient(90deg, rgba(32,217,255,.28), rgba(32,217,255,.10));
+        border: 1px solid rgba(32,217,255,.5);
     }
     .lab-art-ball {
         position: absolute; right: 18%; bottom: 34%; width: 16px; height: 16px;
@@ -205,7 +205,7 @@ _SHELL_CSS = """
     .hud-bl { bottom: 12px; left: 14px; }
     .hud-br { bottom: 12px; right: 14px; }
     .hud-brand { display: flex; flex-direction: column; line-height: 1.1; }
-    .hud-brand b { font-size: 12px; letter-spacing: .28em; color: #9cc8ee; }
+    .hud-brand b { font-size: 12px; letter-spacing: .28em; color: #4FD4F2; }
     .hud-brand span { font-size: 9px; letter-spacing: .22em; color: var(--lab-muted); }
     .hud-pill {
         font-family: var(--lab-mono); font-size: 10px; letter-spacing: .12em;
@@ -228,16 +228,16 @@ _SHELL_CSS = """
         background: linear-gradient(180deg, rgba(42,51,65,.55), rgba(42,51,65,0));
     }
     .lab-current-kicker { font-size: 10px; letter-spacing: .24em; color: var(--lab-muted); font-weight: 700; }
-    .lab-current-title { font-size: 22px; font-weight: 800; margin: 4px 0 2px; color: #a9cdec; letter-spacing: .01em; }
+    .lab-current-title { font-size: 22px; font-weight: 800; margin: 4px 0 2px; color: #7FE3FF; letter-spacing: .01em; }
     .lab-current-desc { color: var(--lab-muted); font-size: 13px; line-height: 1.5; }
 
     /* thin premium progress line */
     .lab-progress { padding: 0 20px 16px; }
     .lab-progress-track {
         position: relative; height: 3px; border-radius: 3px;
-        background: rgba(142,193,238,.2); overflow: hidden;
+        background: rgba(32,217,255,.2); overflow: hidden;
     }
-    .lab-progress-fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #8ec1ee, #63d4cf); width: 0%; transition: width .4s ease; }
+    .lab-progress-fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #20D9FF, #20D9FF); width: 0%; transition: width .4s ease; }
     .lab-progress-legend { display: flex; justify-content: space-between; margin-top: 8px; font-family: var(--lab-mono); font-size: 10px; color: var(--lab-muted); letter-spacing: .1em; }
 
     /* ---------- RIGHT: live analysis panel ---------- */
@@ -259,7 +259,7 @@ _SHELL_CSS = """
     .lab-step.done .ic { color: var(--lab-ok); }
     .lab-step.done .tx { color: var(--lab-muted); }
     .lab-step.active .ic { color: var(--lab-teal); animation: labFade 1.4s infinite; }
-    .lab-step.active .tx { color: #9cc8ee; font-weight: 600; }
+    .lab-step.active .tx { color: #4FD4F2; font-weight: 600; }
     .lab-step.up .ic { color: rgba(126,139,157,.5); }
     .lab-step.up .tx { color: rgba(126,139,157,.6); }
     @keyframes labFade { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
@@ -273,7 +273,7 @@ _SHELL_CSS = """
     .lab-done, .lab-err { padding: 26px 24px; text-align: left; }
     .lab-done .ok-ring { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--lab-ok); display: inline-flex; align-items: center; justify-content: center; color: var(--lab-ok); margin-bottom: 10px; }
     .lab-err .ok-ring { border-color: var(--lab-danger); color: var(--lab-danger); }
-    .lab-done .tt, .lab-err .tt { font-size: 20px; font-weight: 800; color: #a9cdec; }
+    .lab-done .tt, .lab-err .tt { font-size: 20px; font-weight: 800; color: #7FE3FF; }
     .lab-done .dd, .lab-err .dd { color: var(--lab-muted); font-size: 13px; margin-top: 4px; line-height: 1.5; }
     .lab-done .btn, .lab-err .btn {
         margin-top: 16px; display: inline-flex; align-items: center; gap: 8px;
@@ -477,7 +477,7 @@ _ROSTER_CSS = """
     }
     .paceai-roster-kicker {
         font-size: 11px; font-weight: 800; letter-spacing: .2em;
-        color: #63d4cf; text-transform: uppercase;
+        color: #20D9FF; text-transform: uppercase;
     }
     .paceai-roster-note {
         font-size: 11px; color: #7e8b9d;
@@ -500,16 +500,16 @@ _ROSTER_CSS = """
         font-size: 12px; color: #7e8b9d;
     }
     .paceai-roster-bar {
-        height: 5px; border-radius: 3px; background: rgba(142,193,238,.18);
+        height: 5px; border-radius: 3px; background: rgba(32,217,255,.18);
         overflow: hidden;
     }
     .paceai-roster-bar i {
         display: block; height: 100%; border-radius: 3px;
-        background: linear-gradient(90deg, #8ec1ee, currentColor);
+        background: linear-gradient(90deg, #20D9FF, currentColor);
     }
     .paceai-roster-conf {
         font-family: 'JetBrains Mono', 'Consolas', monospace;
-        font-size: 12px; font-weight: 700; color: #9cc8ee; text-align: right;
+        font-size: 12px; font-weight: 700; color: #4FD4F2; text-align: right;
     }
     .paceai-roster-empty {
         padding: 14px 6px 10px; color: #7e8b9d; font-size: 13px; line-height: 1.5;

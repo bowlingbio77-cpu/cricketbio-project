@@ -92,11 +92,13 @@ else:
     )
 
 try:
-    perf_bundle = ml_models.load_bundle(config.PERFORMANCE_MODEL_PATH)
+    perf_bundle = ml_models.load_bundle(
+        os.path.join(config.MODEL_DIR, "performance_random_forest.joblib"))
 except Exception:
     perf_bundle = None
 try:
-    injury_bundle = ml_models.load_bundle(config.INJURY_MODEL_PATH)
+    injury_bundle = ml_models.load_bundle(
+        os.path.join(config.MODEL_DIR, "injury_random_forest.joblib"))
 except Exception:
     injury_bundle = None
 

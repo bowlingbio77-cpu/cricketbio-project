@@ -32,18 +32,18 @@ BORDER_STRONG = "#4b586c"
 TEXT_PRIMARY = "#e9eef5"
 TEXT_SECONDARY = "#aeb9c8"
 TEXT_MUTED = "#7e8b9d"
-TEXT_ACCENT = "#63d4cf"
+TEXT_ACCENT = "#20D9FF"
 
 # Semantic
 COLOR_SUCCESS = "#43d9a3"
 COLOR_WARNING = "#e8b34a"
 COLOR_ERROR = "#ff7086"
-COLOR_INFO = "#63d4cf"
+COLOR_INFO = "#20D9FF"
 
 # Accent (PaceAI kinetic ice-cobalt, tuned for dusk surfaces)
-ACCENT = "#8ec1ee"
-ACCENT_DIM = "rgba(142,193,238,0.14)"
-ACCENT_BORDER = "rgba(142,193,238,0.35)"
+ACCENT = "#20D9FF"
+ACCENT_DIM = "rgba(32,217,255,0.14)"
+ACCENT_BORDER = "rgba(32,217,255,0.35)"
 
 # Surfaces for cards
 CARD_BG = "linear-gradient(180deg, #2e3949 0%, #232b38 100%)"
@@ -203,6 +203,156 @@ section[data-testid="stSidebar"] {{
     border-right: 1px solid {BORDER_DEFAULT} !important;
 }}
 
+/* ============================================================
+   NATIVE WIDGET SURFACES (dark)
+   ------------------------------------------------------------
+   .streamlit/config.toml sets base="dark", but Streamlit's own
+   widget internals still ship hard-coded light surfaces in some
+   builds. Pin them to the design tokens so no light panel can
+   appear on top of the dark UI. These are native st.* widgets
+   only; the custom .p-* components are styled further down.
+   ============================================================ */
+div[data-baseweb="select"] > div,
+div[data-baseweb="input"],
+div[data-baseweb="base-input"],
+div[data-baseweb="textarea"] {{
+    background-color: {BG_SECONDARY} !important;
+    border-color: {BORDER_DEFAULT} !important;
+    color: {TEXT_PRIMARY} !important;
+}}
+div[data-baseweb="popover"] > div,
+div[role="listbox"] {{
+    background-color: {BG_PRIMARY} !important;
+    border-color: {BORDER_DEFAULT} !important;
+    color: {TEXT_PRIMARY} !important;
+}}
+div[role="listbox"] [role="option"]:hover {{
+    background-color: {BG_TERTIARY} !important;
+    color: {TEXT_PRIMARY} !important;
+}}
+div[data-baseweb="popover"] svg,
+[data-testid="stSelectbox"] svg {{
+    fill: {TEXT_SECONDARY} !important;
+}}
+
+[data-testid="stFileUploaderDropzone"] {{
+    background-color: {BG_SECONDARY} !important;
+    border: 1px dashed {BORDER_DEFAULT} !important;
+    color: {TEXT_SECONDARY} !important;
+}}
+[data-testid="stFileUploaderDropzone"]:hover {{
+    border-color: {ACCENT} !important;
+    color: {TEXT_PRIMARY} !important;
+}}
+[data-testid="stFileUploaderDropzone"] small,
+[data-testid="stFileUploaderDropzone"] span {{
+    color: {TEXT_MUTED} !important;
+}}
+
+[data-testid="stExpander"] {{
+    background-color: {BG_PRIMARY} !important;
+    border: 1px solid {BORDER_DEFAULT} !important;
+    border-radius: {RADIUS_MD} !important;
+}}
+[data-testid="stExpander"] summary {{
+    background-color: transparent !important;
+    color: {TEXT_PRIMARY} !important;
+}}
+[data-testid="stExpander"] summary:hover {{
+    color: {ACCENT} !important;
+}}
+[data-testid="stExpander"] svg {{
+    fill: {TEXT_SECONDARY} !important;
+}}
+
+[data-testid="stMetric"] {{
+    background-color: {BG_PRIMARY} !important;
+    border: 1px solid {BORDER_DEFAULT} !important;
+    border-radius: {RADIUS_MD} !important;
+    padding: {SP_MD} !important;
+}}
+[data-testid="stMetricLabel"] p,
+[data-testid="stMetricLabel"] {{
+    color: {TEXT_MUTED} !important;
+}}
+[data-testid="stMetricValue"] {{
+    color: {TEXT_PRIMARY} !important;
+}}
+[data-testid="stMetricDelta"] {{
+    color: {TEXT_SECONDARY} !important;
+}}
+
+[data-testid="stSlider"] [data-testid="stTickBarMin"],
+[data-testid="stSlider"] [data-testid="stTickBarMax"] {{
+    color: {TEXT_MUTED} !important;
+}}
+
+[data-testid="stTabs"] [data-baseweb="tab-list"] {{
+    background-color: {BG_PRIMARY} !important;
+    border-bottom: 1px solid {BORDER_DEFAULT} !important;
+}}
+[data-testid="stTabs"] [data-baseweb="tab"] {{
+    background-color: transparent !important;
+    color: {TEXT_SECONDARY} !important;
+}}
+[data-testid="stTabs"] [aria-selected="true"] {{
+    color: {ACCENT} !important;
+    border-bottom: 2px solid {ACCENT} !important;
+}}
+
+[data-testid="stForm"] {{
+    background-color: {BG_PRIMARY} !important;
+    border: 1px solid {BORDER_DEFAULT} !important;
+    border-radius: {RADIUS_MD} !important;
+}}
+
+[data-testid="stDataFrame"],
+[data-testid="stDataFrame"] * {{
+    background-color: {BG_PRIMARY} !important;
+    color: {TEXT_PRIMARY} !important;
+}}
+
+[data-testid="stToggle"] label,
+[data-testid="stCheckbox"] label,
+[data-testid="stRadio"] label {{
+    color: {TEXT_SECONDARY} !important;
+}}
+
+/* Secondary Streamlit buttons that are not the custom .p-* components */
+.stButton > button,
+.stDownloadButton > button,
+.stFormSubmitButton > button {{
+    background-color: {BG_SECONDARY} !important;
+    color: {TEXT_PRIMARY} !important;
+    border: 1px solid {BORDER_DEFAULT} !important;
+    border-radius: {RADIUS_SM} !important;
+}}
+.stButton > button:hover,
+.stDownloadButton > button:hover,
+.stFormSubmitButton > button:hover {{
+    border-color: {ACCENT} !important;
+    color: {TEXT_ACCENT} !important;
+}}
+.stButton > button[kind="primary"],
+.stFormSubmitButton > button[kind="primary"] {{
+    background: linear-gradient(180deg, {ACCENT}, #2563EB) !important;
+    color: {BG_APP} !important;
+    border-color: transparent !important;
+}}
+
+/* Status / alert containers must not reintroduce a light block */
+[data-testid="stAlert"] {{
+    background-color: {BG_PRIMARY} !important;
+    border: 1px solid {BORDER_DEFAULT} !important;
+    color: {TEXT_PRIMARY} !important;
+}}
+
+/* Tooltips / popovers rendered by Streamlit */
+[data-testid="stTooltipContent"] {{
+    background-color: {BG_TERTIARY} !important;
+    color: {TEXT_PRIMARY} !important;
+}}
+
 /* Remove default Streamlit padding on main */
 .block-container {{
     padding-top: 2rem !important;
@@ -237,7 +387,7 @@ section[data-testid="stSidebar"] {{
 .stButton:focus-within,
 .stTextInput:focus-within,
 .stNumberInput:focus-within {{
-    box-shadow: 0 0 0 2px rgba(142,193,238,0.35);
+    box-shadow: 0 0 0 2px rgba(32,217,255,0.35);
 }}
 .sr-only {{
     position: absolute; width: 1px; height: 1px;
@@ -263,6 +413,40 @@ section[data-testid="stSidebar"] {{
 .p-label {{
     font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em;
     text-transform: uppercase; color: {TEXT_SECONDARY};
+}}
+
+/* ============================================================
+   MASTHEAD + PRIMARY NAV
+   The wordmark and the two-destination nav live above the app
+   body, not in a sidebar. Weight is on the wordmark only; the
+   sub-label is metadata and stays quiet.
+   ============================================================ */
+.pai-masthead {{
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+    padding: 0 0 14px; margin: 0 0 6px;
+    border-bottom: 1px solid {BORDER_DEFAULT};
+}}
+.pai-masthead-brand {{
+    font-size: 1.32rem; font-weight: 800; letter-spacing: 0.16em;
+    color: {TEXT_PRIMARY};
+}}
+.pai-masthead-sub {{
+    font-size: 0.7rem; font-weight: 600; letter-spacing: 0.13em;
+    text-transform: uppercase; color: {TEXT_MUTED};
+}}
+/* Keep the primary nav visually quiet until it is used: Streamlit renders the
+   radio as a segmented control, so only the resting state is toned down here. */
+.stRadio [role="radiogroup"] {{ gap: 4px; }}
+.stRadio [role="radiogroup"] > label {{
+    padding: 6px 16px; border-radius: {RADIUS_SM};
+    transition: background-color 120ms ease, color 120ms ease;
+}}
+.stRadio [role="radiogroup"] > label:hover {{ background: {BG_TERTIARY}; }}
+.stRadio [role="radiogroup"] > label:has(input:checked) {{
+    background: {BG_PRIMARY}; color: {TEXT_PRIMARY};
+}}
+.stRadio [role="radiogroup"] > label:has(input:focus-visible) {{
+    outline: 2px solid {ACCENT}; outline-offset: 2px;
 }}
 
 /* ============================================================
@@ -415,10 +599,10 @@ section[data-testid="stSidebar"] {{
     color: white; font-weight: 700; font-size: 0.85rem;
     letter-spacing: 0.02em; border: none; cursor: pointer;
     transition: all 0.2s ease; width: 100%;
-    box-shadow: 0 2px 8px rgba(142,193,238,0.25);
+    box-shadow: 0 2px 8px rgba(32,217,255,0.25);
 }}
 .p-btn-primary:hover {{
-    box-shadow: 0 4px 16px rgba(142,193,238,0.35);
+    box-shadow: 0 4px 16px rgba(32,217,255,0.35);
     transform: translateY(-1px);
 }}
 .p-btn-secondary {{
@@ -650,8 +834,8 @@ section[data-testid="stSidebar"] {{
    PRIORITY / FINDINGS CARD
    ============================================================ */
 .p-finding {{
-    border: 1px solid rgba(142,193,238,0.28);
-    background: linear-gradient(135deg, rgba(142,193,238,0.08), {BG_PRIMARY});
+    border: 1px solid rgba(32,217,255,0.28);
+    background: linear-gradient(135deg, rgba(32,217,255,0.08), {BG_PRIMARY});
     border-radius: {RADIUS_LG};
     padding: 20px;
     margin: 16px 0;

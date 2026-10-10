@@ -22,9 +22,27 @@ def test_sports_preprocess_no_duplicates_or_errors(sports_df):
     X, y, groups, names = preprocess_sports_injury(sports_df)
     assert len(names) == len(set(names))
     assert X.shape[0] == len(y) == len(groups)
-    assert X.ndim == 2 and np.isfinite(X).all() is not None
+    # NaNs survive preprocessing on purpose -- sensor data has ~3% missing
+    # values and imputation belongs to the trainer/bundle (tested below).
+    # Infinities, however, would poison the scaler.
+    assert X.ndim == 2 and not np.isinf(X).any()
     assert set(np.unique(y)) <= {0, 1, 2}
     assert len(np.unique(groups)) > 100
+
+
+def test_trained_bundle_imputes_missing_values(sports_df):
+    X, y, groups, names = preprocess_sports_injury(sports_df)
+    rng = np.random.default_rng(0)
+    idx = rng.choice(len(y), size=400, replace=False)
+    bundle = ml_models.train_injury_model(
+        X[idx], y[idx], "random_forest", feature_names=names,
+        label_map=config.SPORTS_INJURY_LABEL_MAP, data_source="real",
+        groups=groups[idx], imputer=SimpleImputer(strategy="median"))
+    assert bundle.imputer is not None
+    # Every input missing: the bundle must impute at serve time instead of
+    # feeding all-NaN rows straight to the model.
+    pred = ml_models.predict(bundle, {n: float("nan") for n in names})
+    assert pred["risk_level"] in config.SPORTS_INJURY_LABEL_MAP.values()
 
 
 def test_sports_temporal_features_are_lag_only(sports_df):

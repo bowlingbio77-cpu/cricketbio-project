@@ -53,6 +53,7 @@ _ADDED_COLUMNS = {
     "athlete": "TEXT",
     "tags": "TEXT",
     "fingerprint": "TEXT",
+    "meta": "TEXT",  # provenance/verification fields added on save (finding #9)
 }
 
 
@@ -66,6 +67,7 @@ def init_db():
     """Create the database/table if it doesn't exist yet, and migrate old
     databases that predate the athlete/tags/fingerprint columns. Safe to call
     often."""
+    os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
     conn = _connect()
     try:
         conn.execute(_SCHEMA)
@@ -82,14 +84,17 @@ def init_db():
 
 
 def _fingerprint(*, athlete, label, tags, input_mode, model, bowling_arm,
-                 feature_vector, performance_score):
+                 feature_vector, performance_score, injury_risk=None,
+                 shap_performance=None, shap_injury=None, coaching_notes=None):
     """Content hash identifying a unique saved result. Re-saving identical
-    content (same athlete, tags, mode, model, arm, features and score) yields
-    the same fingerprint and is treated as idempotent."""
+    content (same athlete, tags, mode, model, arm, features, score, risk,
+    SHAP and coaching notes) yields the same fingerprint and is treated as
+    idempotent."""
     canonical = json.dumps([
         athlete or "", label or "", tags or "", input_mode or "", model or "",
         bowling_arm or "", feature_vector, performance_score,
-    ], sort_keys=True, separators=(",", ":"))
+        injury_risk, shap_performance, shap_injury, coaching_notes,
+    ], sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha1(canonical.encode("utf-8")).hexdigest()
 
 
@@ -116,7 +121,16 @@ def save_analysis(result, *, label="", input_mode="", bowling_arm="", model="",
     fingerprint = _fingerprint(
         athlete=athlete, label=label, tags=tags, input_mode=input_mode,
         model=model, bowling_arm=bowling_arm, feature_vector=feature_vector,
-        performance_score=performance_score)
+        performance_score=performance_score, injury_risk=injury_risk,
+        shap_performance=shap_perf, shap_injury=shap_injury,
+        coaching_notes=coaching_notes)
+
+    # Provenance/verification state travels with the row so a 2D-only or
+    # ML-withheld run can still be recognised when recalled from history.
+    meta = {k: data.get(k) for k in (
+        "feature_provenance", "landmark_source_summary", "subject_verified",
+        "scoring_blocked_reason", "delivery_reliable", "bowler_track_id",
+    ) if data.get(k) is not None}
 
     conn = _connect()
     try:
@@ -126,8 +140,8 @@ def save_analysis(result, *, label="", input_mode="", bowling_arm="", model="",
                 created_at, label, input_mode, bowling_arm, model,
                 athlete, tags, fingerprint,
                 performance_score, risk_level, feature_vector, injury_risk,
-                shap_performance, shap_injury, coaching_notes, stage_times
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                shap_performance, shap_injury, coaching_notes, stage_times, meta
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -146,6 +160,7 @@ def save_analysis(result, *, label="", input_mode="", bowling_arm="", model="",
                 json.dumps(shap_injury) if shap_injury else None,
                 json.dumps(coaching_notes),
                 json.dumps(stage_times),
+                json.dumps(meta) if meta else None,
             ),
         )
         conn.commit()
@@ -161,9 +176,14 @@ def save_analysis(result, *, label="", input_mode="", bowling_arm="", model="",
 def _parse_row(row):
     d = dict(row)
     for key in ("feature_vector", "injury_risk", "shap_performance", "shap_injury",
-                "coaching_notes", "stage_times"):
+                "coaching_notes", "stage_times", "meta"):
         if d.get(key):
-            d[key] = json.loads(d[key])
+            try:
+                d[key] = json.loads(d[key])
+            except (ValueError, TypeError):
+                # Keep the raw string rather than crashing the whole History
+                # page (and its export button) on one corrupt cell.
+                pass
     return d
 
 

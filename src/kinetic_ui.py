@@ -21,13 +21,13 @@ SURFACE = "#212833"
 PANEL = "#2b3442"
 LINE = "#3d4859"
 BORDER_STRONG = "#4b586c"
-NAVY = "#8ec1ee"
-TEAL = "#63d4cf"
+NAVY = "#20D9FF"
+TEAL = "#20D9FF"
 BODY = "#e9eef5"
 SECONDARY = "#aeb9c8"
 MUTED = "#7e8b9d"
 OUTLINE = "#5f6d80"
-ICE = "rgba(142, 193, 238, 0.16)"
+ICE = "rgba(32, 217, 255, 0.16)"
 OK = "#43d9a3"
 WARN = "#e8b34a"
 DANGER = "#ff7086"
@@ -128,7 +128,7 @@ KINETIC_CSS = """
     .kin-load { display: flex; align-items: center; gap: 14px; }
     .kin-donut { --p: 0; --ring: %(OK)s;
         width: 68px; height: 68px; border-radius: 50%%; flex: 0 0 68px;
-        background: conic-gradient(var(--ring) calc(var(--p) * 1%%), rgba(142,193,238,.16) 0);
+        background: conic-gradient(var(--ring) calc(var(--p) * 1%%), rgba(32,217,255,.16) 0);
         display: flex; align-items: center; justify-content: center; position: relative; }
     .kin-donut::after { content: ""; position: absolute; inset: 8px; border-radius: 50%%; background: %(PANEL)s; }
     .kin-donut span { position: relative; z-index: 1; font-family: 'JetBrains Mono', 'Consolas', monospace;
@@ -141,10 +141,10 @@ KINETIC_CSS = """
     .kin-timeline { padding: 14px 20px 16px; border: 1px solid var(--k-line);
         border-radius: 10px; background: %(PANEL)s; }
     .kin-tl-track { position: relative; height: 6px; border-radius: 3px;
-        background: rgba(142,193,238,.16); margin: 0 10px; }
+        background: rgba(32,217,255,.16); margin: 0 10px; }
     .kin-tl-marker { position: absolute; top: -4px; width: 14px; height: 14px;
         border-radius: 50%%; background: %(PANEL)s; border: 3px solid var(--k-nav);
-        box-shadow: 0 0 0 3px rgba(142,193,238,.25); }
+        box-shadow: 0 0 0 3px rgba(32,217,255,.25); }
     .kin-tl-marker.release { border-color: %(DANGER)s; box-shadow: 0 0 0 3px rgba(255,112,134,.25); }
     .kin-tl-marker.impact { border-color: %(OK)s; box-shadow: 0 0 0 3px rgba(67,217,163,.25); }
     .kin-phases { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 12px; }
@@ -299,21 +299,31 @@ def rail_html(meta: dict) -> str:
                 f'<div class="kin-kpi-sub">{esc(sub)}</div></div>'
                 f'<div class="kin-kpi-val">{v}{unit_h}</div></div>')
 
+    # Identity claims must never outrun the evidence. A role with no locked track
+    # is not an identity at all, so the card disappears. And when the subject is
+    # unverified the result page withholds scoring, so the rail must not name a
+    # role or print a confidence number it cannot stand behind.
     identity = ""
-    if meta.get("track") is not None or meta.get("role"):
-        sub = f"confidence {_fmt(meta.get('conf'), '', 2)}" if meta.get("conf") is not None else "identity locked"
-        role = str(meta.get("role") or "bowler").upper()
-        avatar = esc(role[:1])
+    if meta.get("track") is not None:
+        track_label = f"Track #{esc(meta.get('track'))}"
+        if meta.get("verified") is False:
+            sub, role, avatar, chip_cls = "identity not confirmed", "UNCONFIRMED", "?", "kin-amber"
+        else:
+            conf = meta.get("conf")
+            sub = f"confidence {_fmt(conf, '', 2)}" if conf is not None else "identity locked"
+            role = str(meta.get("role") or "bowler").upper()
+            avatar, chip_cls = esc(role[:1]), ""
+        chip_extra = f" {chip_cls}" if chip_cls else ""
         identity = f"""
         <div class="kin-card">
           <div class="kin-card-kicker">Bowler Identity</div>
           <div class="kin-identity">
             <div class="kin-avatar">{avatar}</div>
             <div>
-              <div class="kin-identity-name">Track #{esc(meta.get('track') or '\u2014')}</div>
+              <div class="kin-identity-name">{track_label}</div>
               <div class="kin-identity-sub">{esc(sub)}</div>
             </div>
-            <span class="kin-chip">{esc(role)}</span>
+            <span class="kin-chip{chip_extra}">{esc(role)}</span>
           </div>
         </div>"""
 

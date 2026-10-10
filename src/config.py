@@ -43,6 +43,16 @@ SUBJECT_VERIFICATION_REQUIRED = True
 # themselves are still returned; only the predictions are withheld.
 REFUSE_ML_ON_UNRELIABLE_DELIVERY = False
 
+# --- Feature provenance source tags ---
+# Canonical values for feature_provenance[...]["source"]. Shared by the producer
+# (feature_engineering) and the consumer (result_view) so the 2D-vs-3D trust
+# layer cannot silently drift. Contract: docs/RESULT_REDESIGN.md.
+PROV_WORLD_3D = "world_3d"            # MediaPipe metric 3D landmarks
+PROV_NORMALIZED_2D = "normalized_2d"  # 2D image coords; perspective-distorted angles
+PROV_MISSING = "missing_xyz"          # no landmark data; config default substituted
+PROV_3D_ARRAY = "3d_array"            # raw ndarray feed with z (unit-test / synthetic)
+PROV_2D_ARRAY = "2d_array"            # raw ndarray feed, x/y only
+
 # The 33 MediaPipe Pose landmarks, in official index order.
 POSE_LANDMARK_NAMES = [
     "nose", "left_eye_inner", "left_eye", "left_eye_outer",

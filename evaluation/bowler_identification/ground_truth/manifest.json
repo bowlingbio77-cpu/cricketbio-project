@@ -1,0 +1,275 @@
+{
+  "description": "Bowler-identity ground truth from raw Sportradar annotations.",
+  "source": "evaluation/single_video_benchmark/dataset/data",
+  "identity_policy": "PER_DELIVERY",
+  "policy_note": "Annotations fragment bowler identity across multiple person-ids. Under PER_DELIVERY, identity is resolved inside each contiguous event=='is bowling' window, because a video contains two different bowlers (one per over). Frames annotated as bowler under a different id inside a window are counted as fragmented_frames_excluded and are NOT scored as misses, so accuracy uses a conservative denominator. action_window_frames is the evaluation set: it deliberately covers only frames inside a bowling action, which is the semantically correct unit for 'did the system pick the bowler during his delivery'. It is a subset of all bowler-role frames (scored_fraction_of_bowler_frames), which also include the bowler standing at the mark or walking back -- those frames are not evaluated.",
+  "not_biomechanics_ground_truth": "This is identity/bbox ground truth only. It contains no per-delivery biomechanical labels, so no biomechanics accuracy may be derived from it.",
+  "videos": 26,
+  "videos_with_footage": 26,
+  "errors": [],
+  "per_video": [
+    {
+      "video_id": "20220327_3916886_2overs",
+      "resolved_bowler_ids": 4,
+      "distinct_bowler_ids": 9,
+      "scored_fraction_of_bowler_frames": 0.077046,
+      "action_window_frames": 822,
+      "fragmented_frames_excluded": 0,
+      "detected_deliveries": 12,
+      "has_video": true
+    },
+    {
+      "video_id": "20221001_4139131_2overs",
+      "resolved_bowler_ids": 3,
+      "distinct_bowler_ids": 8,
+      "scored_fraction_of_bowler_frames": 0.081176,
+      "action_window_frames": 395,
+      "fragmented_frames_excluded": 3,
+      "detected_deliveries": 6,
+      "has_video": true
+    },
+    {
+      "video_id": "20221001_4139132_2overs",
+      "resolved_bowler_ids": 7,
+      "distinct_bowler_ids": 15,
+      "scored_fraction_of_bowler_frames": 0.183132,
+      "action_window_frames": 1166,
+      "fragmented_frames_excluded": 0,
+      "detected_deliveries": 12,
+      "has_video": true
+    },
+    {
+      "video_id": "20221001_4139134_2overs",
+      "resolved_bowler_ids": 6,
+      "distinct_bowler_ids": 10,
+      "scored_fraction_of_bowler_frames": 0.105845,
+      "action_window_frames": 996,
+      "fragmented_frames_excluded": 94,
+      "detected_deliveries": 10,
+      "has_video": true
+    },
+    {
+      "video_id": "20221105_4139079_2overs",
+      "resolved_bowler_ids": 7,
+      "distinct_bowler_ids": 11,
+      "scored_fraction_of_bowler_frames": 0.107022,
+      "action_window_frames": 1172,
+      "fragmented_frames_excluded": 0,
+      "detected_deliveries": 11,
+      "has_video": true
+    },
+    {
+      "video_id": "20221105_4142385_2overs",
+      "resolved_bowler_ids": 7,
+      "distinct_bowler_ids": 14,
+      "scored_fraction_of_bowler_frames": 0.086028,
+      "action_window_frames": 673,
+      "fragmented_frames_excluded": 0,
+      "detected_deliveries": 10,
+      "has_video": true
+    },
+    {
+      "video_id": "20221112_4139153_2overs",
+      "resolved_bowler_ids": 11,
+      "distinct_bowler_ids": 43,
+      "scored_fraction_of_bowler_frames": 0.058604,
+      "action_window_frames": 502,
+      "fragmented_frames_excluded": 69,
+      "detected_deliveries": 11,
+      "has_video": true
+    },
+    {
+      "video_id": "20221112_4142385_2overs",
+      "resolved_bowler_ids": 7,
+      "distinct_bowler_ids": 11,
+      "scored_fraction_of_bowler_frames": 0.10012,
+      "action_window_frames": 919,
+      "fragmented_frames_excluded": 105,
+      "detected_deliveries": 11,
+      "has_video": true
+    },
+    {
+      "video_id": "20221112_4142388_2overs",
+      "resolved_bowler_ids": 4,
+      "distinct_bowler_ids": 6,
+      "scored_fraction_of_bowler_frames": 0.117587,
+      "action_window_frames": 1148,
+      "fragmented_frames_excluded": 0,
+      "detected_deliveries": 14,
+      "has_video": true
+    },
+    {
+      "video_id": "20221112_4142735_2overs",
+      "resolved_bowler_ids": 4,
+      "distinct_bowler_ids": 5,
+      "scored_fraction_of_bowler_frames": 0.145625,
+      "action_window_frames": 1338,
+      "fragmented_frames_excluded": 0,
+      "detected_deliveries": 12,
+      "has_video": true
+    },
+    {
+      "video_id": "20221112_4155986_2overs",
+      "resolved_bowler_ids": 4,
+      "distinct_bowler_ids": 5,
+      "scored_fraction_of_bowler_frames": 0.182984,
+      "action_window_frames": 1284,
+      "fragmented_frames_excluded": 0,
+      "detected_deliveries": 10,
+      "has_video": true
+    },
+    {
+      "video_id": "20221119_4139084_2overs",
+      "resolved_bowler_ids": 4,
+      "distinct_bowler_ids": 7,
+      "scored_fraction_of_bowler_frames": 0.112623,
+      "action_window_frames": 1200,
+      "fragmented_frames_excluded": 0,
+      "detected_deliveries": 11,
+      "has_video": true
+    },
+    {
+      "video_id": "20221126_4139156_2overs",
+      "resolved_bowler_ids": 9,
+      "distinct_bowler_ids": 14,
+      "scored_fraction_of_bowler_frames": 0.097701,
+      "action_window_frames": 939,
+      "fragmented_frames_excluded": 0,
+      "detected_deliveries": 11,
+      "has_video": true
+    },
+    {
+      "video_id": "20221126_4139157_2overs",
+      "resolved_bowler_ids": 7,
+      "distinct_bowler_ids": 13,
+      "scored_fraction_of_bowler_frames": 0.171416,
+      "action_window_frames": 1149,
+      "fragmented_frames_excluded": 116,
+      "detected_deliveries": 12,
+      "has_video": true
+    },
+    {
+      "video_id": "20221126_4155987_2overs",
+      "resolved_bowler_ids": 7,
+      "distinct_bowler_ids": 11,
+      "scored_fraction_of_bowler_frames": 0.101149,
+      "action_window_frames": 546,
+      "fragmented_frames_excluded": 0,
+      "detected_deliveries": 8,
+      "has_video": true
+    },
+    {
+      "video_id": "20221203_4139088_2overs",
+      "resolved_bowler_ids": 3,
+      "distinct_bowler_ids": 4,
+      "scored_fraction_of_bowler_frames": 0.047113,
+      "action_window_frames": 474,
+      "fragmented_frames_excluded": 0,
+      "detected_deliveries": 11,
+      "has_video": true
+    },
+    {
+      "video_id": "20221203_4139090_2overs",
+      "resolved_bowler_ids": 11,
+      "distinct_bowler_ids": 43,
+      "scored_fraction_of_bowler_frames": 0.064921,
+      "action_window_frames": 372,
+      "fragmented_frames_excluded": 62,
+      "detected_deliveries": 11,
+      "has_video": true
+    },
+    {
+      "video_id": "20221203_4139091_2overs",
+      "resolved_bowler_ids": 3,
+      "distinct_bowler_ids": 5,
+      "scored_fraction_of_bowler_frames": 0.099615,
+      "action_window_frames": 853,
+      "fragmented_frames_excluded": 0,
+      "detected_deliveries": 11,
+      "has_video": true
+    },
+    {
+      "video_id": "20221203_4139160_2overs",
+      "resolved_bowler_ids": 4,
+      "distinct_bowler_ids": 7,
+      "scored_fraction_of_bowler_frames": 0.128311,
+      "action_window_frames": 1056,
+      "fragmented_frames_excluded": 9,
+      "detected_deliveries": 11,
+      "has_video": true
+    },
+    {
+      "video_id": "20221203_4139162_2overs",
+      "resolved_bowler_ids": 10,
+      "distinct_bowler_ids": 21,
+      "scored_fraction_of_bowler_frames": 0.08076,
+      "action_window_frames": 565,
+      "fragmented_frames_excluded": 97,
+      "detected_deliveries": 11,
+      "has_video": true
+    },
+    {
+      "video_id": "20221203_4139164_2overs",
+      "resolved_bowler_ids": 9,
+      "distinct_bowler_ids": 13,
+      "scored_fraction_of_bowler_frames": 0.135122,
+      "action_window_frames": 1148,
+      "fragmented_frames_excluded": 16,
+      "detected_deliveries": 12,
+      "has_video": true
+    },
+    {
+      "video_id": "20221203_4142396_2overs",
+      "resolved_bowler_ids": 3,
+      "distinct_bowler_ids": 4,
+      "scored_fraction_of_bowler_frames": 0.096527,
+      "action_window_frames": 1170,
+      "fragmented_frames_excluded": 0,
+      "detected_deliveries": 10,
+      "has_video": true
+    },
+    {
+      "video_id": "20221203_4142743_2overs",
+      "resolved_bowler_ids": 6,
+      "distinct_bowler_ids": 11,
+      "scored_fraction_of_bowler_frames": 0.102079,
+      "action_window_frames": 918,
+      "fragmented_frames_excluded": 0,
+      "detected_deliveries": 12,
+      "has_video": true
+    },
+    {
+      "video_id": "20221203_4142744_2overs",
+      "resolved_bowler_ids": 3,
+      "distinct_bowler_ids": 3,
+      "scored_fraction_of_bowler_frames": 0.090338,
+      "action_window_frames": 1036,
+      "fragmented_frames_excluded": 0,
+      "detected_deliveries": 11,
+      "has_video": true
+    },
+    {
+      "video_id": "20221203_4143496_2overs",
+      "resolved_bowler_ids": 6,
+      "distinct_bowler_ids": 12,
+      "scored_fraction_of_bowler_frames": 0.098392,
+      "action_window_frames": 1132,
+      "fragmented_frames_excluded": 29,
+      "detected_deliveries": 11,
+      "has_video": true
+    },
+    {
+      "video_id": "20221203_4156185_2overs",
+      "resolved_bowler_ids": 10,
+      "distinct_bowler_ids": 22,
+      "scored_fraction_of_bowler_frames": 0.073406,
+      "action_window_frames": 509,
+      "fragmented_frames_excluded": 74,
+      "detected_deliveries": 10,
+      "has_video": true
+    }
+  ],
+  "total_scored_frames": 23482,
+  "total_fragmented_excluded": 674,
+  "mean_scored_fraction_of_bowler_frames": 0.105563
+}

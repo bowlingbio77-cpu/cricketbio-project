@@ -1,0 +1,126 @@
+{
+  "tasks_version": "cricket_understanding_tasks_v1",
+  "schema_version": "cricket_understanding_v1",
+  "min_train_samples_per_class": 2,
+  "min_test_samples": 1,
+  "tasks": {
+    "A": {
+      "task": "A",
+      "title": "Cricket object detection",
+      "status": "NOT READY - no human-labelled samples",
+      "ready": false,
+      "n_train": 0,
+      "n_val": 0,
+      "n_test": 0,
+      "n_train_human": 0,
+      "n_model_derived_rows_rejected": 0,
+      "per_class_train": {},
+      "unlearnable_classes": [
+        "BALL",
+        "BOWLER",
+        "FIELDER",
+        "NON_STRIKER",
+        "STRIKER",
+        "STUMPS",
+        "UNKNOWN",
+        "WICKETKEEPER"
+      ],
+      "guards": [
+        {
+          "name": "human_labels_present",
+          "passed": false,
+          "detail": "0 train rows are attributable to a human. There is no cricket ground truth in this repository, so nothing can be trained or scored."
+        },
+        {
+          "name": "held_out_split_nonempty",
+          "passed": false,
+          "detail": "The test split is EMPTY. Any accuracy computed on train or val is in-sample and must never be reported as generalisation."
+        },
+        {
+          "name": "label_support_per_class",
+          "passed": false,
+          "detail": "8 class(es) have fewer than 2 training sample(s): BALL, BOWLER, FIELDER, NON_STRIKER, STRIKER, STUMPS, UNKNOWN, WICKETKEEPER. They cannot be learned; reporting a confusion matrix over them would be misleading."
+        }
+      ]
+    },
+    "B": {
+      "task": "B",
+      "title": "Cricket role recognition",
+      "status": "NOT READY - no human-labelled samples",
+      "ready": false,
+      "n_train": 0,
+      "n_val": 0,
+      "n_test": 0,
+      "n_train_human": 0,
+      "n_model_derived_rows_rejected": 0,
+      "per_class_train": {},
+      "unlearnable_classes": [
+        "BOWLER",
+        "FIELDER",
+        "NON_STRIKER",
+        "STRIKER",
+        "UNKNOWN",
+        "WICKETKEEPER"
+      ],
+      "guards": [
+        {
+          "name": "human_labels_present",
+          "passed": false,
+          "detail": "0 train rows are attributable to a human. There is no cricket ground truth in this repository, so nothing can be trained or scored."
+        },
+        {
+          "name": "held_out_split_nonempty",
+          "passed": false,
+          "detail": "The test split is EMPTY. Any accuracy computed on train or val is in-sample and must never be reported as generalisation."
+        },
+        {
+          "name": "label_support_per_class",
+          "passed": false,
+          "detail": "6 class(es) have fewer than 2 training sample(s): BOWLER, FIELDER, NON_STRIKER, STRIKER, UNKNOWN, WICKETKEEPER. They cannot be learned; reporting a confusion matrix over them would be misleading."
+        }
+      ]
+    },
+    "C": {
+      "task": "C",
+      "title": "Bowling action / phase model",
+      "status": "NOT READY - no human-labelled samples",
+      "ready": false,
+      "n_train": 0,
+      "n_val": 0,
+      "n_test": 0,
+      "n_train_human": 0,
+      "n_model_derived_rows_rejected": 0,
+      "per_class_train": {},
+      "unlearnable_classes": [
+        "APPROACH",
+        "DELIVERY_STRIDE",
+        "FOLLOW_THROUGH",
+        "FRONT_FOOT_CONTACT",
+        "GATHER",
+        "NON_BOWLING",
+        "RELEASE",
+        "RUN_UP",
+        "UNKNOWN"
+      ],
+      "guards": [
+        {
+          "name": "human_labels_present",
+          "passed": false,
+          "detail": "0 train rows are attributable to a human. There is no cricket ground truth in this repository, so nothing can be trained or scored."
+        },
+        {
+          "name": "held_out_split_nonempty",
+          "passed": false,
+          "detail": "The test split is EMPTY. Any accuracy computed on train or val is in-sample and must never be reported as generalisation."
+        },
+        {
+          "name": "label_support_per_class",
+          "passed": false,
+          "detail": "9 class(es) have fewer than 2 training sample(s): APPROACH, DELIVERY_STRIDE, FOLLOW_THROUGH, FRONT_FOOT_CONTACT, GATHER, NON_BOWLING, RELEASE, RUN_UP, UNKNOWN. They cannot be learned; reporting a confusion matrix over them would be misleading."
+        }
+      ]
+    }
+  },
+  "n_ready": 0,
+  "n_total": 3
+}

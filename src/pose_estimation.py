@@ -27,24 +27,91 @@ class PoseFrame:
     landmarks: np.ndarray  # shape (33, 4) -> x, y, z, visibility (x,y normalized 0-1)
     world_landmarks: Optional[np.ndarray] = None  # shape (33, 3) -> metric x,y,z (meters)
     n_people: int = 1  # how many simultaneous people the pose model saw in this frame
+    #: How the analysed subject was chosen: "subject_overlap" (the caller's locked
+    #: region decided it), "largest_area_fallback" (no pose overlapped the locked
+    #: region, so the legacy heuristic decided), or "largest_area" (no region was
+    #: supplied). Surfaced so the pipeline can refuse to score a fallback frame.
+    subject_selection: str = "largest_area"
 
 
-def _primary_person(pose_landmarks) -> int:
-    """
-    Index of the person to analyze. MediaPipe can detect several people in one
-    frame (fielders, keeper, umpire); blindly taking [0] is not guaranteed to
-    be the bowler. We pick the person with the LARGEST landmark bounding box:
-    in a bowler-cropped frame that is the bowler, and in a full scene it is the
-    dominant (usually nearest) person.
-    """
+def _landmark_bbox(pose_landmarks) -> tuple:
+    """Axis-aligned bbox of one person's landmarks, in normalized coords."""
+    xs = [p.x for p in pose_landmarks]
+    ys = [p.y for p in pose_landmarks]
+    return (min(xs), min(ys), max(xs), max(ys))
+
+
+def _iou(a, b) -> float:
+    ax1, ay1, ax2, ay2 = a
+    bx1, by1, bx2, by2 = b
+    ix1, iy1 = max(ax1, bx1), max(ay1, by1)
+    ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+    iw, ih = max(0.0, ix2 - ix1), max(0.0, iy2 - iy1)
+    inter = iw * ih
+    if inter <= 0.0:
+        return 0.0
+    area_a = max(0.0, ax2 - ax1) * max(0.0, ay2 - ay1)
+    area_b = max(0.0, bx2 - bx1) * max(0.0, by2 - by1)
+    union = area_a + area_b - inter
+    return float(inter / union) if union > 0 else 0.0
+
+
+def _largest_area_index(pose_landmarks) -> int:
     best_idx, best_area = 0, -1.0
     for i, lm in enumerate(pose_landmarks):
-        xs = [p.x for p in lm]
-        ys = [p.y for p in lm]
-        area = (max(xs) - min(xs)) * (max(ys) - min(ys))
+        x1, y1, x2, y2 = _landmark_bbox(lm)
+        area = (x2 - x1) * (y2 - y1)
         if area > best_area:
             best_idx, best_area = i, area
     return best_idx
+
+
+def _select_subject(pose_landmarks, subject_bbox=None,
+                    frame_size=None) -> tuple:
+    """Choose which detected person to analyse.
+
+    This is the authoritative subject decision. It is *not* allowed to contradict
+    the caller's locked identity: when ``subject_bbox`` (the bowler's region, in
+    pixel coordinates of the frame being analysed) is supplied, the person whose
+    pose actually overlaps that region wins.
+
+    Selecting by landmark area alone was the second, independent identity decision
+    in this pipeline and the direct cause of the measured failure: on side-on
+    broadcast footage the nearest, largest person is the batsman, not a small
+    distant bowler. Area is now only a fallback for frames where no pose overlaps
+    the locked region, and that fallback is reported so the caller can refuse to
+    score it.
+
+    Returns ``(index, method)``.
+    """
+    if not pose_landmarks:
+        return 0, "none"
+
+    if subject_bbox is not None and frame_size is not None:
+        fh, fw = frame_size
+        if fw > 0 and fh > 0:
+            sx1, sy1, sx2, sy2 = subject_bbox
+            region = (sx1 / fw, sy1 / fh, sx2 / fw, sy2 / fh)
+            best_idx, best_iou = -1, 0.0
+            for i, lm in enumerate(pose_landmarks):
+                overlap = _iou(_landmark_bbox(lm), region)
+                if overlap > best_iou:
+                    best_idx, best_iou = i, overlap
+            if best_idx >= 0 and best_iou > 0.0:
+                return best_idx, "subject_overlap"
+            return _largest_area_index(pose_landmarks), "largest_area_fallback"
+
+    return _largest_area_index(pose_landmarks), "largest_area"
+
+
+def _primary_person(pose_landmarks) -> int:
+    """Index of the person to analyse, by largest landmark bounding box.
+
+    Retained for backward compatibility. Prefer :func:`_select_subject`, which
+    honours a caller-supplied identity lock; this function has no notion of one
+    and must not be used on full broadcast frames.
+    """
+    return _largest_area_index(pose_landmarks)
 
 
 class PoseEstimator:
@@ -68,7 +135,17 @@ class PoseEstimator:
         self.landmarker = mp_vision.PoseLandmarker.create_from_options(options)
 
     def process_frame(self, frame_bgr: np.ndarray, frame_idx: int,
-                       timestamp_sec: float) -> Optional[PoseFrame]:
+                       timestamp_sec: float,
+                       subject_bbox=None) -> Optional[PoseFrame]:
+        """Estimate pose for ``frame_bgr``.
+
+        ``subject_bbox`` is the caller's locked identity region as
+        ``(x1, y1, x2, y2)`` in *pixel coordinates of this frame*. When given, the
+        analysed person is the one overlapping that region, so pose extraction
+        cannot silently disagree with the bowler lock. Pass ``None`` only when no
+        identity has been established -- and note the result is then flagged
+        ``largest_area`` and must not be treated as a verified subject.
+        """
         rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
         timestamp_ms = int(timestamp_sec * 1000)
@@ -78,7 +155,9 @@ class PoseEstimator:
             return None
 
         n_people = len(result.pose_landmarks)
-        idx = _primary_person(result.pose_landmarks)
+        frame_size = frame_bgr.shape[:2]
+        idx, method = _select_subject(
+            result.pose_landmarks, subject_bbox=subject_bbox, frame_size=frame_size)
         lm = result.pose_landmarks[idx]
         landmarks = np.array([[p.x, p.y, p.z, p.visibility] for p in lm])
 
@@ -87,13 +166,24 @@ class PoseEstimator:
             wlm = result.pose_world_landmarks[idx]
             world = np.array([[p.x, p.y, p.z] for p in wlm])
 
-        return PoseFrame(frame_idx, timestamp_sec, landmarks, world, n_people)
+        return PoseFrame(frame_idx, timestamp_sec, landmarks, world, n_people, method)
 
-    def process_video_frames(self, frames_iter) -> List[PoseFrame]:
-        """frames_iter yields (frame_idx, timestamp_sec, frame_bgr), e.g. from preprocessing.py"""
+    def process_video_frames(self, frames_iter,
+                             subject_box_by_frame: Optional[dict] = None) -> List[PoseFrame]:
+        """Run pose over ``frames_iter`` yielding ``(frame_idx, timestamp_sec, frame)``.
+
+        ``subject_box_by_frame`` maps ``frame_idx`` to that frame's locked
+        identity region in the *same coordinate space as the frame being passed*.
+        This matters: cropped frames and full frames need different boxes, and
+        supplying the wrong space is how a bowler lock silently degrades into a
+        whole-frame search.
+        """
         pose_sequence = []
         for frame_idx, ts, frame in frames_iter:
-            pf = self.process_frame(frame, frame_idx, ts)
+            subject_bbox = None
+            if subject_box_by_frame:
+                subject_bbox = subject_box_by_frame.get(frame_idx)
+            pf = self.process_frame(frame, frame_idx, ts, subject_bbox=subject_bbox)
             if pf is not None:
                 pose_sequence.append(pf)
         return pose_sequence

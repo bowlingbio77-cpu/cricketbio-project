@@ -67,147 +67,153 @@ RESULT_CSS = f"""
       --pai-ok:{PAI_OK}; --pai-warn:{PAI_WARN}; --pai-danger:{PAI_DANGER};
       --pai-line:{PAI_LINE};
   }}
-  .pai-kicker {{
-      font-size:.66rem; letter-spacing:.15em; font-weight:800; text-transform:uppercase;
-      color:var(--pai-muted); margin:0 0 6px;
-  }}
-  .pai-kicker.accent {{ color:var(--pai-accent); }}
-  .pai-status {{
-      border:1px solid var(--pai-line); border-left:3px solid var(--pai-muted);
-      background:var(--pai-surface); border-radius:10px; padding:16px 18px; margin:0 0 6px;
-  }}
-  .pai-status.ok    {{ border-left-color:var(--pai-ok); }}
-  .pai-status.warn  {{ border-left-color:var(--pai-warn); }}
-  .pai-status.danger{{ border-left-color:var(--pai-danger); }}
-  .pai-status-title {{ font-size:1.02rem; font-weight:800; color:var(--pai-text); margin:0 0 4px; }}
-  .pai-status-copy  {{ color:var(--pai-muted); font-size:.87rem; line-height:1.55; margin:0; }}
-  .pai-chips {{ display:flex; gap:6px; flex-wrap:wrap; margin:10px 0 0; }}
-  .pai-chip {{
-      font-size:.66rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
-      padding:4px 9px; border-radius:999px; border:1px solid var(--pai-line);
-      color:var(--pai-muted); background:var(--pai-raised); white-space:nowrap;
-  }}
-  .pai-chip.ok     {{ color:var(--pai-ok);     border-color:rgba(67,217,163,.45); }}
-  .pai-chip.warn   {{ color:var(--pai-warn);   border-color:rgba(232,179,74,.45); }}
-  .pai-chip.danger {{ color:var(--pai-danger); border-color:rgba(255,112,134,.45); }}
-  .pai-chip.accent {{ color:var(--pai-accent); border-color:rgba(32,217,255,.45); }}
 
-  .pai-hero {{
-      border:1px solid var(--pai-line); border-radius:14px; padding:24px 26px;
-      background:linear-gradient(140deg, var(--pai-raised) 0%, var(--pai-surface) 70%);
-      margin:0 0 8px;
+  /* ---- type scale: one display tier, then section, body, metadata.
+         Weight is spent on the display line and section titles only; every
+         other level separates with size, spacing and colour. ---- */
+  .pai-display {{
+      font-size:clamp(1.95rem,4.2vw,3.15rem); font-weight:700; line-height:1.06;
+      letter-spacing:-.028em; color:var(--pai-text); margin:0 0 16px; max-width:24ch;
   }}
-  .pai-hero.danger {{ border-left:3px solid var(--pai-danger); }}
-  .pai-hero.warn   {{ border-left:3px solid var(--pai-warn); }}
-  .pai-hero.ok     {{ border-left:3px solid var(--pai-ok); }}
-  .pai-hero.accent {{ border-left:3px solid var(--pai-accent); }}
-  .pai-hero-main {{
-      font-size:1.5rem; font-weight:800; line-height:1.28; color:var(--pai-text);
-      margin:6px 0 14px; letter-spacing:-.01em;
+  .pai-display.tight {{ font-size:clamp(1.45rem,2.8vw,2rem); max-width:34ch; }}
+  .pai-eyebrow {{
+      font-size:.63rem; letter-spacing:.19em; font-weight:600; text-transform:uppercase;
+      color:var(--pai-muted); margin:0 0 9px;
   }}
-  .pai-hero-row {{ display:flex; gap:26px; flex-wrap:wrap; }}
-  .pai-hero-cell {{ flex:1 1 240px; min-width:0; }}
-  .pai-hero-lab {{
-      font-size:.63rem; letter-spacing:.14em; font-weight:800; text-transform:uppercase;
-      color:var(--pai-accent); margin:0 0 3px;
+  .pai-eyebrow.accent {{ color:var(--pai-accent); }}
+  .pai-lede {{
+      font-size:1.04rem; font-weight:400; line-height:1.58; color:var(--pai-text);
+      margin:0 0 10px; max-width:60ch;
   }}
-  .pai-hero-val {{ font-size:.95rem; line-height:1.5; color:var(--pai-text); margin:0; }}
+  .pai-body {{ font-size:.9rem; font-weight:400; line-height:1.62; color:var(--pai-muted); margin:0 0 9px; max-width:64ch; }}
 
-  .pai-finding {{
-      border:1px solid var(--pai-line); border-radius:12px; padding:16px 18px;
-      background:var(--pai-surface); margin:0 0 10px;
+  /* ---- 01 validity: a quiet line above a rule, never a box ---- */
+  .pai-state {{
+      display:flex; gap:12px 20px; align-items:baseline; flex-wrap:wrap;
+      padding:0 0 16px; border-bottom:1px solid var(--pai-line);
   }}
-  .pai-finding-top {{ display:flex; justify-content:space-between; gap:14px; align-items:baseline; }}
-  .pai-finding-title {{ font-size:1.02rem; font-weight:800; color:var(--pai-text); margin:0; }}
-  .pai-finding-sev {{
-      font-size:.63rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase;
-      white-space:nowrap; color:var(--pai-muted);
+  .pai-state-word {{
+      flex:0 0 auto; font-size:.72rem; letter-spacing:.17em; font-weight:700;
+      text-transform:uppercase; white-space:nowrap;
   }}
-  .pai-finding-sev.high {{ color:var(--pai-danger); }}
-  .pai-finding-sev.moderate {{ color:var(--pai-warn); }}
-  .pai-finding-sev.positive {{ color:var(--pai-ok); }}
-  .pai-ev {{ display:flex; gap:10px; padding:7px 0; border-top:1px solid var(--pai-line); }}
-  .pai-ev:first-of-type {{ border-top:0; }}
-  .pai-ev-lab {{
-      flex:0 0 108px; font-size:.63rem; letter-spacing:.1em; font-weight:800;
-      text-transform:uppercase; color:var(--pai-muted); padding-top:2px;
-  }}
-  .pai-ev-val {{ flex:1 1 auto; font-size:.88rem; line-height:1.5; color:var(--pai-text); }}
+  .pai-state-word.ok {{ color:var(--pai-ok); }}
+  .pai-state-word.warn {{ color:var(--pai-warn); }}
+  .pai-state-word.danger {{ color:var(--pai-danger); }}
+  .pai-state-copy {{ flex:1 1 340px; font-size:.86rem; line-height:1.56; color:var(--pai-muted); margin:0; }}
+  .pai-withheld {{ margin:16px 0 0; padding:0 0 0 15px; border-left:2px solid var(--pai-danger); }}
+  .pai-withheld-lab {{ font-size:.6rem; letter-spacing:.16em; font-weight:600; text-transform:uppercase; color:var(--pai-danger); margin:0 0 4px; }}
+  .pai-withheld-val {{ font-size:.86rem; line-height:1.56; color:var(--pai-text); margin:0; }}
 
-  .pai-metrics {{ display:flex; gap:14px; flex-wrap:wrap; }}
-  .pai-mgroup {{ flex:1 1 210px; min-width:0; }}
-  .pai-mgroup-name {{
-      font-size:.63rem; letter-spacing:.13em; font-weight:800; text-transform:uppercase;
-      color:var(--pai-muted); margin:0 0 8px; padding-bottom:6px; border-bottom:1px solid var(--pai-line);
+  /* status marks: a dot plus words, so colour is never the only signal */
+  .pai-marks {{ display:flex; gap:18px; flex-wrap:wrap; margin:12px 0 0; padding:0; list-style:none; }}
+  .pai-mark {{
+      font-size:.63rem; letter-spacing:.11em; font-weight:600; text-transform:uppercase;
+      color:var(--pai-muted); display:flex; align-items:center; gap:7px;
   }}
-  .pai-metric {{ padding:7px 0; border-bottom:1px solid rgba(30,39,51,.6); }}
-  .pai-metric:last-child {{ border-bottom:0; }}
-  .pai-metric-top {{ display:flex; justify-content:space-between; gap:10px; align-items:baseline; }}
-  .pai-metric-name {{ font-size:.83rem; color:var(--pai-text); }}
-  .pai-metric-val {{ font-size:.95rem; font-weight:800; color:var(--pai-accent); white-space:nowrap; }}
-  .pai-metric-val.absent {{ color:var(--pai-muted); font-weight:600; font-size:.82rem; }}
-  .pai-metric-srcline {{ font-size:.68rem; color:var(--pai-muted); margin:2px 0 0; line-height:1.45; }}
-  .pai-src-measured {{ color:var(--pai-ok); font-weight:700; }}
-  .pai-src-degraded {{ color:var(--pai-warn); font-weight:700; }}
-  .pai-src-default  {{ color:var(--pai-danger); font-weight:700; }}
-  .pai-src-model    {{ color:var(--pai-accent); font-weight:700; }}
-  .pai-src-sim      {{ color:var(--pai-muted); font-weight:700; }}
+  .pai-mark::before {{ content:""; flex:0 0 5px; width:5px; height:5px; border-radius:50%; background:var(--pai-muted); }}
+  .pai-mark.ok::before     {{ background:var(--pai-ok); }}
+  .pai-mark.warn::before   {{ background:var(--pai-warn); }}
+  .pai-mark.danger::before {{ background:var(--pai-danger); }}
+  .pai-mark.accent::before {{ background:var(--pai-accent); }}
 
-  .pai-plan {{ border:1px solid var(--pai-line); border-radius:12px; overflow:hidden; margin:0 0 10px; }}
-  .pai-plan-head {{
-      display:flex; gap:12px; align-items:center; padding:13px 16px; background:var(--pai-raised);
+  /* ---- the stage: video dominant, insight rail subordinate ---- */
+  .pai-rail {{ padding:0 0 0 28px; border-left:1px solid var(--pai-line); }}
+  .pai-rail-lab {{
+      font-size:.6rem; letter-spacing:.17em; font-weight:600; text-transform:uppercase;
+      color:var(--pai-accent); margin:0 0 5px;
   }}
-  .pai-plan-pri {{
-      flex:0 0 auto; font-size:.63rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase;
-      padding:3px 9px; border-radius:999px; border:1px solid var(--pai-line); color:var(--pai-muted);
-  }}
-  .pai-plan-pri.p1 {{ color:var(--pai-danger); border-color:rgba(255,112,134,.5); }}
-  .pai-plan-pri.p2 {{ color:var(--pai-warn);   border-color:rgba(232,179,74,.5); }}
-  .pai-plan-title {{ flex:1 1 auto; font-size:.93rem; font-weight:700; color:var(--pai-text); }}
-  .pai-plan-body {{ padding:12px 16px; background:var(--pai-surface); }}
+  .pai-rail-val {{ font-size:.9rem; line-height:1.58; color:var(--pai-text); margin:0 0 22px; }}
 
-  .pai-small {{ border:1px solid var(--pai-line); border-radius:10px; padding:14px 16px;
-                background:var(--pai-surface); margin:0 0 10px; }}
-  .pai-small-grid {{ display:flex; gap:22px; flex-wrap:wrap; }}
-  .pai-small-cell {{ flex:1 1 150px; min-width:0; }}
-  .pai-small-lab {{ font-size:.62rem; letter-spacing:.12em; font-weight:800; text-transform:uppercase;
-                    color:var(--pai-muted); margin:0 0 3px; }}
-  .pai-small-val {{ font-size:1.5rem; font-weight:800; color:var(--pai-text); line-height:1.15; }}
-  .pai-small-val.absent {{ font-size:1rem; font-weight:700; color:var(--pai-warn); }}
-  .pai-small-note {{ font-size:.76rem; color:var(--pai-muted); margin:5px 0 0; line-height:1.5; }}
+  /* measurement strip under the video: number first, label quiet */
+  .pai-strip {{ display:flex; flex-wrap:wrap; margin:20px 0 0; border-top:1px solid var(--pai-line); }}
+  .pai-strip-cell {{ flex:1 1 0; min-width:112px; padding:15px 20px 0 0; }}
+  .pai-strip-val {{ font-size:1.6rem; font-weight:700; line-height:1.08; letter-spacing:-.022em; color:var(--pai-text); }}
+  .pai-strip-val.absent {{ font-size:.92rem; font-weight:600; color:var(--pai-warn); letter-spacing:0; }}
+  .pai-strip-lab {{ font-size:.61rem; letter-spacing:.13em; font-weight:600; text-transform:uppercase; color:var(--pai-muted); margin:7px 0 0; }}
+  .pai-strip-src {{ font-size:.59rem; letter-spacing:.09em; font-weight:600; text-transform:uppercase; margin:4px 0 0; }}
 
-  .pai-evidence {{
-      border:1px solid var(--pai-line); border-radius:10px; padding:14px 16px;
-      background:var(--pai-surface); margin:0 0 10px;
-  }}
-  .pai-chain {{ display:flex; gap:8px; align-items:flex-start; padding:6px 0; }}
-  .pai-chain-step {{
-      flex:0 0 20px; height:20px; border-radius:50%; border:1px solid var(--pai-line);
-      background:var(--pai-raised); color:var(--pai-muted); font-size:.63rem; font-weight:800;
-      display:flex; align-items:center; justify-content:center; margin-top:1px;
-  }}
-  .pai-chain-body {{ flex:1 1 auto; min-width:0; }}
-  .pai-chain-lab {{ font-size:.62rem; letter-spacing:.11em; font-weight:800; text-transform:uppercase;
-                     color:var(--pai-accent); }}
-  .pai-chain-val {{ font-size:.87rem; color:var(--pai-text); line-height:1.5; }}
+  /* source-type vocabulary, straight from feature_provenance */
+  .pai-src-measured {{ color:var(--pai-ok); }}
+  .pai-src-degraded {{ color:var(--pai-warn); }}
+  .pai-src-default  {{ color:var(--pai-danger); }}
+  .pai-src-model    {{ color:var(--pai-accent); }}
+  .pai-src-sim      {{ color:var(--pai-muted); }}
 
-  .pai-empty {{
-      border:1px dashed var(--pai-line); border-radius:12px; padding:22px 20px;
-      background:var(--pai-surface); margin:0 0 10px;
-  }}
-  .pai-empty-title {{ font-size:1rem; font-weight:800; color:var(--pai-text); margin:0 0 4px; }}
-  .pai-empty-copy {{ font-size:.85rem; color:var(--pai-muted); line-height:1.55; margin:0; }}
-
-  .pai-sec {{ margin:26px 0 10px; }}
+  /* ---- sections: a rule and a number, nothing more ---- */
+  .pai-sec {{ margin:66px 0 0; padding-top:15px; border-top:1px solid var(--pai-line); }}
+  .pai-sec-first {{ margin-top:38px; }}
   .pai-sec-title {{
-      font-size:.68rem; letter-spacing:.16em; font-weight:800; text-transform:uppercase;
-      color:var(--pai-accent); margin:0 0 3px;
+      font-size:.65rem; letter-spacing:.2em; font-weight:600; text-transform:uppercase;
+      color:var(--pai-muted); margin:0 0 5px;
   }}
-  .pai-sec-sub {{ font-size:.83rem; color:var(--pai-muted); margin:0 0 12px; line-height:1.5; }}
+  .pai-sec.accent .pai-sec-title {{ color:var(--pai-accent); }}
+  .pai-sec-sub {{ font-size:.8rem; line-height:1.56; color:var(--pai-muted); margin:0 0 22px; max-width:62ch; }}
 
+  /* rows: hairline separated, edge aligned, never equal-weight cards */
+  .pai-row {{ padding:22px 0; border-top:1px solid var(--pai-line); }}
+  .pai-row-first {{ border-top:0; padding-top:0; }}
+  .pai-row-top {{ display:flex; gap:18px; align-items:baseline; }}
+  .pai-row-title {{ flex:1 1 auto; font-size:1.14rem; font-weight:600; line-height:1.3; color:var(--pai-text); margin:0; }}
+  .pai-row-sev {{ flex:0 0 auto; font-size:.6rem; letter-spacing:.14em; font-weight:600; text-transform:uppercase; color:var(--pai-muted); white-space:nowrap; }}
+  .pai-row-sev.high {{ color:var(--pai-danger); }}
+  .pai-row-sev.moderate {{ color:var(--pai-warn); }}
+  .pai-row-sev.positive {{ color:var(--pai-ok); }}
+  .pai-row-block {{ margin:10px 0 0; }}
+  .pai-row-lab {{ font-size:.6rem; letter-spacing:.15em; font-weight:600; text-transform:uppercase; color:var(--pai-muted); margin:0 0 3px; }}
+  .pai-row-val {{ font-size:.88rem; line-height:1.58; color:var(--pai-text); margin:0 0 14px; max-width:62ch; }}
+
+  /* ---- 07 coaching reads as an instruction, not a report ---- */
+  .pai-drill {{ padding:24px 0; border-top:1px solid var(--pai-line); }}
+  .pai-drill-first {{ border-top:0; padding-top:0; }}
+  .pai-drill-head {{ display:flex; gap:16px; align-items:baseline; margin:0 0 12px; }}
+  .pai-drill-n {{ flex:0 0 auto; font-size:.66rem; letter-spacing:.14em; font-weight:700; color:var(--pai-accent); }}
+  .pai-drill-title {{ font-size:1.24rem; font-weight:600; line-height:1.28; color:var(--pai-text); margin:0; }}
+
+  /* ---- 06 evidence: numbered steps on a single measure ---- */
+  .pai-chain {{ display:flex; gap:15px; padding:9px 0; border-top:1px solid rgba(30,39,51,.5); }}
+  .pai-chain-first {{ border-top:0; }}
+  .pai-chain-n {{ flex:0 0 auto; min-width:15px; font-size:.63rem; font-weight:700; color:var(--pai-muted); padding-top:2px; }}
+  .pai-chain-body {{ flex:1 1 auto; min-width:0; }}
+  .pai-chain-lab {{ font-size:.6rem; letter-spacing:.15em; font-weight:600; text-transform:uppercase; color:var(--pai-muted); }}
+  .pai-chain-val {{ font-size:.87rem; line-height:1.56; color:var(--pai-text); margin:2px 0 0; }}
+
+  /* ---- 08 / 09 readouts ---- */
+  .pai-readout {{ padding:20px 0; border-top:1px solid var(--pai-line); }}
+  .pai-readout-first {{ border-top:0; padding-top:0; }}
+  .pai-readout-head {{ display:flex; gap:16px; align-items:baseline; margin:0 0 8px; }}
+  .pai-readout-val {{ font-size:1.45rem; font-weight:700; line-height:1.1; letter-spacing:-.02em; }}
+  .pai-readout-val.ok {{ color:var(--pai-ok); }}
+  .pai-readout-val.warn {{ color:var(--pai-warn); }}
+  .pai-readout-val.danger {{ color:var(--pai-danger); }}
+  .pai-readout-val.absent {{ font-size:1rem; font-weight:600; color:var(--pai-warn); letter-spacing:0; }}
+
+  /* ---- the full measurement table (advanced) ---- */
+  .pai-mgroup-name {{
+      font-size:.61rem; letter-spacing:.15em; font-weight:600; text-transform:uppercase;
+      color:var(--pai-muted); margin:22px 0 6px;
+  }}
+  .pai-metric {{ display:flex; gap:18px; align-items:baseline; justify-content:space-between; padding:8px 0; border-top:1px solid rgba(30,39,51,.5); }}
+  .pai-metric-name {{ font-size:.85rem; color:var(--pai-text); }}
+  .pai-metric-val {{ font-size:.85rem; font-weight:700; color:var(--pai-text); white-space:nowrap; }}
+  .pai-metric-val.absent {{ color:var(--pai-muted); font-weight:600; }}
+  .pai-metric-srcline {{ font-size:.62rem; color:var(--pai-muted); margin:0; line-height:1.5; }}
+
+  .pai-empty {{ padding:26px 0; border-top:1px solid var(--pai-line); }}
+  .pai-empty-title {{ font-size:1.05rem; font-weight:600; color:var(--pai-text); margin:0 0 6px; }}
+  .pai-empty-copy {{ font-size:.87rem; line-height:1.6; color:var(--pai-muted); margin:0; max-width:60ch; }}
+
+  /* ---- tablet: video first, insight beneath it ---- */
+  @media (max-width:1100px) {{
+    .pai-rail {{ padding:24px 0 0 0; border-left:0; border-top:1px solid var(--pai-line); }}
+  }}
+  /* ---- mobile: recompose the order, do not just shrink ---- */
   @media (max-width:640px) {{
-    .pai-ev-lab {{ flex-basis:100%; }}
-    .pai-hero-main {{ font-size:1.2rem; }}
+    .pai-strip-cell {{ flex:1 1 46%; padding-right:14px; }}
+    .pai-row-top {{ flex-direction:column; gap:7px; }}
+    .pai-sec {{ margin-top:52px; }}
+  }}
+  @media (prefers-reduced-motion:reduce) {{
+    .pai-root * {{ animation:none !important; transition:none !important; }}
   }}
 </style>
 """
@@ -371,17 +377,17 @@ def _source_for(result, feature: str, is_video: bool) -> tuple:
         return _SRC_SIM
     entry = _prov(result, feature)
     src = entry.get("source")
-    if src == "world_3d":
+    if src == config.PROV_WORLD_3D:
         label, cls, note = _SRC_MEASURED
-    elif src == "normalized_2d":
+    elif src == config.PROV_NORMALIZED_2D:
         label, cls, note = _SRC_DEGRADED
-    elif src == "missing_xyz":
+    elif src == config.PROV_MISSING:
         label, cls, note = _SRC_DEFAULT
     else:
         label, cls, note = _SRC_NONE
     band = entry.get("confidence")
     vis = entry.get("mean_landmark_visibility")
-    if band and src != "missing_xyz":
+    if band and src != config.PROV_MISSING:
         note = f"{note} Landmark confidence: {band}"
         if isinstance(vis, (int, float)):
             note += f" (mean visibility {vis:.2f})."
@@ -446,23 +452,43 @@ def assess_delivery(result, *, perf_bundle=None, is_video: bool = False) -> Deli
     reliable = getattr(result, "delivery_reliable", None)
     blocked = getattr(result, "scoring_blocked_reason", None)
     prov = getattr(result, "feature_provenance", None) or {}
+    # Identity evidence, which the pipeline already produces. docs/RESULT_REDESIGN.md
+    # requires both of these on the top trust rung, but the gate previously read
+    # `subject_verified` alone -- so a run whose bowler the pipeline had explicitly
+    # *rejected* still rendered as trusted. No new API is needed to close this.
+    bowler_confirmed = getattr(result, "bowler_confirmed", None)
+    identity_switch_count = getattr(result, "identity_switch_count", 0) or 0
+    role_engine = getattr(result, "role_engine", None) or {}
+    engine_withheld = bool(role_engine.get("analysis_withheld")) if role_engine else False
+
+    identity_unconfirmed = bowler_confirmed is False or engine_withheld
+    identity_unstable = identity_switch_count > 0
 
     measured = degraded = missing = 0
     for fv_key, entry in prov.items():
         if not isinstance(entry, dict):
             continue
         src = entry.get("source")
-        if src == "world_3d":
+        if src == config.PROV_WORLD_3D:
             measured += 1
-        elif src == "normalized_2d":
+        elif src == config.PROV_NORMALIZED_2D:
             degraded += 1
-        elif src == "missing_xyz":
+        elif src == config.PROV_MISSING:
             missing += 1
     low_conf = sum(1 for e in prov.values()
                    if isinstance(e, dict) and e.get("confidence") == "low")
 
     states = []
     if subject is False or reliable is False:
+        states.append("UNRELIABLE")
+    if identity_unconfirmed:
+        # An unconfirmed bowler is treated exactly like an unverified subject: the
+        # measurements may belong to another player, so nothing may be presented
+        # as a technique judgement.
+        states.append("UNRELIABLE")
+        if subject is not False:
+            subject = False
+    if identity_unstable:
         states.append("UNRELIABLE")
     if blocked:
         states.append("SCORING_WITHHELD")
@@ -491,7 +517,20 @@ def assess_delivery(result, *, perf_bundle=None, is_video: bool = False) -> Deli
 
     if state == "UNRELIABLE":
         tone = "danger"
-        if subject is False:
+        if identity_unstable and subject is not False:
+            headline = "Analysis quality limited — the bowler identity was not stable"
+            headline_copy = (
+                f"The selected track changed {identity_switch_count} time(s) during the clip, "
+                "so the body measurements below cannot be attributed to one bowler. No "
+                "technique judgement has been made from them.")
+        elif identity_unconfirmed and subject is not False:
+            headline = "Analysis quality limited — the bowler was not confirmed in this clip"
+            headline_copy = (
+                "The cricket-evidence check did not confirm which person is bowling, so the "
+                "body measurements below may belong to another player. No technique judgement "
+                "has been made from them. Use the replay to check who is in frame, or confirm "
+                "the bowler manually.")
+        elif subject is False:
             headline = "Analysis quality limited — the bowler was not confirmed in this clip"
             headline_copy = (
                 "More than one person was detected and the movement analysis could not "
@@ -567,6 +606,73 @@ def build_measurements(result, *, is_video: bool = False) -> list:
             source_note=src_note, context=context,
         ))
     return out
+
+
+def build_supporting_measurements(measurements: list, findings: list,
+                                  limit: int = 4) -> list:
+    """The few measurements that support the primary finding.
+
+    Section 05 is specified as "only the measurements relevant to the finding",
+    so this cannot simply be the first N rows. Selection is a fixed, inspectable
+    rule over data already present in `measurements` -- no importance score is
+    invented and nothing is re-weighted:
+
+      1. the primary finding's own feature, when it names one
+      2. any other feature a finding cites
+      3. remaining measured values, in their existing table order
+
+    A measurement with no value is never promoted: an absent reading cannot
+    support a claim about the delivery, it can only qualify one.
+    """
+    by_feature = {m.feature: m for m in measurements}
+    picked: list = []
+    seen: set = set()
+
+    def take(feature) -> None:
+        m = by_feature.get(feature)
+        if m is not None and feature not in seen:
+            seen.add(feature)
+            picked.append(m)
+
+    for f in (findings or [])[:1]:
+        if f.feature:
+            take(f.feature)
+    for f in (findings or []):
+        if f.feature:
+            take(f.feature)
+    for m in measurements:
+        if len(picked) >= limit:
+            break
+        if m.value is not None:
+            take(m.feature)
+    return picked[:limit]
+
+
+def summarise_delivery(status: "DeliveryStatus", findings: list,
+                       measurements: list) -> str:
+    """One plain-language sentence about the delivery as a whole.
+
+    Section 02 is the delivery summary and section 03 is the finding, so this
+    must not restate the finding. It counts only what the run actually
+    produced, and returns "" when the trust gate has already said everything
+    there is to say (see the withheld branch in render_delivery_status).
+    """
+    if status.state in ("UNRELIABLE", "SCORING_WITHHELD"):
+        return ""
+    measured = sum(1 for m in measurements if m.value is not None)
+    if not measured:
+        return "No measurement survived the trust checks, so there is nothing to summarise."
+    unit = "value" if measured == 1 else "values"
+    # build_findings never returns an empty list: a delivery that crossed nothing
+    # still gets a positive confirmation finding (severity "positive"). Counting
+    # that as a crossed band would state the opposite of what was measured.
+    crossed = [f for f in (findings or []) if f.severity != "positive"]
+    if not crossed:
+        return (f"All {measured} measured {unit} sat inside the screening bands "
+                f"PaceAI checks against.")
+    n = len(crossed)
+    pattern = "pattern" if n == 1 else "patterns"
+    return f"{measured} {unit} measured. {n} {pattern} fell outside those bands."
 
 
 def _actionable_notes(result) -> list:
@@ -705,60 +811,72 @@ def _html(markup: str):
     st.markdown(markup, unsafe_allow_html=True)
 
 
-def _section(number: str, title: str, sub: str = ""):
+def _section(number: str, title: str, sub: str = "", *, accent: bool = False,
+             first: bool = False) -> None:
+    cls = "pai-sec accent" if accent else "pai-sec"
+    if first:
+        cls += " pai-sec-first"
     _html(
-        f'<div class="pai-root"><div class="pai-sec">'
+        f'<div class="pai-root"><div class="{cls}">'
         f'<p class="pai-sec-title">{esc(number)} · {esc(title)}</p>'
         + (f'<p class="pai-sec-sub">{esc(sub)}</p>' if sub else "")
         + "</div></div>")
 
 
+def _marker(number: str, title: str) -> None:
+    """Section label for use inside a column, where a full section head with
+    its top rule and 66px lead-in would break the composition."""
+    _html(f'<div class="pai-root"><p class="pai-eyebrow accent">'
+          f'{esc(number)} · {esc(title)}</p></div>')
+
+
 def render_delivery_status(status: DeliveryStatus, result=None) -> None:
-    """01 — Can I trust this analysis? Always first."""
+    """01 — Can this be trusted? A quiet line, never an alarm panel."""
     _section("01", "Delivery status",
-             "What the quality of this analysis is, before anything it says is read.")
+             "What the quality of this analysis is, before anything it says is read.",
+             first=True)
 
     cls = {"ok": "ok", "warn": "warn", "danger": "danger"}[status.tone]
-    chips = []
+    marks = []
 
     if status.subject_verified is True:
-        chips.append(("BOWLER CONFIRMED", "ok"))
+        marks.append(("Bowler confirmed", "ok"))
     elif status.subject_verified is False:
-        chips.append(("BOWLER NOT CONFIRMED", "danger"))
+        marks.append(("Bowler not confirmed", "danger"))
     if status.delivery_reliable is True:
-        chips.append(("DELIVERY FOUND", "ok"))
+        marks.append(("Delivery found", "ok"))
     elif status.delivery_reliable is False:
-        chips.append(("DELIVERY NOT FOUND", "danger"))
+        marks.append(("Delivery not found", "danger"))
     if status.completeness == "complete":
-        chips.append(("FULLY MEASURED", "ok"))
+        marks.append(("Fully measured", "ok"))
     elif status.completeness == "partial":
-        chips.append((f"PARTIAL — {status.degraded} DEGRADED", "warn"))
+        marks.append((f"Partial — {status.degraded} degraded", "warn"))
     else:
-        chips.append((f"LIMITED — {status.missing} UNMEASURED", "danger"))
+        marks.append((f"Limited — {status.missing} unmeasured", "danger"))
     if status.low_confidence:
-        chips.append((f"{status.low_confidence} LOW-CONFIDENCE", "warn"))
+        marks.append((f"{status.low_confidence} low-confidence", "warn"))
     if status.ood_features:
-        chips.append(("OUTSIDE MODEL RANGE", "warn"))
+        marks.append(("Outside model range", "warn"))
     if status.bowler_track_id is not None:
         conf = status.bowler_confidence
-        chips.append((f"BOWLER TRACK #{status.bowler_track_id}"
-                      + (f" · {conf:.0%}" if isinstance(conf, (int, float)) else ""), "accent"))
+        marks.append((f"Bowler track #{status.bowler_track_id}"
+                      + (f" · {conf:.0%}" if isinstance(conf, (int, float)) else ""),
+                      "accent"))
 
-    chip_html = "".join(
-        f'<span class="pai-chip {c}">{esc(t)}</span>' for t, c in chips)
+    mark_html = "".join(
+        f'<li class="pai-mark {c}">{esc(t)}</li>' for t, c in marks)
 
     _html(
-        f'<div class="pai-root"><div class="pai-status {cls}" role="status">'
-        f'<p class="pai-status-title">{esc(status.headline)}</p>'
-        f'<p class="pai-status-copy">{esc(status.headline_copy)}</p>'
-        f'<div class="pai-chips">{chip_html}</div>'
-        f"</div></div>")
+        f'<div class="pai-root"><div class="pai-state" role="status">'
+        f'<span class="pai-state-word {cls}">{esc(status.headline)}</span>'
+        f'<p class="pai-state-copy">{esc(status.headline_copy)}</p></div>'
+        f'<ul class="pai-marks">{mark_html}</ul></div>')
 
     if status.blocked_reason:
         _html(
-            '<div class="pai-root"><div class="pai-status danger" role="status">'
-            '<p class="pai-status-title">What was withheld</p>'
-            f'<p class="pai-status-copy">{esc(status.blocked_reason)}</p>'
+            '<div class="pai-root"><div class="pai-withheld">'
+            '<p class="pai-withheld-lab">What was withheld</p>'
+            f'<p class="pai-withheld-val">{esc(status.blocked_reason)}</p>'
             "</div></div>")
 
     for w in status.warnings[:6]:
@@ -768,91 +886,147 @@ def render_delivery_status(status: DeliveryStatus, result=None) -> None:
                    f"Advanced → pipeline notes.")
 
 
-def render_insight_hero(result, status: DeliveryStatus, finding: Optional[Finding]) -> None:
-    """02 — One main finding, why it matters, what to work on."""
+def render_summary(result, status: DeliveryStatus, findings: list,
+                   measurements: list) -> None:
+    """02 — One sentence about the delivery as a whole.
+
+    Deliberately not a restatement of the finding: 02 is the delivery, 03 is
+    the pattern inside it. See `summarise_delivery`.
+    """
     _section("02", "What this delivery tells you")
+    line = summarise_delivery(status, findings, measurements)
+    if line:
+        _html(f'<div class="pai-root"><p class="pai-lede">{esc(line)}</p></div>')
+        return
+    # Withheld or unreliable: 01 has already said why, so do not repeat it.
+    _html('<div class="pai-root"><p class="pai-body">The trust gate above stopped this '
+          'delivery before a conclusion could be drawn, so no summary is offered. '
+          'What was measured is still listed below, labelled by source.</p></div>')
+
+
+def render_primary_finding(result, status: DeliveryStatus,
+                           finding: Optional[Finding], *,
+                           replay_fn=None, replay_path=None,
+                           feature_vector: Optional[dict] = None,
+                           ball_stats: Optional[dict] = None,
+                           strip: Optional[list] = None) -> None:
+    """03 + 04 + 05 — the one hero statement, the video, and its evidence.
+
+    Composition is 68/32: the replay is the dominant object and the reading of
+    it sits in a subordinate rail. On tablet the rail drops beneath the video
+    (see the 1100px breakpoint); on mobile the whole stage recomposes.
+    """
+    _section("03", "Top finding", accent=True)
 
     if finding is None:
-        _html('<div class="pai-root"><div class="pai-hero danger">'
-              '<p class="pai-kicker">No finding was produced</p>'
-              '<p class="pai-hero-main">This delivery was not analysed for technique.</p>'
-              '<div class="pai-hero-row"><div class="pai-hero-cell">'
-              '<p class="pai-hero-lab">Why it matters</p>'
-              '<p class="pai-hero-val">The measurements below are shown so you can see what '
-              'was captured, but they are not a judgement about a bowling action.</p>'
-              "</div></div></div></div>")
+        _html('<div class="pai-root">'
+              '<p class="pai-display tight">Nothing to act on yet.</p>'
+              '<p class="pai-body">This delivery did not produce enough trustworthy '
+              'evidence to raise a finding. Section 01 says why. The measurements '
+              'that were captured are still shown below, each labelled by where it '
+              'came from.</p></div>')
+    else:
+        _html(f'<div class="pai-root">'
+              f'<p class="pai-display">{esc(finding.title)}</p></div>')
+
+    video_col, rail_col = st.columns([68, 32], gap="large")
+
+    with video_col:
+        # 04 and 05 are labelled unconditionally. The hierarchy is fixed at 11
+        # sections: dropping the label when there is no clip would leave the
+        # reader wondering whether evidence was withheld, rather than told.
+        _marker("04", "Analysis replay")
+        if replay_fn is not None and replay_path:
+            replay_fn(replay_path, result, feature_vector or {}, ball_stats or {})
+        else:
+            render_no_replay()
+        _marker("05", "Key measurements")
+        if strip:
+            render_measurement_strip(strip)
+        else:
+            _html('<div class="pai-root"><div class="pai-empty">'
+                  '<p class="pai-empty-title">No measurement to show</p>'
+                  '<p class="pai-empty-copy">Nothing this run produced both carried a '
+                  'value and was relevant to the finding above.</p></div></div>')
+
+    with rail_col:
+        _html('<div class="pai-root"><div class="pai-rail">')
+        if finding is not None:
+            _rail_block("Why it matters", finding.why)
+            if finding.observed:
+                _rail_block("What was measured", finding.observed)
+        notes = _actionable_notes(result)
+        action = (finding.action if finding is not None and finding.action
+                  else (notes[0] if notes else ""))
+        if action:
+            _rail_block("What to work on", action)
+        elif status.state in ("UNRELIABLE", "SCORING_WITHHELD"):
+            _rail_block("What to work on",
+                       "Nothing yet — this delivery has to be re-recorded or the "
+                       "bowler confirmed before a change is worth chasing.")
+        _html("</div></div>")
+
+
+def _rail_block(label: str, value: str) -> None:
+    _html(f'<p class="pai-rail-lab">{esc(label)}</p>'
+          f'<p class="pai-rail-val">{esc(value)}</p>')
+
+
+def render_measurement_strip(strip: list) -> None:
+    """05 — the few measurements that support the finding, number first."""
+    cells = []
+    for m in strip:
+        if m.value is None:
+            val = (f'<p class="pai-strip-val absent">'
+                   f'{esc(m.source_label.split(" —")[0])}</p>')
+        else:
+            val = f'<p class="pai-strip-val">{esc(fmt(m.value, m.unit))}</p>'
+        cells.append(
+            f'<div class="pai-strip-cell">{val}'
+            f'<p class="pai-strip-lab">{esc(m.label)}</p>'
+            f'<p class="pai-strip-src {esc(m.source_class)}">'
+            f'{esc(m.source_label)}</p></div>')
+    _html('<div class="pai-root"><div class="pai-strip">'
+          + "".join(cells) + "</div></div>")
+
+
+def render_remaining_findings(findings: list) -> None:
+    """03 continued — only the findings the hero has not already stated.
+
+    The primary finding is rendered as the display statement in
+    render_primary_finding. Repeating it here as the first row of a list is
+    the duplication the "remove 20%" test is designed to catch.
+    """
+    rest = list(findings or [])[1:]
+    if not rest:
         return
 
-    tone = {"high": "danger", "moderate": "warn",
-            "low": "warn", "positive": "ok"}.get(finding.severity, "accent")
+    _section("03", "Other findings",
+             "The primary finding is stated above. These ranked behind it.")
 
-    notes = _actionable_notes(result)
-    action = finding.action or (notes[0] if notes else "")
-
-    obs_cell = ""
-    if finding.observed:
-        obs_cell = (f'<div class="pai-hero-cell"><p class="pai-hero-lab">What was measured</p>'
-                    f'<p class="pai-hero-val">{esc(finding.observed)}</p></div>')
-
-    _html(
-        f'<div class="pai-root"><div class="pai-hero {tone}">'
-        f'<p class="pai-kicker">Main finding</p>'
-        f'<p class="pai-hero-main">{esc(finding.title)}</p>'
-        f'<div class="pai-hero-row">'
-        f'<div class="pai-hero-cell"><p class="pai-hero-lab">Why it matters</p>'
-        f'<p class="pai-hero-val">{esc(finding.why)}</p></div>'
-        f"{obs_cell}"
-        + (f'<div class="pai-hero-cell"><p class="pai-hero-lab">What to work on</p>'
-           f'<p class="pai-hero-val">{esc(action)}</p></div>' if action else "")
-        + "</div></div></div>")
-
-
-def render_top_findings(findings: list) -> None:
-    """03 — Up to three findings, no filler."""
-    _section("03", "Top findings",
-             "The strongest evidence in this delivery, most significant first.")
-
-    if not findings:
-        _html('<div class="pai-root"><div class="pai-empty">'
-              '<p class="pai-empty-title">Nothing to report</p>'
-              '<p class="pai-empty-copy">This delivery did not produce enough trustworthy '
-              'evidence to raise a finding. See Delivery status for why.</p></div></div>')
-        return
-
-    for f in findings:
+    for f in rest:
         rows = ""
         if f.observed:
-            rows += (f'<div class="pai-ev"><span class="pai-ev-lab">Observed</span>'
-                     f'<span class="pai-ev-val">{esc(f.observed)}</span></div>')
-        rows += (f'<div class="pai-ev"><span class="pai-ev-lab">Why it matters</span>'
-                 f'<span class="pai-ev-val">{esc(f.why)}</span></div>')
+            rows += (f'<div class="pai-row-block">'
+                     f'<p class="pai-row-lab">Observed</p>'
+                     f'<p class="pai-row-val">{esc(f.observed)}</p></div>')
+        rows += (f'<div class="pai-row-block">'
+                 f'<p class="pai-row-lab">Why it matters</p>'
+                 f'<p class="pai-row-val">{esc(f.why)}</p></div>')
         if f.action:
-            rows += (f'<div class="pai-ev"><span class="pai-ev-lab">Action</span>'
-                     f'<span class="pai-ev-val">{esc(f.action)}</span></div>')
+            rows += (f'<div class="pai-row-block">'
+                     f'<p class="pai-row-lab">Action</p>'
+                     f'<p class="pai-row-val">{esc(f.action)}</p></div>')
         _html(
-            f'<div class="pai-root"><div class="pai-finding">'
-            f'<div class="pai-finding-top">'
-            f'<p class="pai-finding-title">{esc(f.title)}</p>'
-            f'<span class="pai-finding-sev {esc(f.severity)}">{esc(f.severity)}</span>'
+            f'<div class="pai-root"><div class="pai-row">'
+            f'<div class="pai-row-top">'
+            f'<p class="pai-row-title">{esc(f.title)}</p>'
+            f'<span class="pai-row-sev {esc(f.severity)}">{esc(f.severity)}</span>'
             f"</div>{rows}</div></div>")
-
-
-def render_replay(replay_fn: Optional[Callable], replay_path, result,
-                  feature_vector: dict, ball_stats: dict) -> None:
-    """04 — Visual centrepiece. Delegates to the existing replay renderer."""
-    _section("04", "Analysis replay",
-             "The evidence behind the findings above. Bowler box, ball track, pose "
-             "skeleton and release marker are burned into this render.")
-    if replay_fn is None:
-        st.caption("Replay is unavailable in this view.")
-        return
-    replay_fn(replay_path, result, feature_vector, ball_stats)
 
 
 def render_no_replay() -> None:
     """04 for entries with no clip behind them. States the absence, never fakes it."""
-    _section("04", "Analysis replay",
-             "The evidence behind the findings above.")
     _html('<div class="pai-root"><div class="pai-empty">'
           '<p class="pai-empty-title">No replay for this entry</p>'
           '<p class="pai-empty-copy">These values were typed in rather than measured '
@@ -861,38 +1035,37 @@ def render_no_replay() -> None:
           "</div></div>")
 
 
-def render_key_measurements(measurements: list) -> None:
-    """05 — Only the measurements, grouped, each with its source type."""
-    _section("05", "Key measurements",
-             "Each value carries where it came from, so a measured angle and a "
-             "placeholder are never confused.")
-    groups = []
+def render_measurement_table(measurements: list) -> None:
+    """Every measurement, grouped, each with its source type.
+
+    The complete table lives in section 10 rather than beside the finding:
+    section 05 shows only what supports the finding, and hiding the rest is not
+    an option (principle 10), so it is disclosed one level down instead.
+    """
+    if not measurements:
+        return
+    blocks = []
     for g in GROUPS:
         items = [m for m in measurements if m.group == g]
-        if items:
-            groups.append((g, items))
-
-    blocks = []
-    for g, items in groups:
+        if not items:
+            continue
         rows = []
         for m in items:
             if m.value is None:
-                val = f'<span class="pai-metric-val absent">{esc(m.source_label.split(" —")[0])}</span>'
+                val = (f'<span class="pai-metric-val absent">'
+                       f'{esc(m.source_label.split(" —")[0])}</span>')
             else:
                 val = f'<span class="pai-metric-val">{esc(fmt(m.value, m.unit))}</span>'
             ctx = f' · {esc(m.context)}' if m.context else ""
             rows.append(
-                f'<div class="pai-metric" title="{esc(m.plain)}">'
-                f'<div class="pai-metric-top">'
-                f'<span class="pai-metric-name">{esc(m.label)}</span>{val}</div>'
-                f'<p class="pai-metric-srcline">'
+                f'<div class="pai-metric">'
+                f'<span class="pai-metric-name">{esc(m.label)}</span>{val}'
+                f'<span class="pai-metric-srcline">'
                 f'<span class="{esc(m.source_class)}">{esc(m.source_label)}</span>'
-                f'{esc(m.source_note)}{ctx}</p></div>')
-        blocks.append(f'<div class="pai-mgroup"><p class="pai-mgroup-name">{esc(g)}</p>'
-                      + "".join(rows) + "</div>")
+                f' · {esc(m.plain)}{esc(m.source_note)}{ctx}</span></div>')
+        blocks.append(f'<p class="pai-mgroup-name">{esc(g)}</p>' + "".join(rows))
 
-    _html(f'<div class="pai-root"><div class="pai-metrics">'
-          + "".join(blocks) + "</div></div>")
+    _html('<div class="pai-root">' + "".join(blocks) + "</div>")
 
 
 def render_evidence_panel(chains: list, status: Optional[DeliveryStatus] = None) -> None:
@@ -914,25 +1087,32 @@ def render_evidence_panel(chains: list, status: Optional[DeliveryStatus] = None)
         return
     for chain in chains:
         steps = "".join(
-            f'<div class="pai-chain"><span class="pai-chain-step">{i + 1}</span>'
+            f'<div class="pai-chain"><span class="pai-chain-n">{i + 1}</span>'
             f'<div class="pai-chain-body"><p class="pai-chain-lab">{esc(lab)}</p>'
             f'<p class="pai-chain-val">{esc(val)}</p></div></div>'
             for i, (lab, val) in enumerate(chain))
-        _html(f'<div class="pai-root"><div class="pai-evidence">{steps}</div></div>')
+        _html(f'<div class="pai-root">{steps}</div>')
 
 
 def render_coaching_plan(result, status: DeliveryStatus) -> None:
-    """07 — Every note the pipeline produced, as an ordered plan."""
-    _section("07", "Coaching plan",
-             "Produced by this run's threshold checks. Nothing here is generic advice.")
+    """07 — Written as a training instruction, not as another analytics panel.
+
+    Each drill is: the change, WHY it was raised (the measured value and the
+    band it crossed), and what to do next session. The WHY is only ever filled
+    from a finding that actually cites the feature, so a drill can never carry
+    a justification the pipeline did not produce.
+    """
+    _section("07", "What to work on",
+             "Each item below was raised by this delivery's own threshold checks. "
+             "Nothing here is generic advice.")
     notes = _actionable_notes(result)
 
     if not notes:
         if status.state in ("UNRELIABLE", "SCORING_WITHHELD"):
             _html('<div class="pai-root"><div class="pai-empty">'
-                  '<p class="pai-empty-title">No coaching plan produced</p>'
-                  '<p class="pai-empty-copy">The pipeline did not generate coaching '
-                  'recommendations for this delivery'
+                  '<p class="pai-empty-title">No drill yet</p>'
+                  '<p class="pai-empty-copy">No coaching recommendation was produced for '
+                  'this delivery'
                   + (" because the bowler could not be confirmed."
                      if status.state == "UNRELIABLE" else ".")
                   + "</p></div></div>")
@@ -944,16 +1124,57 @@ def render_coaching_plan(result, status: DeliveryStatus) -> None:
                   'and compare across sessions.</p></div></div>')
         return
 
-    for i, note in enumerate(notes[:6]):
-        pri = f"p{i + 1}" if i < 2 else ""
+    findings = build_findings(result, status)
+    fv = dict(getattr(result, "feature_vector", None) or {})
+
+    for i, note in enumerate(notes[:4]):
+        why = _why_for_note(note, findings, fv)
+        why_block = ""
+        if why:
+            why_block = (f'<div class="pai-row-block">'
+                         f'<p class="pai-row-lab">Why</p>'
+                         f'<p class="pai-row-val">{esc(why)}</p></div>')
+        first = " pai-drill-first" if i == 0 else ""
         _html(
-            f'<div class="pai-root"><div class="pai-plan">'
-            f'<div class="pai-plan-head">'
-            f'<span class="pai-plan-pri {pri}">Priority {i + 1}</span>'
-            f'<span class="pai-plan-title">{esc(note)}</span>'
-            f"</div></div></div>")
-    if len(notes) > 6:
-        st.caption(f"{len(notes) - 6} further notes are in Advanced → coaching output.")
+            f'<div class="pai-root"><div class="pai-drill{first}">'
+            f'<div class="pai-drill-head">'
+            f'<span class="pai-drill-n">{i + 1:02d}</span>'
+            f'<p class="pai-drill-title">{esc(note)}</p></div>'
+            f"{why_block}"
+            f'<div class="pai-row-block">'
+            f'<p class="pai-row-lab">Next session</p>'
+            f'<p class="pai-row-val">{esc(_next_session(i))}</p></div>'
+            f"</div></div>")
+    if len(notes) > 4:
+        st.caption(f"{len(notes) - 4} further notes are in Advanced → coaching output.")
+
+
+def _why_for_note(note: str, findings: list, fv: dict) -> str:
+    """The measured justification for one coaching note, or "" if there is none.
+
+    A note is only ever explained by a finding that actually fired, so this
+    cannot attach a number that did not contribute to the flag.
+    """
+    for f in findings:
+        if f.feature and _num(fv, f.feature) is not None:
+            label = _META.get(f.feature, {}).get("label", f.feature)
+            unit = _META.get(f.feature, {}).get("unit", "")
+            return (f"Your measured {label.lower()} was "
+                    f"{fmt(_num(fv, f.feature), unit)} on this delivery.")
+    return ""
+
+
+def _next_session(index: int) -> str:
+    """A concrete, repeatable next step. Index only rotates phrasing."""
+    return (
+        "Record 3–5 deliveries from the same camera angle and compare the movement "
+        "against this one.",
+        "Film the same angle again next session, then check whether this value moved.",
+        "Repeat this delivery five times and keep the clip that matches this one most "
+        "closely for side-by-side review.",
+        "Bring one clip of this pattern to your next session and review it against this "
+        "measurement.",
+    )[index % 4]
 
 
 def render_performance_indicator(result, bundle, ml_models=None) -> None:
@@ -996,29 +1217,29 @@ def render_performance_indicator(result, bundle, ml_models=None) -> None:
 
     interval_html = ""
     if interval:
-        interval_html = (f'<p class="pai-small-note">Model uncertainty: 68% of predictions '
+        interval_html = (f'<p class="pai-body">Model uncertainty: 68% of predictions '
                          f'for inputs like this fall between {interval[0]:.0f} and '
                          f'{interval[1]:.0f}. This is a band on the model, not a confidence '
                          f'interval on a physical measurement.</p>')
 
+    tone = "ok" if score >= 80 else ("warn" if score >= 60 else "danger")
     _html(
-        f'<div class="pai-root"><div class="pai-small">'
-        f'<div class="pai-small-grid">'
-        f'<div class="pai-small-cell"><p class="pai-small-lab">Demo score</p>'
-        f'<p class="pai-small-val">{score:.0f}<span style="font-size:.9rem;color:{PAI_MUTED}">'
-        f" / 100</span></p></div>"
-        f'<div class="pai-small-cell"><p class="pai-small-lab">Reading</p>'
-        f'<p class="pai-small-val" style="font-size:.92rem">{esc(band)}</p></div>'
-        f"</div>"
-        f'<p class="pai-small-note">{esc(ctx)}</p>{interval_html}'
+        f'<div class="pai-root"><div class="pai-readout">'
+        f'<div class="pai-readout-head">'
+        f'<p class="pai-eyebrow">Performance indicator</p>'
+        f'<p class="pai-readout-val {tone}">{score:.0f}'
+        f'<span style="font-size:.85rem;color:{PAI_MUTED}"> / 100</span></p></div>'
+        f'<p class="pai-body">{esc(band)}.</p>'
+        f'<p class="pai-body">{esc(ctx)}</p>{interval_html}'
         f"</div></div>")
 
 
 def render_risk_indicators(result, status: DeliveryStatus) -> None:
     """09 — Screening context. Never a diagnosis, never a score when withheld."""
-    _section("09", "Biomechanical risk indicators",
-             "Published screening bands, checked against this delivery's measurements. "
-             "Screening only — not a medical assessment and not an injury prediction.")
+    _section("09", "Risk indicators",
+             "Published screening bands checked against this delivery's measurements. "
+             "These are screening indicators — not a medical assessment, and not an "
+             "injury prediction.")
     clinical = injury_kb.map_from_pipeline_features(
         getattr(result, "feature_vector", None) or {})
     cards = injury_kb.assess_biomechanical_risks(clinical)
@@ -1033,25 +1254,31 @@ def render_risk_indicators(result, status: DeliveryStatus) -> None:
         for c in cards:
             sev = str(c.get("severity", "")).lower()
             tone = "danger" if sev.startswith("high") else "warn"
-            triggers = "".join(
-                f'<div class="pai-ev"><span class="pai-ev-lab">Triggered factor</span>'
-                f'<span class="pai-ev-val">{esc(t)}</span></div>'
-                for t in (c.get("trigger_detected") or []))
-            incidence = (f'<div class="pai-ev"><span class="pai-ev-lab">Reported incidence</span>'
-                         f'<span class="pai-ev-val">{esc(c.get("clinical_incidence"))}</span></div>'
-                         if c.get("clinical_incidence") else "")
-            recovery = (f'<div class="pai-ev"><span class="pai-ev-lab">Recovery context</span>'
-                        f'<span class="pai-ev-val">{esc(c.get("est_recovery_timeline"))}</span></div>'
-                        if c.get("est_recovery_timeline") else "")
-            limitation = ('<div class="pai-ev"><span class="pai-ev-lab">Limitation</span>'
-                          '<span class="pai-ev-val">A screening band, not a diagnosis. '
-                          'Reference values in this build are pending source verification '
-                          '(see CITATION.md).</span></div>')
+            rows = ""
+            for t in (c.get("trigger_detected") or []):
+                rows += (f'<div class="pai-row-block">'
+                         f'<p class="pai-row-lab">Triggered factor</p>'
+                         f'<p class="pai-row-val">{esc(t)}</p></div>')
+            if c.get("clinical_incidence"):
+                rows += (f'<div class="pai-row-block">'
+                         f'<p class="pai-row-lab">Reported incidence</p>'
+                         f'<p class="pai-row-val">{esc(c["clinical_incidence"])}</p></div>')
+            if c.get("est_recovery_timeline"):
+                rows += (f'<div class="pai-row-block">'
+                         f'<p class="pai-row-lab">Recovery context</p>'
+                         f'<p class="pai-row-val">'
+                         f'{esc(c["est_recovery_timeline"])}</p></div>')
+            rows += ('<div class="pai-row-block">'
+                     '<p class="pai-row-lab">Limitation</p>'
+                     '<p class="pai-row-val">A screening band, not a diagnosis. '
+                     'Reference values in this build are pending source verification '
+                     '(see CITATION.md).</p></div>')
             _html(
-                f'<div class="pai-root"><div class="pai-status {tone}">'
-                f'<p class="pai-status-title">{esc(c.get("injury"))}</p>'
-                f'<p class="pai-status-copy">{esc(c.get("anatomical_site"))}</p>'
-                f"{triggers}{incidence}{recovery}{limitation}</div></div>")
+                f'<div class="pai-root"><div class="pai-readout">'
+                f'<div class="pai-readout-head">'
+                f'<p class="pai-eyebrow">{esc(c.get("anatomical_site") or "Screening band")}</p>'
+                f'<p class="pai-readout-val {tone}">{esc(str(c.get("injury") or ""))}</p>'
+                f"</div>{rows}</div></div>")
 
     risk = getattr(result, "injury_risk", None)
     fv = getattr(result, "feature_vector", None) or {}
@@ -1059,36 +1286,35 @@ def render_risk_indicators(result, status: DeliveryStatus) -> None:
     model_block = ""
     if risk is None:
         model_block = (
-            '<p class="pai-kicker" style="margin-top:16px">Model risk indicator</p>'
-            '<p class="pai-empty-copy">No model risk-indicator output was produced for this '
+            '<p class="pai-eyebrow" style="margin-top:26px">Model risk indicator</p>'
+            '<p class="pai-body">No model risk-indicator output was produced for this '
             'delivery, so no risk level or probability is shown. Nothing is inferred in its '
             'place.</p>')
     else:
         level = _risk_level(result) or ""
         tone = "ok" if level == "low" else ("warn" if level == "moderate" else "danger")
         model_block = (
-            f'<p class="pai-kicker" style="margin-top:18px">Model biomechanical risk indicator</p>'
-            f'<div class="pai-status {tone}">'
-            f'<p class="pai-status-title">{esc(level.upper() or "UNAVAILABLE")}</p>'
-            f'<p class="pai-status-copy">Demo model output. Its training labels were derived '
-            f'from the benchmark thresholds, so it largely re-states the screening result '
-            f'above rather than adding independent evidence. It is a screening context '
-            f'indicator, not a diagnosis, and not an injury prediction.</p>'
-            f"</div>")
+            '<p class="pai-eyebrow" style="margin-top:26px">Model risk indicator</p>'
+            f'<p class="pai-readout-val {tone}">{esc(level.upper() or "UNAVAILABLE")}</p>'
+            '<p class="pai-body">Demo model output. Its training labels were derived '
+            'from the benchmark thresholds, so it largely re-states the screening result '
+            'above rather than adding independent evidence. It is a screening context '
+            'indicator, not a diagnosis, and not an injury prediction.</p>')
 
     _html(f'<div class="pai-root">{model_block}</div>')
 
 
 def render_advanced(result, *, perf_bundle=None, injury_bundle=None,
                     status: Optional[DeliveryStatus] = None,
+                    measurements: Optional[list] = None,
                     extra_renderers: Optional[dict] = None) -> None:
     """10 — Everything technical, collapsed."""
     with st.expander("Advanced analysis — full technical detail, diagnostics and export",
                      expanded=False):
         _section("10", "Advanced analysis",
-                 "Model internals, SHAP contributions, the full reference table and "
-                 "run diagnostics. Collapsed by default — none of this is needed to "
-                 "act on the findings above.")
+                 "Model internals, SHAP contributions, the complete measurement table, "
+                 "the reference table and run diagnostics. Collapsed by default — none of "
+                 "this is needed to act on the findings above.")
         extra = extra_renderers or {}
         if extra.get("gauges_and_radar"):
             extra["gauges_and_radar"]()
@@ -1102,6 +1328,11 @@ def render_advanced(result, *, perf_bundle=None, injury_bundle=None,
             extra["timing"]()
         if extra.get("notes"):
             extra["notes"]()
+
+        if measurements:
+            st.markdown("**All measurements** — every value this run captured, with the "
+                        "plain-language meaning of each")
+            render_measurement_table(measurements)
 
         prov = getattr(result, "feature_provenance", None) or {}
         if prov:
@@ -1145,7 +1376,22 @@ def render_result_page(result, *, perf_bundle=None, injury_bundle=None,
                        is_video: bool = False, replay_fn=None,
                        replay_path=None, ball_stats=None,
                        advanced_renderers=None, session_writer=None) -> DeliveryStatus:
-    """Orchestrator for sections 01-11. Returns the computed status."""
+    """Orchestrator for sections 01-11. Returns the computed status.
+
+    Render order is the information priority, not the section numbering:
+
+      first viewport   01 trust gate, 02 delivery summary, 03 the finding as
+                       display type, 04 the replay at 68% with 05's supporting
+                       measurements beneath it, and one action in the rail
+      below that      06 evidence, 07 what to work on, 08 performance,
+                       09 risk indicators
+      last            10 advanced (collapsed), 11 history/export
+
+    The video sits in the first viewport on purpose. It is the only object that
+    lets a bowler verify a claim about their own delivery, and burying it under
+    a stack of panels was the single biggest thing separating this from the
+    composition it was meant to be.
+    """
     _html(RESULT_CSS)
     fv = dict(getattr(result, "feature_vector", None) or {})
     bs = dict(ball_stats or {})
@@ -1154,24 +1400,22 @@ def render_result_page(result, *, perf_bundle=None, injury_bundle=None,
     findings = build_findings(result, status)
     measurements = build_measurements(result, is_video=is_video)
     chains = build_evidence(result, findings, status)
+    strip = build_supporting_measurements(measurements, findings)
 
-    st.markdown("---")
     render_delivery_status(status, result)
-    render_insight_hero(result, status, findings[0] if findings else None)
-    render_top_findings(findings)
-    if is_video or replay_path:
-        render_replay(replay_fn, replay_path, result, fv, bs)
-    else:
-        # The hierarchy stays fixed at 11 sections. Silently dropping the replay
-        # would leave the user wondering whether evidence was withheld.
-        render_no_replay()
-    render_key_measurements(measurements)
+    render_summary(result, status, findings, measurements)
+    render_primary_finding(
+        result, status, findings[0] if findings else None,
+        replay_fn=replay_fn, replay_path=replay_path,
+        feature_vector=fv, ball_stats=bs, strip=strip)
+    render_remaining_findings(findings)
     render_evidence_panel(chains, status)
     render_coaching_plan(result, status)
     render_performance_indicator(result, perf_bundle, _lazy_ml_models())
     render_risk_indicators(result, status)
     render_advanced(result, perf_bundle=perf_bundle, injury_bundle=injury_bundle,
-                    status=status, extra_renderers=advanced_renderers)
+                    status=status, measurements=measurements,
+                    extra_renderers=advanced_renderers)
     render_history_export(result, session_writer)
     return status
 
